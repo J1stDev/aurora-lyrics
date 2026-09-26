@@ -12,7 +12,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 
 - 🎤 **Word-by-word lyrics** from Apple Music, Musixmatch, NetEase and more. Each word lights up as it's sung.
 - 🌌 **Looks gorgeous**: the album art drifts behind the lyrics, lines glide in with a soft spring, and the current line glows.
-- 🎨 **Make it yours**: 7 layouts, 7 one-click themes, 10 line motions, 11 word animations, fonts, colours and your own accent colour.
+- 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 10 line motions, 11 word animations, fonts, colours and your own accent colour.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
 - 📸 **Share** your favourite lines as a ready-to-post image.
@@ -78,9 +78,9 @@ With the mouse:
 ### Layouts and themes
 
 - **Layouts** (*Look → Layout*): Split, Mirrored, Poster, Vinyl (a spinning record), Stage, Captions, and Lyrics only.
-- **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back.
+- **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge, Retro (amber terminal), Synthwave, Concert, Zen, Sunset and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back.
 - **Accent colour**: taken from the album cover, or pick your own.
-- Six fonts, four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient or solid).
+- Eight fonts (including Mono and Condensed), four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient or solid).
 
 ### Mini lyrics
 

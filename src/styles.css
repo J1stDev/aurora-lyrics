@@ -360,61 +360,87 @@
 }
 
 /* Focus: upcoming words wait slightly out of focus and sharpen as they're sung, like a
-   camera pulling focus. (filter also carries the glow, so both are set here.) */
+   camera pulling focus. The next line is pre-blurred by the same amount, so nothing jumps
+   when it becomes the active line. (filter also carries the glow, so both are set here.) */
 .aur-root[data-words="on"][data-wordanim="focus"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
-	--lit: clamp(0, var(--e) * 2.5, 1);
+	--lit: clamp(0, var(--e) * 2.2, 1);
 	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
-	transform: translateY(calc(0.03em - var(--lit) * 0.05em)) scale(calc(0.97 + 0.03 * var(--lit)));
-	filter: blur(calc((1 - var(--lit)) * 0.055em))
+	transform: translateY(calc(0.03em - var(--lit) * 0.05em)) scale(calc(0.965 + 0.035 * var(--lit)));
+	filter: blur(calc((1 - var(--lit)) * 0.045em))
 		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--lit) * var(--aur-glow-k)), transparent));
 }
+.aur-root[data-words="on"][data-wordanim="focus"] .aur-stage[data-mode="synced"] .aur-line.has-words:not(.is-active)[data-d="1"] .aur-main { filter: blur(0.045em); }
 
-/* Bounce: each word hops as it starts and lands with a small second bounce. */
+/* Bounce: each word hops as it starts (stretching as it rises), squashes as it lands, and
+   rebounds once, a little. Everything is a function of the word's own progress. */
 .aur-root[data-words="on"][data-wordanim="bounce"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
 	--lit: clamp(0, var(--e) * 4, 1);
-	--t: clamp(0, var(--p) * 2, 1); /* the bounce plays over the first half of the word */
-	--h1: sin(calc(clamp(0, var(--t) / 0.62, 1) * 3.14159));
-	--h2: sin(calc(clamp(0, (var(--t) - 0.62) / 0.38, 1) * 3.14159));
+	--t: clamp(0, var(--p) * 1.8, 1); /* the bounce plays over the first ~55% of the word */
+	--h1: sin(calc(clamp(0, var(--t) / 0.6, 1) * 3.14159)); /* main hop */
+	--sq: sin(calc(clamp(0, (var(--t) - 0.52) / 0.2, 1) * 3.14159)); /* landing squash */
+	--h2: sin(calc(clamp(0, (var(--t) - 0.66) / 0.34, 1) * 3.14159)); /* small rebound */
 	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
 	transform-origin: 50% 100%;
-	transform: translateY(calc(0.02em - var(--h1) * 0.2em - var(--h2) * 0.06em)) scale(calc(1 + 0.05 * var(--h1)), calc(1 + 0.04 * var(--h1)));
+	transform: translateY(calc(0.02em - var(--h1) * 0.22em - var(--h2) * 0.05em))
+		scale(calc(1 - 0.03 * var(--h1) + 0.07 * var(--sq)), calc(1 + 0.07 * var(--h1) - 0.09 * var(--sq)));
 }
 
-/* Neon: the word flickers on in the accent colour with a coloured glow, then stays lit. */
+/* Neon: unlit words are faint glass tubes (a thin coloured outline); each word flickers on in
+   the accent colour with a coloured glow, then stays lit. */
 .aur-root[data-words="on"][data-wordanim="neon"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
 	--lit: clamp(0, var(--e) * 5, 1);
 	--neon: color-mix(in oklab, var(--aur-accent) 70%, #fff);
 	--gk: max(var(--aur-glow-k), 0.7); /* this style is about glow, so keep some even with Glow off */
-	color: color-mix(in srgb, var(--neon) calc(var(--lit) * 100%), var(--aur-dim));
+	color: color-mix(in srgb, var(--neon) calc(var(--lit) * 100%), color-mix(in srgb, var(--aur-hi) 22%, transparent));
+	-webkit-text-stroke: 0.014em color-mix(in oklab, var(--neon) calc((1 - var(--lit)) * 50%), transparent);
 	transform: none;
 	filter:
 		drop-shadow(0 0 0.05em color-mix(in srgb, #fff calc(38% * var(--lit) * var(--gk)), transparent))
 		drop-shadow(0 0 0.32em color-mix(in oklab, var(--neon) calc(75% * var(--lit) * var(--gk)), transparent));
 }
-.aur-root[data-words="on"][data-wordanim="neon"] .is-active .aur-w.now { animation: aur-neon-on 0.42s linear; }
+.aur-root[data-words="on"][data-wordanim="neon"] .is-active .aur-w.now { animation: aur-neon-on 0.5s linear; }
 @keyframes aur-neon-on {
-	0% { opacity: 0.35; }
-	18% { opacity: 1; }
-	28% { opacity: 0.55; }
-	42%, 100% { opacity: 1; }
+	0% { opacity: 0.3; }
+	8% { opacity: 1; }
+	14% { opacity: 0.45; }
+	22% { opacity: 1; }
+	30% { opacity: 0.75; }
+	38%, 100% { opacity: 1; }
 }
 
-/* Typewriter: every word is split into letters; each letter snaps in as it's reached
-   (upcoming letters are only faintly visible). */
-.aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c { --wave: 1.1; }
+/* Typewriter: every word is split into letters; each letter snaps in as it's reached, with
+   a caret on the letter being typed (upcoming letters are only faintly visible). */
+.aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c { --wave: 1.1; position: relative; }
 .aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
-	--lit: clamp(0, var(--p) * 4, 1);
+	--lit: clamp(0, var(--p) * 3.5, 1);
 	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), color-mix(in srgb, var(--aur-hi) 16%, transparent));
 	transform: translateY(calc((1 - var(--lit)) * 0.1em)) scale(calc(0.92 + 0.08 * var(--lit)));
 }
+.aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c::after {
+	content: "";
+	position: absolute;
+	top: 0.14em;
+	bottom: 0.1em;
+	right: -0.05em;
+	width: 0.07em;
+	border-radius: 0.04em;
+	background: var(--aur-hi);
+	opacity: clamp(0, var(--p) * (1 - var(--p)) * 8, 1); /* only while this letter is being typed */
+}
 
-/* Shimmer: a sweep whose leading edge is a bright band of light; sung text settles into a
-   soft accent-tinted white. */
+/* Shimmer: a sweep whose leading edge is a soft band of light; sung text settles into a
+   gentle accent-tinted white. */
 .aur-root[data-words="on"][data-wordanim="shimmer"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
-	--x: calc(var(--p) * (100% + 0.9em));
+	--x: calc(var(--p) * (100% + 1.2em));
 	--sung: color-mix(in oklab, var(--aur-hi) 74%, var(--aur-accent));
 	color: transparent;
-	background-image: linear-gradient(90deg, var(--sung) calc(var(--x) - 0.9em), #fff calc(var(--x) - 0.35em), var(--aur-dim) var(--x));
+	background-image: linear-gradient(
+		90deg,
+		var(--sung) calc(var(--x) - 1.2em),
+		#fff calc(var(--x) - 0.55em),
+		color-mix(in oklab, #fff 50%, var(--aur-dim)) calc(var(--x) - 0.25em),
+		var(--aur-dim) var(--x)
+	);
 	-webkit-background-clip: text;
 	background-clip: text;
 }
@@ -632,22 +658,30 @@
 .aur-root[data-anim="cinematic"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(calc(-50% - 0.45em)) scale(1.03); }
 .aur-root[data-anim="cinematic"] .aur-stage[data-mode="synced"] .aur-line.is-active { filter: none; transform: translateY(-50%) scale(1.05); transition-delay: 0s, 0.14s, 0.14s, 0s, 0s; }
 
-/* ---- Spring (list): Flow with a livelier overshoot and a wider stagger. */
-.aur-root[data-anim="spring"] { --aur-stagger: 48ms; --aur-move: 1.25s; --aur-move-ease: cubic-bezier(0.34, 1.75, 0.5, 1); }
-.aur-root[data-anim="spring"] .aur-line { --aur-s: 0.94; }
+/* ---- Spring (list): Flow with a livelier overshoot and a wider stagger; the new line lands
+   with a small springy settle. */
+.aur-root[data-anim="spring"] { --aur-stagger: 42ms; --aur-move: 1.15s; --aur-move-ease: cubic-bezier(0.3, 1.55, 0.5, 1); }
+.aur-root[data-anim="spring"] .aur-line { --aur-s: 0.95; }
 .aur-root[data-anim="spring"] .aur-line.is-active { --aur-s: 1.02; }
+.aur-root[data-anim="spring"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main {
+	transform-origin: var(--aur-origin) 60%;
+	animation: aur-spring-settle 0.75s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes aur-spring-settle { from { transform: translateY(0.08em) scale(0.97); } }
 
 /* ---- Wheel (list): lines sit on a turning drum. Each line tilts away by its distance from
-   the active one (--dd = signed distance, --ad = |distance|) and is pulled slightly towards
-   the centre, like the rows of an iOS picker. */
-.aur-root[data-anim="wheel"] { --aur-stagger: 10ms; --aur-move: 0.9s; }
+   the active one (--dd = signed distance, --ad = |distance|), is pulled towards the centre
+   and fades with distance, like the rows of an iOS picker. */
+.aur-root[data-anim="wheel"] { --aur-stagger: 0ms; --aur-move: 0.95s; --aur-move-ease: cubic-bezier(0.25, 1.12, 0.4, 1); }
 .aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line {
 	transform: perspective(700px) translate3d(0, calc(var(--aur-y, 0px) - var(--dd, 0) * var(--ad, 0) * 0.1em), 0) rotateX(calc(var(--dd, 0) * -21deg)) scale(calc(var(--aur-s) - var(--ad, 0) * 0.03));
 	transform-origin: 50% 50%; /* vanishing point in the middle of the line, like a real drum */
 	backface-visibility: hidden;
 }
 .aur-root[data-anim="wheel"] .aur-line { --aur-s: 1; }
-.aur-root[data-anim="wheel"] .aur-line:not([data-d]) { opacity: 0; }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.62 - var(--ad, 0) * 0.12); }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; }
 .aur-line[data-d="-6"] { --dd: -6; --ad: 6; }
 .aur-line[data-d="-5"] { --dd: -5; --ad: 5; }
 .aur-line[data-d="-4"] { --dd: -4; --ad: 4; }
@@ -661,27 +695,72 @@
 .aur-line[data-d="5"] { --dd: 5; --ad: 5; }
 .aur-line[data-d="6"] { --dd: 6; --ad: 6; }
 
-/* ---- Swipe (stack): one line at a time; the old line slides off to the left as the new one
-   slides in from the right. */
-.aur-root[data-anim="swipe"] .aur-line { transition-duration: 0.45s, 0.75s, 0.6s, 0.5s, 0.6s; }
-.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line { transform: translate(14%, -50%); }
-.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translate(-14%, -50%); }
-.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line.is-active { transform: translate(0, -50%); transition-delay: 0s, 0.06s, 0.06s, 0s, 0s; }
-.aur-root[data-depth="on"][data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d] { filter: blur(6px); }
+/* The three one-line styles below set timing per state, so each move uses the timing of the
+   state it's going to: the old line leaves quickly, the new one arrives slowly and a beat
+   later. Transition order: opacity, transform, filter, color, text-shadow. */
 
-/* ---- Zoom (stack): sung lines fly past the viewer; the next line arrives from far away. */
-.aur-root[data-anim="zoom"] .aur-line { transition-duration: 0.5s, 0.9s, 0.7s, 0.5s, 0.7s; }
-.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line { transform: translateY(-50%) scale(0.6); }
-.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(-50%) scale(1.45); }
-.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line[data-d] { filter: blur(10px); }
-.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line.is-active { filter: none; transform: translateY(-50%) scale(1); transition-delay: 0s, 0.08s, 0.08s, 0s, 0s; }
+/* ---- Swipe (stack): the old line slides off to the left as the new one glides in from the
+   right. Distances are in em, so short and long lines travel the same way. */
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: translate(1.6em, -50%) scale(0.98);
+	transition-duration: 0.5s, 0.8s, 0.6s, 0.5s, 0.6s;
+	transition-timing-function: ease, cubic-bezier(0.22, 1, 0.36, 1), ease, ease, ease;
+}
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
+	transform: translate(-1.6em, -50%) scale(0.98);
+	transition-duration: 0.3s, 0.55s, 0.4s, 0.3s, 0.3s;
+	transition-timing-function: ease-in, cubic-bezier(0.55, 0, 0.8, 0.4), ease, ease, ease;
+	transition-delay: 0s;
+}
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line.is-active {
+	transform: translate(0, -50%) scale(1);
+	transition-duration: 0.55s, 0.9s, 0.6s, 0.5s, 0.6s;
+	transition-delay: 0.1s, 0.08s, 0.1s, 0s, 0s;
+}
+.aur-root[data-depth="on"][data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d]:not(.is-active) { filter: blur(5px); }
 
-/* ---- Flip (stack): a split-flap board; the old line flips up and away, the new one flips
-   down into place. */
-.aur-root[data-anim="flip"] .aur-line { transition-duration: 0.35s, 0.7s, 0.5s, 0.5s, 0.5s; --aur-move-ease: cubic-bezier(0.34, 1.4, 0.64, 1); }
-.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line { transform: translateY(-50%) perspective(800px) rotateX(-85deg); backface-visibility: hidden; }
-.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(-50%) perspective(800px) rotateX(85deg); }
-.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line.is-active { transform: translateY(-50%) perspective(800px) rotateX(0deg); transition-delay: 0s, 0.1s, 0.1s, 0s, 0s; }
+/* ---- Zoom (stack): sung lines rush past the viewer; the next line arrives from far away,
+   coming into focus as it settles. */
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: translateY(-50%) scale(0.72);
+	filter: blur(8px);
+	transition-duration: 0.5s, 0.9s, 0.7s, 0.5s, 0.6s;
+}
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
+	transform: translateY(-50%) scale(1.32);
+	filter: blur(12px);
+	transition-duration: 0.35s, 0.6s, 0.45s, 0.3s, 0.3s;
+	transition-timing-function: ease-in, cubic-bezier(0.4, 0, 1, 1), ease-in, ease, ease;
+	transition-delay: 0s;
+}
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line.is-active {
+	transform: translateY(-50%) scale(1);
+	filter: none;
+	transition-duration: 0.6s, 1s, 0.8s, 0.5s, 0.6s;
+	transition-timing-function: ease, cubic-bezier(0.16, 1, 0.3, 1), ease-out, ease, ease;
+	transition-delay: 0.1s, 0.1s, 0.1s, 0s, 0s;
+}
+
+/* ---- Flip (stack): a split-flap board. Lines hang from a hinge along their top edge: the
+   new line swings down into place with a small bounce, the old one folds up and away. */
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line {
+	transform-origin: 50% 0%;
+	transform: translateY(-50%) perspective(900px) rotateX(-92deg);
+	backface-visibility: hidden;
+	transition-duration: 0.4s, 0.8s, 0.5s, 0.5s, 0.5s;
+}
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
+	transform: translateY(-50%) perspective(900px) rotateX(80deg);
+	transition-duration: 0.25s, 0.5s, 0.3s, 0.3s, 0.3s;
+	transition-timing-function: ease-in, cubic-bezier(0.5, 0, 0.9, 0.5), ease, ease, ease;
+	transition-delay: 0s;
+}
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line.is-active {
+	transform: translateY(-50%) perspective(900px) rotateX(0deg);
+	transition-duration: 0.35s, 0.85s, 0.5s, 0.5s, 0.5s;
+	transition-timing-function: ease-out, cubic-bezier(0.2, 1.35, 0.35, 1), ease, ease, ease;
+	transition-delay: 0.12s, 0.12s, 0s, 0s, 0s;
+}
 
 /* ============================================================== context off */
 

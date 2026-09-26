@@ -19,6 +19,8 @@ export const FONTS = {
 	inter: { label: "Inter", web: "Inter:wght@500;700;800;900", stack: '"Inter", "Segoe UI Variable Display", system-ui, sans-serif' },
 	outfit: { label: "Outfit", web: "Outfit:wght@500;700;800;900", stack: '"Outfit", "Segoe UI Variable Display", system-ui, sans-serif' },
 	rounded: { label: "Rounded", web: "Nunito:wght@500;700;800;900", stack: '"SF Pro Rounded", ui-rounded, "Nunito", "Segoe UI Variable Display", system-ui, sans-serif' },
+	mono: { label: "Mono", web: "JetBrains+Mono:wght@500;700;800", stack: '"JetBrains Mono", "Cascadia Code", Consolas, ui-monospace, monospace' },
+	condensed: { label: "Condensed", web: "Oswald:wght@500;600;700", stack: '"Oswald", "Bahnschrift SemiCondensed", "Arial Narrow", sans-serif' },
 	serif: { label: "Serif", web: "Playfair+Display:wght@500;700;800;900", stack: '"Playfair Display", "Iowan Old Style", "Palatino Linotype", Georgia, serif' },
 };
 
@@ -192,6 +194,11 @@ export const THEMES = [
 	{ id: "karaoke", label: "Karaoke", hint: "Big centred captions", swatch: ["#ffb13d", "#8a1f5c"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", animation: "fade", wordAnim: "karaoke" } },
 	{ id: "cinema", label: "Cinema", hint: "One line, serif", swatch: ["#3a3226", "#0b0a08"], values: { view: "lyrics", font: "serif", fontWeight: "700", textAlign: "center", animation: "cinematic", wordAnim: "rise", bgOpacity: 0.65 } },
 	{ id: "lounge", label: "Lounge", hint: "Spinning vinyl", swatch: ["#c0703a", "#2b1408"], values: { view: "vinyl", font: "serif", fontWeight: "700", animation: "flow", wordAnim: "letters" } },
+	{ id: "retro", label: "Retro", hint: "Amber terminal", swatch: ["#ffb000", "#1a1204"], values: { view: "lyrics", font: "mono", fontWeight: "700", textColor: "accent", accent: "#ffb000", animation: "flip", wordAnim: "typewriter", depthBlur: false, bgStyle: "solid" } },
+	{ id: "synthwave", label: "Synthwave", hint: "Retro-future neon", swatch: ["#ff4fd8", "#1b0b3a"], values: { view: "stage", font: "outfit", fontWeight: "900", textAlign: "center", textColor: "accent", accent: "#ff4fd8", glow: "radiant", animation: "wheel", wordAnim: "neon", bgStyle: "gradient", bgOpacity: 0.3 } },
+	{ id: "concert", label: "Concert", hint: "Big, bold, live", swatch: ["#ffd23f", "#3a0f0f"], values: { view: "stage", font: "condensed", fontWeight: "700", textAlign: "center", glow: "radiant", animation: "zoom", wordAnim: "bounce", bgOpacity: 0.3 } },
+	{ id: "zen", label: "Zen", hint: "Soft and slow", swatch: ["#9fd8b8", "#10231c"], values: { view: "lyrics", font: "serif", fontWeight: "500", textAlign: "center", accent: "#9fd8b8", animation: "fade", wordAnim: "focus", bgStyle: "gradient", bgOpacity: 0.55 } },
+	{ id: "sunset", label: "Sunset", hint: "Warm shimmer", swatch: ["#ff8a4c", "#3a0e2e"], values: { font: "inter", textColor: "accent", accent: "#ff8a4c", animation: "spring", wordAnim: "shimmer", bgStyle: "gradient", bgOpacity: 0.4 } },
 	{ id: "midnight", label: "Midnight", hint: "Cool blue", swatch: ["#7aa2ff", "#0b1330"], values: { font: "inter", textColor: "accent", accent: "#7aa2ff", bgStyle: "gradient", bgOpacity: 0.6 } },
 ];
 
