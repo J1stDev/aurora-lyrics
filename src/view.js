@@ -25,6 +25,8 @@ const BROWSE_RESUME = 3000; // synced: return to the current line after browsing
 const LEAVE_MS = 220; // fade-out before content is swapped (keep in sync with styles.css)
 const ENTER_MS = 1600; // how long the entrance animation class stays on
 const LONG_WORD_MS = 900; // words held at least this long get a letter-by-letter sweep + swell
+// Word animations that work on single letters, so every word is split into letters.
+const SPLIT_WORD_ANIMS = new Set(["letters", "typewriter"]);
 const WORD_LEAD_MS = 40; // highlight words slightly early to cover render latency
 
 export class LyricsView {
@@ -163,7 +165,7 @@ export class LyricsView {
 		this.stage.scrollTop = 0;
 		this.scrollPos = 0;
 
-		const letters = this.wordAnim === "letters";
+		const letters = SPLIT_WORD_ANIMS.has(this.wordAnim);
 		/**
 		 * Append word spans for `words` to `container`; returns [{ w, span }].
 		 * Pieces with no whitespace between them (syllables of one word) share one
@@ -288,7 +290,7 @@ export class LyricsView {
 			this.stopBrowsing(true);
 		}
 		// These change the DOM structure, so re-render in place (no swap animation).
-		const rebuild = (wordAnim != null && (wordAnim === "letters") !== (this.wordAnim === "letters")) || (showBg != null && showBg !== this.showBg);
+		const rebuild = (wordAnim != null && SPLIT_WORD_ANIMS.has(wordAnim) !== SPLIT_WORD_ANIMS.has(this.wordAnim)) || (showBg != null && showBg !== this.showBg);
 		if (wordAnim != null) this.wordAnim = wordAnim;
 		if (showBg != null) this.showBg = showBg;
 		if (rebuild && this.lyrics && !this.frozen) this.render(this.lyrics);

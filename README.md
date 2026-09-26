@@ -12,7 +12,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 
 - 🎤 **Word-by-word lyrics** from Apple Music, Musixmatch, NetEase and more. Each word lights up as it's sung.
 - 🌌 **Looks gorgeous**: the album art drifts behind the lyrics, lines glide in with a soft spring, and the current line glows.
-- 🎨 **Make it yours**: 7 layouts, 7 one-click themes, 6 word animations, fonts, colours and your own accent colour.
+- 🎨 **Make it yours**: 7 layouts, 7 one-click themes, 10 line motions, 11 word animations, fonts, colours and your own accent colour.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
 - 📸 **Share** your favourite lines as a ready-to-post image.
@@ -66,7 +66,8 @@ With the mouse:
 
 ### Lyrics that follow the music
 
-- Words fill in as they're sung. Choose from **Fill**, **Glow**, **Pop**, **Rise**, **Letters** and **Karaoke**.
+- Words light up as they're sung, in 11 styles: **Fill**, **Glow**, **Pop**, **Rise**, **Letters**, **Karaoke**, **Focus** (blur to sharp), **Bounce**, **Neon** (flickers on in colour), **Typewriter** and **Shimmer** (a band of light sweeps through).
+- Lines move in 10 styles (*Motion → Style*): **Flow**, **Slide**, **Scale**, **Spring** and **Wheel** (a 3D drum) scroll the whole song; **Fade**, **Cinematic**, **Swipe**, **Zoom** and **Flip** (split-flap) show one line at a time.
 - Background vocals appear as a smaller line under the main one.
 - In **duets**, each singer gets their own colour and side.
 - Instrumental breaks show three dots that fill up until the singing starts again.

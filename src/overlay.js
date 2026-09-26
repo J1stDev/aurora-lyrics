@@ -17,6 +17,8 @@ const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.cs
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
 const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
+// Motion styles that stack lines at the centre (one line in focus) instead of a scrolling list.
+const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip"]);
 const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {
@@ -364,7 +366,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (all.accent === "album") st.removeProperty("--aur-user-accent");
 		else st.setProperty("--aur-user-accent", all.accent);
 
-		const layout = all.animation === "fade" || all.animation === "cinematic" ? "stack" : "list";
+		const layout = STACK_ANIMS.has(all.animation) ? "stack" : "list";
 		const reduced = reducedMotion(all);
 		Object.assign(root.dataset, {
 			anim: all.animation,

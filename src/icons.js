@@ -86,6 +86,24 @@ export const STYLE_ART = {
 	letters: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="6" y="17" width="6" height="8" rx="2"/><rect x="14" y="13" width="6" height="8" rx="2"/><rect x="22" y="11" width="6" height="8" rx="2"/><rect x="30" y="14" width="6" height="8" rx="2" opacity=".7"/><rect x="38" y="17" width="6" height="8" rx="2" opacity=".35"/><rect x="46" y="17" width="6" height="8" rx="2" opacity=".35"/></svg>`,
 };
 
+// New motion styles
+Object.assign(STYLE_ART, {
+	spring: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="6" y="4" width="34" height="4" rx="2" opacity=".25" transform="translate(0 -2)"/><rect x="6" y="15" width="44" height="6" rx="3" transform="translate(0 -1)"/><rect x="6" y="27" width="30" height="4" rx="2" opacity=".35" transform="translate(3 2)"/><rect x="6" y="35" width="24" height="3" rx="1.5" opacity=".15" transform="translate(7 2)"/></svg>`,
+	wheel: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="12" y="4" width="30" height="2.5" rx="1.25" opacity=".2"/><rect x="8" y="10" width="38" height="4" rx="2" opacity=".4"/><rect x="5" y="17" width="48" height="6" rx="3"/><rect x="8" y="26" width="36" height="4" rx="2" opacity=".4"/><rect x="12" y="33.5" width="28" height="2.5" rx="1.25" opacity=".2"/></svg>`,
+	swipe: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="-6" y="18" width="14" height="5" rx="2.5" opacity=".2"/><rect x="12" y="17" width="36" height="6" rx="3"/><rect x="52" y="18" width="14" height="5" rx="2.5" opacity=".2"/><path d="M40 31h10m-3-3 3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".5"/></svg>`,
+	zoom: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="2" y="13" width="56" height="14" rx="7" opacity=".12"/><rect x="11" y="17" width="38" height="6" rx="3"/><rect x="22" y="25.5" width="16" height="2.5" rx="1.25" opacity=".3"/></svg>`,
+	flip: `<svg viewBox="0 0 60 40" aria-hidden="true"><path d="M10 9h40l-4 8H14z" opacity=".3"/><rect x="8" y="19" width="44" height="7" rx="3"/><rect x="8" y="22.2" width="44" height=".8" fill="#000" opacity=".35"/></svg>`,
+});
+
+// New word animations (three "words", the middle one being sung)
+Object.assign(STYLE_ART, {
+	focus: `<svg viewBox="0 0 60 40" aria-hidden="true"><defs><filter id="sa-blur"><feGaussianBlur stdDeviation="1.4"/></filter></defs><rect x="4" y="16" width="14" height="8" rx="4"/><rect x="21" y="16" width="18" height="8" rx="4" opacity=".8"/><rect x="42" y="16" width="14" height="8" rx="4" opacity=".4" filter="url(#sa-blur)"/></svg>`,
+	bounce: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="4" y="19" width="14" height="8" rx="4"/><rect x="21" y="9" width="18" height="8" rx="4"/><path d="M25 22q5 4 10 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".4"/><rect x="42" y="19" width="14" height="8" rx="4" opacity=".3"/></svg>`,
+	neon: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="17" y="12" width="26" height="16" rx="8" opacity=".14"/><rect x="4" y="16" width="14" height="8" rx="4" opacity=".75"/><rect x="21" y="16" width="18" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><rect x="42" y="16" width="14" height="8" rx="4" opacity=".3"/></svg>`,
+	typewriter: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="6" y="16" width="6" height="8" rx="1.5"/><rect x="14" y="16" width="6" height="8" rx="1.5"/><rect x="22" y="16" width="6" height="8" rx="1.5"/><rect x="30" y="14" width="1.6" height="12" rx=".8"/><rect x="34" y="16" width="6" height="8" rx="1.5" opacity=".2"/><rect x="42" y="16" width="6" height="8" rx="1.5" opacity=".2"/></svg>`,
+	shimmer: `<svg viewBox="0 0 60 40" aria-hidden="true"><defs><linearGradient id="sa-sh" x1="0" x2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".75"/><stop offset=".62" stop-color="currentColor"/><stop offset=".72" stop-color="currentColor" stop-opacity=".3"/></linearGradient></defs><rect x="4" y="16" width="52" height="8" rx="4" fill="url(#sa-sh)"/><rect x="33" y="11" width="4" height="18" rx="2" opacity=".25"/></svg>`,
+});
+
 // Layout cards
 Object.assign(STYLE_ART, {
 	split: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="5" y="9" width="20" height="20" rx="3"/><rect x="31" y="11" width="24" height="3.5" rx="1.75" opacity=".35"/><rect x="31" y="18" width="22" height="4.5" rx="2.25"/><rect x="31" y="26" width="18" height="3.5" rx="1.75" opacity=".35"/></svg>`,

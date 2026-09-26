@@ -350,13 +350,73 @@
 }
 
 /* Long-held notes (any style except Karaoke): letters rise in a wave and the word swells. */
-.aur-root[data-words="on"]:not([data-wordanim="karaoke"]):not([data-wordanim="letters"]) .is-active .aur-w.is-long .aur-c {
+.aur-root[data-words="on"]:not([data-wordanim="karaoke"]):not([data-wordanim="letters"]):not([data-wordanim="typewriter"]) .is-active .aur-w.is-long .aur-c {
 	transform: translateY(calc(0.03em - var(--e) * 0.075em - 0.08em * var(--hop))) scale(calc(1 + 0.05 * var(--hop)));
 }
 .aur-root[data-words="on"] .is-active .aur-w.is-long.now .aur-c {
 	filter:
 		drop-shadow(0 0 0.05em color-mix(in srgb, #fff calc((20% + 30% * var(--hop)) * var(--aur-glow-k)), transparent))
 		drop-shadow(0 0 calc(0.22em + 0.25em * var(--hop)) color-mix(in oklab, var(--aur-glow-tint) calc((30% + 35% * var(--hop)) * var(--aur-glow-k)), transparent));
+}
+
+/* Focus: upcoming words wait slightly out of focus and sharpen as they're sung, like a
+   camera pulling focus. (filter also carries the glow, so both are set here.) */
+.aur-root[data-words="on"][data-wordanim="focus"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 2.5, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+	transform: translateY(calc(0.03em - var(--lit) * 0.05em)) scale(calc(0.97 + 0.03 * var(--lit)));
+	filter: blur(calc((1 - var(--lit)) * 0.055em))
+		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--lit) * var(--aur-glow-k)), transparent));
+}
+
+/* Bounce: each word hops as it starts and lands with a small second bounce. */
+.aur-root[data-words="on"][data-wordanim="bounce"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 4, 1);
+	--t: clamp(0, var(--p) * 2, 1); /* the bounce plays over the first half of the word */
+	--h1: sin(calc(clamp(0, var(--t) / 0.62, 1) * 3.14159));
+	--h2: sin(calc(clamp(0, (var(--t) - 0.62) / 0.38, 1) * 3.14159));
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+	transform-origin: 50% 100%;
+	transform: translateY(calc(0.02em - var(--h1) * 0.2em - var(--h2) * 0.06em)) scale(calc(1 + 0.05 * var(--h1)), calc(1 + 0.04 * var(--h1)));
+}
+
+/* Neon: the word flickers on in the accent colour with a coloured glow, then stays lit. */
+.aur-root[data-words="on"][data-wordanim="neon"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 5, 1);
+	--neon: color-mix(in oklab, var(--aur-accent) 70%, #fff);
+	--gk: max(var(--aur-glow-k), 0.7); /* this style is about glow, so keep some even with Glow off */
+	color: color-mix(in srgb, var(--neon) calc(var(--lit) * 100%), var(--aur-dim));
+	transform: none;
+	filter:
+		drop-shadow(0 0 0.05em color-mix(in srgb, #fff calc(38% * var(--lit) * var(--gk)), transparent))
+		drop-shadow(0 0 0.32em color-mix(in oklab, var(--neon) calc(75% * var(--lit) * var(--gk)), transparent));
+}
+.aur-root[data-words="on"][data-wordanim="neon"] .is-active .aur-w.now { animation: aur-neon-on 0.42s linear; }
+@keyframes aur-neon-on {
+	0% { opacity: 0.35; }
+	18% { opacity: 1; }
+	28% { opacity: 0.55; }
+	42%, 100% { opacity: 1; }
+}
+
+/* Typewriter: every word is split into letters; each letter snaps in as it's reached
+   (upcoming letters are only faintly visible). */
+.aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c { --wave: 1.1; }
+.aur-root[data-words="on"][data-wordanim="typewriter"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--p) * 4, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), color-mix(in srgb, var(--aur-hi) 16%, transparent));
+	transform: translateY(calc((1 - var(--lit)) * 0.1em)) scale(calc(0.92 + 0.08 * var(--lit)));
+}
+
+/* Shimmer: a sweep whose leading edge is a bright band of light; sung text settles into a
+   soft accent-tinted white. */
+.aur-root[data-words="on"][data-wordanim="shimmer"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--x: calc(var(--p) * (100% + 0.9em));
+	--sung: color-mix(in oklab, var(--aur-hi) 74%, var(--aur-accent));
+	color: transparent;
+	background-image: linear-gradient(90deg, var(--sung) calc(var(--x) - 0.9em), #fff calc(var(--x) - 0.35em), var(--aur-dim) var(--x));
+	-webkit-background-clip: text;
+	background-clip: text;
 }
 
 /* ---- translation: a smaller, softer line under each lyric; brightens with the active line */
@@ -571,6 +631,57 @@
 .aur-root[data-anim="cinematic"] .aur-stage[data-mode="synced"] .aur-line[data-d] { filter: blur(16px); }
 .aur-root[data-anim="cinematic"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(calc(-50% - 0.45em)) scale(1.03); }
 .aur-root[data-anim="cinematic"] .aur-stage[data-mode="synced"] .aur-line.is-active { filter: none; transform: translateY(-50%) scale(1.05); transition-delay: 0s, 0.14s, 0.14s, 0s, 0s; }
+
+/* ---- Spring (list): Flow with a livelier overshoot and a wider stagger. */
+.aur-root[data-anim="spring"] { --aur-stagger: 48ms; --aur-move: 1.25s; --aur-move-ease: cubic-bezier(0.34, 1.75, 0.5, 1); }
+.aur-root[data-anim="spring"] .aur-line { --aur-s: 0.94; }
+.aur-root[data-anim="spring"] .aur-line.is-active { --aur-s: 1.02; }
+
+/* ---- Wheel (list): lines sit on a turning drum. Each line tilts away by its distance from
+   the active one (--dd = signed distance, --ad = |distance|) and is pulled slightly towards
+   the centre, like the rows of an iOS picker. */
+.aur-root[data-anim="wheel"] { --aur-stagger: 10ms; --aur-move: 0.9s; }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: perspective(700px) translate3d(0, calc(var(--aur-y, 0px) - var(--dd, 0) * var(--ad, 0) * 0.1em), 0) rotateX(calc(var(--dd, 0) * -21deg)) scale(calc(var(--aur-s) - var(--ad, 0) * 0.03));
+	transform-origin: 50% 50%; /* vanishing point in the middle of the line, like a real drum */
+	backface-visibility: hidden;
+}
+.aur-root[data-anim="wheel"] .aur-line { --aur-s: 1; }
+.aur-root[data-anim="wheel"] .aur-line:not([data-d]) { opacity: 0; }
+.aur-line[data-d="-6"] { --dd: -6; --ad: 6; }
+.aur-line[data-d="-5"] { --dd: -5; --ad: 5; }
+.aur-line[data-d="-4"] { --dd: -4; --ad: 4; }
+.aur-line[data-d="-3"] { --dd: -3; --ad: 3; }
+.aur-line[data-d="-2"] { --dd: -2; --ad: 2; }
+.aur-line[data-d="-1"] { --dd: -1; --ad: 1; }
+.aur-line[data-d="1"] { --dd: 1; --ad: 1; }
+.aur-line[data-d="2"] { --dd: 2; --ad: 2; }
+.aur-line[data-d="3"] { --dd: 3; --ad: 3; }
+.aur-line[data-d="4"] { --dd: 4; --ad: 4; }
+.aur-line[data-d="5"] { --dd: 5; --ad: 5; }
+.aur-line[data-d="6"] { --dd: 6; --ad: 6; }
+
+/* ---- Swipe (stack): one line at a time; the old line slides off to the left as the new one
+   slides in from the right. */
+.aur-root[data-anim="swipe"] .aur-line { transition-duration: 0.45s, 0.75s, 0.6s, 0.5s, 0.6s; }
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line { transform: translate(14%, -50%); }
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translate(-14%, -50%); }
+.aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line.is-active { transform: translate(0, -50%); transition-delay: 0s, 0.06s, 0.06s, 0s, 0s; }
+.aur-root[data-depth="on"][data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d] { filter: blur(6px); }
+
+/* ---- Zoom (stack): sung lines fly past the viewer; the next line arrives from far away. */
+.aur-root[data-anim="zoom"] .aur-line { transition-duration: 0.5s, 0.9s, 0.7s, 0.5s, 0.7s; }
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line { transform: translateY(-50%) scale(0.6); }
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(-50%) scale(1.45); }
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line[data-d] { filter: blur(10px); }
+.aur-root[data-anim="zoom"] .aur-stage[data-mode="synced"] .aur-line.is-active { filter: none; transform: translateY(-50%) scale(1); transition-delay: 0s, 0.08s, 0.08s, 0s, 0s; }
+
+/* ---- Flip (stack): a split-flap board; the old line flips up and away, the new one flips
+   down into place. */
+.aur-root[data-anim="flip"] .aur-line { transition-duration: 0.35s, 0.7s, 0.5s, 0.5s, 0.5s; --aur-move-ease: cubic-bezier(0.34, 1.4, 0.64, 1); }
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line { transform: translateY(-50%) perspective(800px) rotateX(-85deg); backface-visibility: hidden; }
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] { transform: translateY(-50%) perspective(800px) rotateX(85deg); }
+.aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line.is-active { transform: translateY(-50%) perspective(800px) rotateX(0deg); transition-delay: 0s, 0.1s, 0.1s, 0s, 0s; }
 
 /* ============================================================== context off */
 
