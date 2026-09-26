@@ -16,6 +16,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
 - 📸 **Share** your favourite lines as a ready-to-post image.
+- 🎸 **Guitar tabs**: one click to the song's tab on Songsterr.
 - 💬 **Lyrics in the Now Playing panel**: Spotify's small lyrics preview is replaced by a live, synced one.
 
 ## Install
@@ -51,6 +52,7 @@ Press **Esc** to close.
 | **Esc** | Close (closes an open panel first) |
 | **T** | Translation on / off |
 | **S** | Share lyrics as an image |
+| **G** | Guitar tabs on Songsterr |
 | **F** | Fullscreen |
 | **[** and **]** | Lyrics too early or too late? Nudge them by 0.1 s |
 
@@ -101,6 +103,10 @@ Then **Copy image** and paste it anywhere, or **Save PNG**.
 
 Press **T** to show a translation under every line, in your Spotify language or any language you choose (*Sources → Translation*). Lines already in your language aren't repeated.
 
+### Guitar tabs (Songsterr)
+
+Press **G** or the guitar-pick button. A small card shows which parts Songsterr has for the song (guitar, bass, drums…) and how hard the guitar part is. Click **Open tab** to play along on songsterr.com in your browser. If there's no tab yet, you can search Songsterr instead. You can hide the button in *General → Interface*.
+
 ### Up next
 
 In the last 20 seconds of a song, a small card shows what's playing next. Click it to skip straight to it.
@@ -144,6 +150,7 @@ Aurora Lyrics has no account and no tracking. It only contacts:
 
 - the lyrics sources above, to find lyrics;
 - Google Translate, only when translation is on;
+- Songsterr's song search, only when you open the guitar tabs card;
 - Google Fonts, only if you choose one of the web fonts.
 
 Your settings and imported lyrics stay on your computer.
@@ -187,6 +194,7 @@ src/
   npv.js         lyrics card in Spotify's Now Playing panel
   mini.js        mini lyrics pill (drag, Alt+M, Document Picture-in-Picture pop-out)
   share.js       share sheet + canvas renderer for lyric images
+  tabs.js        Songsterr lookup (public song search → tab link, parts, difficulty)
   translate.js   line-by-line translation (batched, aligned, cached)
   providers.js   Spotify + LRCLIB providers, registry, and the resolver (quality tiers, upgrades, pinning)
   net.js         fetch / CORS-proxy / Spotify-auth helpers (no CosmosAsync for third-party hosts)

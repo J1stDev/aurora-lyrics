@@ -41,6 +41,7 @@ const ORDER = [
 	"view.js",
 	"panel.js",
 	"share.js",
+	"tabs.js",
 	"overlay.js",
 	"npv.js",
 	"mini.js",

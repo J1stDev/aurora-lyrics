@@ -11,6 +11,7 @@ import { translateLyrics, resolveTarget } from "./translate.js";
 import { LyricsView } from "./view.js";
 import { createPanel, ensureFont } from "./panel.js";
 import { createShareSheet } from "./share.js";
+import { findTabs, songsterrSearchUrl } from "./tabs.js";
 import { ICONS } from "./icons.js";
 
 const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.css
@@ -154,6 +155,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		);
 
 		// Actions: like, volume, settings, fullscreen, close.
+		const tabsBtn = iconBtn("Guitar tabs on Songsterr (G)", ICONS.pick(), () => toggleTabs(), "aur-icon-btn aur-toggle aur-tabs-btn");
 		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "aur-icon-btn aur-heart");
 		const muteBtn = iconBtn("Mute", ICONS.volHigh(), act(() => playerCommand("toggleMute")));
 		const vol = h("input", { type: "range", class: "aur-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
@@ -176,6 +178,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				heartBtn,
 				h("div", { class: "aur-volume" }, muteBtn, vol),
 				h("span", { class: "aur-sep", "aria-hidden": "true" }),
+				tabsBtn,
 				iconBtn("Share lyrics as an image (S)", ICONS.share(), () => openShare()),
 				iconBtn("Mini lyrics (Alt+M)", ICONS.mini(), () => (settings.set("miniLyrics", true), close())),
 				iconBtn("Settings", ICONS.settings(), () => panel.toggle("settings")),
@@ -231,6 +234,9 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		const toastEl = h("div", { class: "aur-toast", role: "status", "aria-live": "polite" });
+
+		// Songsterr tabs: a small card above the control bar with what's available.
+		const tabsPop = h("div", { class: "aur-tabs-pop", role: "dialog", "aria-label": "Guitar tabs", hidden: true });
 
 		// Queue peek: the next track, shown near the end of the current one. Click to skip to it.
 		const upArt = h("img", { class: "aur-upnext-art", alt: "", decoding: "async" });
@@ -302,6 +308,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			miniProgress,
 			panel.el,
 			share.el,
+			tabsPop,
 			upNext,
 			toastEl,
 		);
@@ -313,6 +320,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				seek(t - settings.get("offset") + 20);
 				setTimeout(kick, 60);
 			},
+		});
+
+		// Clicking anywhere else closes the tabs card.
+		root.addEventListener("pointerdown", (e) => {
+			if (!tabsPop.hidden && !tabsPop.contains(e.target) && !tabsBtn.contains(e.target)) closeTabs();
 		});
 
 		// Activity → show controls; idle → hide them (and the cursor).
@@ -340,7 +352,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -377,6 +389,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			glow: all.glow,
 			duet: all.duetColors ? "on" : "off",
 			accent: all.accent === "album" ? "album" : "custom",
+			tabs: all.tabsButton ? "on" : "off",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
@@ -579,6 +592,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			ui.view.freeze(); // don't let the old lyrics chase the new track's position
 		}
 		updateTrackChrome(track);
+		closeTabs();
 		ui.panel.onTrackChange();
 		setSourceBadge();
 
@@ -879,6 +893,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		state.open = false;
 		ui.panel.close();
 		ui.share.close();
+		closeTabs();
 		ui.view.stopBrowsing(true);
 		ui.root.classList.remove("is-open");
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -886,6 +901,65 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		kick(); // cancels pending frames because state.open is false
 		state.lastFocus?.focus?.({ preventScroll: true });
 		onOpenChange?.(false);
+	}
+
+	// ---------------------------------------------------------------------------
+	// Songsterr tabs popover
+	// ---------------------------------------------------------------------------
+	function openExternal(url) {
+		window.open(url, "_blank", "noopener");
+	}
+
+	function closeTabs() {
+		if (!ui || ui.tabsPop.hidden) return;
+		ui.tabsPop.classList.remove("is-open");
+		ui.tabsBtn.classList.remove("is-on");
+		state.tabsToken = (state.tabsToken || 0) + 1;
+		setTimeout(() => !ui.tabsPop.classList.contains("is-open") && (ui.tabsPop.hidden = true), 220);
+	}
+
+	async function toggleTabs() {
+		if (!ui) return;
+		if (!ui.tabsPop.hidden && ui.tabsPop.classList.contains("is-open")) return closeTabs();
+		const track = state.track || getCurrentTrack();
+		if (!track?.isTrack) return toast("Tabs are only available for songs");
+		const pop = ui.tabsPop;
+		const token = (state.tabsToken = (state.tabsToken || 0) + 1);
+		const head = h("div", { class: "aur-tabs-head" }, h("span", { class: "aur-tabs-logo", html: ICONS.pick() }), h("div", null, h("div", { class: "aur-tabs-kicker" }, "Songsterr"), h("div", { class: "aur-tabs-song" }, track.title)));
+		pop.replaceChildren(head, h("div", { class: "aur-tabs-status" }, "Looking for tabs…"));
+		pop.hidden = false;
+		void pop.offsetWidth;
+		pop.classList.add("is-open");
+		ui.tabsBtn.classList.add("is-on");
+		let res = null;
+		let failed = false;
+		try {
+			res = await findTabs(track);
+		} catch (e) {
+			console.warn("[aurora-lyrics] Songsterr search failed", e);
+			failed = true;
+		}
+		if (token !== state.tabsToken) return;
+		const searchBtn = (label) => h("button", { class: "aur-btn aur-btn-ghost", onclick: () => (openExternal(songsterrSearchUrl(track)), closeTabs()) }, label);
+		if (!res) {
+			pop.replaceChildren(head, h("div", { class: "aur-tabs-status" }, failed ? "Couldn't reach Songsterr." : "No tab for this song yet."), h("div", { class: "aur-tabs-actions" }, searchBtn("Search Songsterr")));
+			return;
+		}
+		const LABELS = { guitar: "Guitar", bass: "Bass", drums: "Drums", vocals: "Vocals", other: "Other" };
+		const chips = Object.entries(res.parts)
+			.filter(([, n]) => n)
+			.map(([k, n]) => h("span", { class: "aur-tabs-chip" }, n > 1 ? `${LABELS[k]} ×${n}` : LABELS[k]));
+		const diff = res.difficulty ? h("div", { class: "aur-tabs-diff", title: `Guitar difficulty ${res.difficulty} of 5` }, "Guitar difficulty ", h("span", { class: "aur-tabs-dots", style: `--d:${res.difficulty}` }, h("i"), h("i"), h("i"), h("i"), h("i"))) : null;
+		pop.replaceChildren(
+			head,
+			h("div", { class: "aur-tabs-chips" }, chips),
+			diff,
+			h(
+				"div",
+				{ class: "aur-tabs-actions" },
+				h("button", { class: "aur-btn aur-btn-primary", html: `<span>Open tab</span>${ICONS.external()}`, onclick: () => (openExternal(res.url), closeTabs()) }),
+			),
+		);
 	}
 
 	/** Share sheet; `lineIdx` preselects that line (right-click on a line). */
@@ -924,7 +998,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (e.key === "Escape") {
 				e.preventDefault();
 				e.stopPropagation();
-				if (ui.share.isOpen()) ui.share.close();
+				if (!ui.tabsPop.hidden) closeTabs();
+				else if (ui.share.isOpen()) ui.share.close();
 				else if (ui.panel.isOpen()) ui.panel.close();
 				else if (ui.view.browsing) ui.view.stopBrowsing();
 				else close();
@@ -936,6 +1011,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			else if (e.key === "f" || e.key === "F") toggleFullscreen();
 			else if (e.key === "t" || e.key === "T") settings.set("translate", !settings.get("translate"));
 			else if (e.key === "s" || e.key === "S") openShare();
+			else if ((e.key === "g" || e.key === "G") && settings.get("tabsButton")) toggleTabs();
 			else return;
 			e.preventDefault();
 			e.stopPropagation();

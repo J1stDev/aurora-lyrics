@@ -202,6 +202,24 @@
 			if (u.includes("Slow")) return body(200, { syncedLyrics: null, plainLyrics: T4_PLAIN });
 			return u.includes("/search") ? body(200, []) : body(404, {});
 		}
+		if (u.includes("songsterr.com/api/songs")) {
+			await delay(500);
+			// Only Harbor Lights has a tab, so both the found and not-found cards can be tried.
+			if (!u.includes("Harbor")) return body(200, []);
+			return body(200, [
+				{
+					songId: 12345,
+					artist: "Mock Artist",
+					title: "Harbor Lights",
+					tracks: [
+						{ instrument: "Electric Guitar (clean)", name: "Lead Guitar", difficulty: 3 },
+						{ instrument: "Acoustic Guitar (steel)", name: "Rhythm Guitar", difficulty: 2 },
+						{ instrument: "Electric Bass (finger)", name: "Bass", difficulty: 2 },
+						{ instrument: "Drums", name: "Drums" },
+					],
+				},
+			]);
+		}
 		if (u.includes("unison.boidu.dev")) {
 			await delay(300);
 			if (u.includes("Echo")) return body(200, { success: true, data: { format: "ttml", lyrics: ttml(ECHO), syncType: "WORD" } });
