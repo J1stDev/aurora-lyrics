@@ -4,8 +4,6 @@ A Spicetify extension: full-screen, animated, synced lyrics for Spotify Desktop.
 
 ![Aurora Lyrics](docs/preview.png)
 
-A full-screen, animated, synced lyrics overlay for Spotify Desktop.
-
 - **Background:** the album art slowly drifts and rotates behind the lyrics, with film grain to avoid banding. The art is blurred as a 256 px thumbnail and scaled up, which keeps the GPU cost low. Album-colour gradient and solid backgrounds are also available.
 - **Flow motion (default):** lines move in a staggered spring wave. The leading line moves first and the rest follow a few milliseconds apart. Nearby lines get depth-of-field blur.
 - **Other styles:** Slide (smooth scroll), Scale (springy zoom), Fade (3-line carousel), and Cinematic (one big line that blurs in).
@@ -22,10 +20,14 @@ A full-screen, animated, synced lyrics overlay for Spotify Desktop.
   - **Lyrics only**: just the words, with small track info in the corner.
 
   Wide layouts need at least 900×540 and Stage/Captions at least 600px of height; smaller windows fall back to lyrics only.
-- **Word-by-word animation** in five styles: **Fill** (smooth sweep), **Glow** (word lights up), **Pop** (springy bounce), **Rise** (words float into place), and **Letters** (a letter-by-letter wave). Held words swell and glow. Background vocals appear as a smaller line under the main one and fill in time with it. Instrumental breaks show three dots that fill up over the gap.
+- **Word-by-word animation** in six styles: **Fill** (smooth sweep), **Glow** (word lights up), **Pop** (springy bounce), **Rise** (words float into place), **Letters** (a letter-by-letter wave), and **Karaoke** (a sharp wipe in the accent colour). Held words swell and glow. Background vocals appear as a smaller line under the main one and fill in time with it. Instrumental breaks show three dots that fill up over the gap.
 - **Duet colours**: in duets, each singer gets their own colour and the second singer's lines sit on the opposite side. Works with Apple Music and TTML lyrics, and with `v1:` / `v2:` voice tags in LRC files. Turn it off under *Look → Text*.
 - **Themes**: one-click looks under *Look → Theme*: Aurora (default), Neon, Minimal, Karaoke, Cinema, Lounge and Midnight. A theme sets the layout, font, colours, glow, animations and background; it leaves your text size and spacing alone. Your own look is kept as *Custom*, so you can switch back.
 - **Accent colour**: use the album's colour (default) or pick your own. The accent drives the glow, *Accent tint* text, Karaoke wipe, duet colours and the Gradient background.
+- **Mini lyrics**: a small floating pill with the current line (word by word) and the next one, shown over Spotify while fullscreen is closed. Drag it anywhere; it remembers where you left it. Click the text to go fullscreen. Where the Spotify build supports it, the pop-out button turns it into an always-on-top window. Toggle with **Alt+M**.
+- **Share as an image**: pick up to six lines and get a ready-to-post image with the cover art and track info. Square, portrait or story size; blurred album art, gradient or dark background. Copy it to the clipboard or save a PNG. Press **S**, use the share button, or right-click any line.
+- **Up next**: in the last 20 seconds of a song, a card shows the next track in your queue with a countdown. Click it to play it now.
+- **Artist and album links**: click the artist or album name next to the lyrics to open that page in Spotify.
 - **Estimated word timing** (optional) spreads each line's time across its words, so word animations also work on line-synced lyrics. Estimated timing is labelled *est. words*.
 - **Typography:** Spotify Mix, System, Inter, Outfit, Rounded, and Serif fonts. Four weights. Pure-white text or a tint taken from the album colours.
 - **Transitions:** lyrics cross-fade on track change and rise in with a stagger around the current line. Use the mouse wheel to browse the lyrics; the view returns to the current line after 3 s.
@@ -79,7 +81,7 @@ spicetify apply
 | Action | How |
 | --- | --- |
 | Open / close | Top-bar or play-bar lyrics button, or **Alt+L** |
-| Close | **Esc** (closes the settings panel first, if it's open) |
+| Close | **Esc** (closes the share sheet or settings panel first, if one is open) |
 | Offset −/+100 ms | `[` / `]`, or the buttons in the control bar. Click the value to reset it. |
 | Fullscreen | **F**, or the control-bar button |
 | Translate | **T**, or the 文A button next to the source chip |
@@ -92,13 +94,14 @@ spicetify apply
 | Choose the source for this track | ✎ button → *Load lyrics from* (Auto = search all) |
 | See what every source returns | ✎ button → *Test all sources* (or `AuroraLyrics.testSources()` in DevTools). Ignores on/off switches; changes nothing. |
 | Play / pause (split view) | Click the big cover |
+| Go to the artist or album | Click the artist or album name under the cover (or in the header) |
 | Share lyrics as an image | **S**, the share button, or right-click a line. Pick up to 6 lines, a format (Square / Portrait / Story) and a background, then *Copy image* or *Save PNG*. |
 | Mini lyrics | **Alt+M**, the mini button in the control bar or the Now Playing card, or *General → Interface*. A small pill with the current line floats over Spotify while fullscreen is closed. Drag it anywhere; click the text to go fullscreen. Where supported, ⧉ pops it out into an always-on-top window. |
 | Up next | In the last 20 s of a song (over 45 s long) a card shows the next track in the queue; click it to play it now. The mini pill shows it after the last lyric line. Turn off in *General → Interface*. |
 
 Offset sign: **+** shows lyrics **earlier**, which matches the LRC `[offset:]` convention.
 
-From DevTools (`spicetify enable-devtools`) you can also call `AuroraLyrics.open()`, `.close()`, or `.toggle()`.
+From DevTools (`spicetify enable-devtools`) you can also call `AuroraLyrics.open()`, `.close()`, `.toggle()`, or `.toggleMini()`.
 
 ## Develop
 
@@ -109,6 +112,8 @@ src/
   view.js        LyricsView: renders lines, active-line/word tracking, layouts
   panel.js       settings drawer (generated from the schema) + lyrics import editor
   npv.js         lyrics card in Spotify's Now Playing panel (replaces Spotify's preview card)
+  mini.js        mini lyrics pill (drag, Alt+M, Document Picture-in-Picture pop-out)
+  share.js       share sheet + canvas renderer for lyric images
   translate.js   line-by-line translation (batched, aligned, cached)
   providers.js   Spotify + LRCLIB providers, registry, and the resolver (quality tiers, progressive upgrades, pinning)
   net.js         fetch / CORS-proxy / Spotify-auth helpers (no CosmosAsync for third-party hosts)
@@ -118,12 +123,12 @@ src/
   cache.js       LRU lyrics cache (TTL + negative cache) and imported-lyrics store
   settings.js    settings schema, defaults, validation, persistence
   storage.js     Spicetify.LocalStorage → localStorage → memory fallback; moves data saved under the old name
-  player.js      defensive wrappers for Spicetify.Player (track info, position)
+  player.js      defensive wrappers for Spicetify.Player (track info, position, queue, page links)
   icons.js       inline SVG icons
   util.js        helpers
   styles.css     all styles (inlined into the bundle at build time)
 build.mjs        zero-dependency bundler → dist/aurora-lyrics.js
-test/            node:test unit tests (parsers, formats, providers, resolver)
+test/            node:test unit tests (parsers, formats, providers, resolver, duets, themes, share)
 dev/             browser preview harness with a mocked Spicetify
 install.ps1      install / uninstall helper
 ```
@@ -162,6 +167,13 @@ The sources are ES modules so the tests can import them directly. The build stri
 - [ ] Split view: the cover shrinks when paused, clicking it toggles playback, and a narrow window falls back to lyrics only.
 - [ ] Resize the window from very narrow to large: lines wrap and stay centered on the anchor.
 - [ ] Fullscreen button / F enters and leaves fullscreen. Closing the overlay exits fullscreen.
+- [ ] A duet with Apple Music lyrics: the second singer's lines are coloured and on the opposite side.
+- [ ] Each theme applies; changing a setting afterwards shows *Custom*, and *Custom* restores your look after picking a theme.
+- [ ] A custom accent colour tints the glow, *Accent tint* text and the Gradient background.
+- [ ] Alt+M shows the mini pill; it follows the song, can be dragged, and remembers its position. The pop-out button opens a window or explains that it isn't available.
+- [ ] S opens the share sheet; *Copy image* pastes into another app, *Save PNG* writes a file, and the cover art appears in the image.
+- [ ] Near the end of a song, *Up next* shows the next queued track; clicking it skips.
+- [ ] Clicking the artist or album name opens its page and closes the overlay.
 
 ## Known limitations
 
@@ -183,8 +195,7 @@ The sources are ES modules so the tests can import them directly. The build stri
 ## Ideas
 
 - Per-track offset stored alongside the cache
-- Duet colouring (TTML agents / Musixmatch performer tags)
-- Translation/romanization line under each lyric
+- Romanization (Korean, Japanese kana) under each lyric
 - Tap-to-sync editor for creating LRC timings from plain lyrics
-- Dynamic accent color for the active line from the album palette
+- Background prefetch of the next queued track's lyrics
 - Export current lyrics as `.lrc`
