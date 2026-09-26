@@ -2060,31 +2060,24 @@
 .aur-link:hover, .aur-link:focus-visible { color: #fff; text-decoration-color: currentColor; outline: none; }
 
 /* ============================================================== top-bar button
-   Matches Spotify's round global-nav buttons (Home, Marketplace): a 48px circle on the
-   elevated background, subdued icon that brightens on hover. Uses Spotify's own theme
-   variables so Spicetify themes recolour it too. */
+   The same liquid-glass tile as the player-bar button (see the end of this file), sized to
+   sit with Spotify's 48px global-nav buttons. */
 .aur-topbar-btn {
+	--aur-pb-c: #b98cff;
+	position: relative;
 	display: inline-grid !important;
 	place-items: center;
-	width: 48px !important;
-	height: 48px !important;
-	min-width: 48px;
+	width: 44px !important;
+	height: 44px !important;
+	min-width: 44px;
 	margin-inline: 8px;
 	padding: 0 !important;
 	border: 0;
-	border-radius: 50% !important;
-	background-color: var(--background-elevated-base, #1f1f1f) !important;
-	color: var(--text-subdued, #b3b3b3) !important;
+	border-radius: 14px !important;
+	overflow: hidden;
 	cursor: pointer;
-	transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
-.aur-topbar-btn:hover, .aur-topbar-btn:focus-visible {
-	background-color: var(--background-elevated-highlight, #2a2a2a) !important;
-	color: var(--text-base, #fff) !important;
-	transform: scale(1.04);
-}
-.aur-topbar-btn:active { transform: scale(0.98); }
-.aur-topbar-btn svg { width: 20px; height: 20px; }
+.aur-topbar-btn svg { position: relative; width: 20px; height: 20px; }
 
 /* ============================================================== Songsterr tabs card */
 .aur-root[data-tabs="off"] .aur-tabs-btn { display: none; }
@@ -2362,6 +2355,11 @@
 	padding: 0 !important;
 	border: 0;
 	border-radius: 10px !important;
+	overflow: hidden;
+	cursor: pointer;
+}
+/* glass surface, shared by both buttons */
+:is(.aur-pb-btn, .aur-topbar-btn) {
 	color: rgba(255, 255, 255, 0.82) !important;
 	background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04)) !important;
 	box-shadow:
@@ -2369,24 +2367,24 @@
 		inset 0 0 0 1px rgba(255, 255, 255, 0.08),
 		0 2px 8px rgba(0, 0, 0, 0.35);
 	backdrop-filter: blur(10px) saturate(1.4);
-	overflow: hidden;
-	cursor: pointer;
 	transition: background 0.3s ease, box-shadow 0.3s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 /* the glassy sheen across the top half */
-.aur-pb-btn::before {
+:is(.aur-pb-btn, .aur-topbar-btn)::before {
 	content: "";
 	position: absolute;
 	inset: 0 0 50%;
-	border-radius: 10px 10px 40% 40% / 10px 10px 8px 8px;
+	border-radius: inherit;
+	border-bottom-left-radius: 40% 8px;
+	border-bottom-right-radius: 40% 8px;
 	background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
 	pointer-events: none;
 }
-.aur-pb-btn::after { display: none !important; } /* Spotify's own "active" dot; the glow replaces it */
+:is(.aur-pb-btn, .aur-topbar-btn)::after { display: none !important; } /* Spotify's own "active" dot; the glow replaces it */
 .aur-pb-btn svg { position: relative; width: 16px; height: 16px; }
-.aur-pb-btn:hover { color: #fff !important; transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
-.aur-pb-btn:active { transform: scale(0.94); }
-.aur-pb-btn.is-on {
+:is(.aur-pb-btn, .aur-topbar-btn):hover { color: #fff !important; transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
+:is(.aur-pb-btn, .aur-topbar-btn):active { transform: scale(0.94); }
+:is(.aur-pb-btn, .aur-topbar-btn).is-on {
 	color: #fff !important;
 	background:
 		linear-gradient(180deg, color-mix(in oklab, var(--aur-pb-c) 55%, rgba(255, 255, 255, 0.25)), color-mix(in oklab, var(--aur-pb-c) 28%, transparent)) !important;
