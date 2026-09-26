@@ -79,6 +79,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			bgStack,
 			h("div", { class: "aur-bg-gradient" }),
 			h("div", { class: "aur-bg-shade" }),
+			// Theme ambience (scanlines, spotlights, stars…); each theme styles these layers.
+			h("div", { class: "aur-fx" }, h("i", { class: "aur-fx-a" }), h("i", { class: "aur-fx-b" }), h("i", { class: "aur-fx-c" })),
 			h("div", { class: "aur-bg-grain" }),
 		);
 
@@ -390,6 +392,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			duet: all.duetColors ? "on" : "off",
 			accent: all.accent === "album" ? "album" : "custom",
 			tabs: all.tabsButton ? "on" : "off",
+			fx: all.ambience ? all.themeFx || "none" : "none",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",

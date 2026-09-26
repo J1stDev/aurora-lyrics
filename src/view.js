@@ -370,6 +370,8 @@ export class LyricsView {
 		} else {
 			this.y = Math.round(this.stage.clientHeight * ANCHOR - (focus.offsetTop + focus.offsetHeight / 2));
 			if (!this.browsing) this.list.style.setProperty("--aur-y", `${this.y}px`);
+			// Where the active line sits inside the list box: the Wheel's shared vanishing point.
+			this.list.style.setProperty("--aur-anchor-y", `${Math.round(this.stage.clientHeight * ANCHOR - this.list.offsetTop)}px`);
 		}
 
 		if (instant) {

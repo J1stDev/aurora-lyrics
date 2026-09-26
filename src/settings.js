@@ -59,6 +59,7 @@ export const SCHEMA = [
 	},
 	// Theme ("accent" = "album" or a "#rrggbb" colour; used for glow, tints, karaoke, gradient)
 	{ key: "accent", section: "Theme", label: "Accent colour", type: "color", default: "album" },
+	{ key: "ambience", section: "Theme", label: "Theme ambience (scanlines, spotlights, stars…)", type: "toggle", default: true },
 	// Text
 	{ key: "font", section: "Text", label: "Font", type: "select", ui: "fonts", options: Object.entries(FONTS).map(([k, f]) => [k, f.label]), default: "spotify" },
 	{ key: "fontSize", section: "Text", label: "Size", type: "range", min: 24, max: 104, step: 2, unit: "px", default: 56 },
@@ -241,7 +242,8 @@ export const DEFAULTS = Object.fromEntries(SCHEMA.map((s) => [s.key, s.default])
 /** Non-schema UI state that is persisted alongside settings. */
 // customLook: the user's own look, saved when a theme replaces it (so "Custom" can bring it back).
 // miniPos: centre of the mini lyrics pill as fractions of the window ({ x, y }), null = default.
-const EXTRA_DEFAULTS = { pinControls: false, seenTip: false, customLook: null, miniPos: null };
+// themeFx: the ambience layer of the last theme picked (kept when you then tweak settings).
+const EXTRA_DEFAULTS = { pinControls: false, seenTip: false, customLook: null, miniPos: null, themeFx: "aurora" };
 
 /** Coerce and clamp a raw value against its schema entry. */
 function validate(entry, value) {
@@ -278,9 +280,11 @@ function load() {
 		);
 	}
 	for (const [k, d] of Object.entries(EXTRA_DEFAULTS)) out[k] = typeof saved[k] === typeof d ? saved[k] : d;
+	if (out.themeFx !== "none" && !THEMES.some((t) => t.id === out.themeFx)) out.themeFx = "aurora";
 	const mp = saved.miniPos;
 	out.miniPos = mp && Number.isFinite(mp.x) && Number.isFinite(mp.y) ? { x: clamp(mp.x, 0, 1), y: clamp(mp.y, 0, 1) } : null;
 	out.customLook = saved.customLook && typeof saved.customLook === "object" ? pickLook(saved.customLook) : null;
+	if (out.customLook && typeof saved.customLook.themeFx === "string") out.customLook.themeFx = saved.customLook.themeFx;
 	return out;
 }
 
@@ -321,14 +325,14 @@ export const settings = {
 	/** Apply a theme; "custom" restores the look saved when a theme first replaced it. */
 	applyTheme(id) {
 		if (id === "custom") {
-			if (current.customLook) this.setMany(current.customLook);
+			if (current.customLook) this.setMany({ ...current.customLook, themeFx: current.customLook.themeFx || "none" });
 			return;
 		}
 		const theme = THEMES.find((t) => t.id === id);
 		if (!theme) return;
 		// Leaving a look of the user's own: keep it so it can be restored.
-		if (!matchTheme(current)) this.setMany({ customLook: pickLook(current) });
-		this.setMany(themeLook(theme));
+		if (!matchTheme(current)) this.setMany({ customLook: { ...pickLook(current), themeFx: current.themeFx } });
+		this.setMany({ ...themeLook(theme), themeFx: theme.id });
 	},
 	reset() {
 		current = { ...DEFAULTS, ...EXTRA_DEFAULTS, seenTip: current.seenTip };

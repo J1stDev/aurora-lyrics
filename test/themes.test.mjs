@@ -53,3 +53,18 @@ test("every theme only uses valid settings values", async () => {
 		assert.deepEqual(Object.fromEntries(Object.keys(themeLook(t)).map((k) => [k, settings.get(k)])), themeLook(t));
 	}
 });
+
+test("theme ambience follows the last theme picked and survives tweaks", async () => {
+	const { settings } = await freshSettings({ font: "inter" }); // a custom look
+	assert.equal(settings.get("themeFx"), "aurora");
+	settings.applyTheme("retro");
+	assert.equal(settings.get("themeFx"), "retro");
+	settings.set("fontSize", 70); // not part of the look
+	settings.set("glow", "radiant"); // part of the look: now Custom, ambience stays
+	assert.equal(settings.currentTheme(), null);
+	assert.equal(settings.get("themeFx"), "retro");
+	settings.applyTheme("zen");
+	settings.applyTheme("custom"); // back to the look saved before Zen (the tweaked Retro)
+	assert.equal(settings.get("glow"), "radiant");
+	assert.equal(settings.get("themeFx"), "retro");
+});

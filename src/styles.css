@@ -346,7 +346,15 @@
 
 /* Letters: every word is split; each letter hops as the sweep passes through it. */
 .aur-root[data-words="on"][data-wordanim="letters"] .is-active.has-words .aur-w .aur-c {
-	transform: translateY(calc(0.03em - var(--e) * 0.06em - 0.13em * var(--hop))) scale(calc(1 + 0.09 * var(--hop)));
+	--wave: 3.2; /* about three letters in motion at once: a rolling wave rather than a hop per letter */
+	transform-origin: 50% 85%;
+	transform: translateY(calc(0.03em - var(--e) * 0.06em - 0.16em * var(--hop))) rotate(calc(-4deg * var(--hop))) scale(calc(1 + 0.11 * var(--hop)));
+}
+/* Each letter's glow swells as it hops, then settles to the normal sung glow. */
+.aur-root:not([data-glow="off"])[data-words="on"][data-wordanim="letters"] .is-active.has-words .aur-w .aur-c {
+	filter:
+		drop-shadow(0 0 0.04em color-mix(in srgb, #fff calc((24% * var(--e) + 30% * var(--hop)) * var(--aur-glow-k)), transparent))
+		drop-shadow(0 0 calc(0.2em + 0.2em * var(--hop)) color-mix(in oklab, var(--aur-glow-tint) calc((28% * var(--e) + 36% * var(--hop)) * var(--aur-glow-k)), transparent));
 }
 
 /* Long-held notes (any style except Karaoke): letters rise in a wave and the word swells. */
@@ -372,8 +380,10 @@
 .aur-root[data-words="on"][data-wordanim="focus"] .aur-stage[data-mode="synced"] .aur-line.has-words:not(.is-active)[data-d="1"] .aur-main { filter: blur(0.045em); }
 
 /* Bounce: each word hops as it starts (stretching as it rises), squashes as it lands, and
-   rebounds once, a little. Everything is a function of the word's own progress. */
+   rebounds once, a little. Long-held words hop higher; their letters bounce one after another.
+   Everything is a function of the word's (or letter's) own progress. */
 .aur-root[data-words="on"][data-wordanim="bounce"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--hh: 0.2em;
 	--lit: clamp(0, var(--e) * 4, 1);
 	--t: clamp(0, var(--p) * 1.8, 1); /* the bounce plays over the first ~55% of the word */
 	--h1: sin(calc(clamp(0, var(--t) / 0.6, 1) * 3.14159)); /* main hop */
@@ -381,9 +391,10 @@
 	--h2: sin(calc(clamp(0, (var(--t) - 0.66) / 0.34, 1) * 3.14159)); /* small rebound */
 	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
 	transform-origin: 50% 100%;
-	transform: translateY(calc(0.02em - var(--h1) * 0.22em - var(--h2) * 0.05em))
+	transform: translateY(calc(0.02em - var(--h1) * var(--hh) - var(--h2) * var(--hh) * 0.25))
 		scale(calc(1 - 0.03 * var(--h1) + 0.07 * var(--sq)), calc(1 + 0.07 * var(--h1) - 0.09 * var(--sq)));
 }
+.aur-root[data-words="on"][data-wordanim="bounce"] .is-active.has-words .aur-w.is-long .aur-c { --hh: 0.28em; }
 
 /* Neon: unlit words are faint glass tubes (a thin coloured outline); each word flickers on in
    the accent colour with a coloured glow, then stays lit. */
@@ -428,21 +439,22 @@
 	opacity: clamp(0, var(--p) * (1 - var(--p)) * 8, 1); /* only while this letter is being typed */
 }
 
-/* Shimmer: a sweep whose leading edge is a soft band of light; sung text settles into a
-   gentle accent-tinted white. */
+/* Shimmer: a sweep whose leading edge is a band of light with an accent-tinted rim; sung text
+   settles into a gentle accent-tinted white with a soft top gloss, and glints as the band
+   passes through the middle of the word. */
 .aur-root[data-words="on"][data-wordanim="shimmer"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
-	--x: calc(var(--p) * (100% + 1.2em));
-	--sung: color-mix(in oklab, var(--aur-hi) 74%, var(--aur-accent));
+	--x: calc(var(--p) * (100% + 1.4em));
+	--sung: color-mix(in oklab, var(--aur-hi) 76%, var(--aur-accent));
+	--rim: color-mix(in oklab, var(--aur-accent) 45%, #fff);
 	color: transparent;
-	background-image: linear-gradient(
-		90deg,
-		var(--sung) calc(var(--x) - 1.2em),
-		#fff calc(var(--x) - 0.55em),
-		color-mix(in oklab, #fff 50%, var(--aur-dim)) calc(var(--x) - 0.25em),
-		var(--aur-dim) var(--x)
-	);
+	background-image:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 55%),
+		linear-gradient(90deg, var(--sung) calc(var(--x) - 1.4em), #fff calc(var(--x) - 0.7em), var(--rim) calc(var(--x) - 0.35em), var(--aur-dim) var(--x));
 	-webkit-background-clip: text;
 	background-clip: text;
+	filter:
+		drop-shadow(0 0 0.04em color-mix(in srgb, #fff calc((22% * var(--e) + 30% * var(--hop)) * max(var(--aur-glow-k), 0.5)), transparent))
+		drop-shadow(0 0 0.3em color-mix(in oklab, var(--rim) calc((24% * var(--e) + 34% * var(--hop)) * max(var(--aur-glow-k), 0.5)), transparent));
 }
 
 /* ---- translation: a smaller, softer line under each lyric; brightens with the active line */
@@ -669,17 +681,18 @@
 }
 @keyframes aur-spring-settle { from { transform: translateY(0.08em) scale(0.97); } }
 
-/* ---- Wheel (list): lines sit on a turning drum. Each line tilts away by its distance from
-   the active one (--dd = signed distance, --ad = |distance|), is pulled towards the centre
-   and fades with distance, like the rows of an iOS picker. */
-.aur-root[data-anim="wheel"] { --aur-stagger: 0ms; --aur-move: 0.95s; --aur-move-ease: cubic-bezier(0.25, 1.12, 0.4, 1); }
+/* ---- Wheel (list): lines sit on a turning drum. All lines share one vanishing point at the
+   active line (--aur-anchor-y, set by view.js), so the rows curve away above and below like a
+   real cylinder: each line tilts by its distance from the active one (--dd signed, --ad
+   absolute), sinks back in depth, is pulled towards the centre and fades out. */
+.aur-root[data-anim="wheel"] { --aur-stagger: 0ms; --aur-move: 1s; --aur-move-ease: cubic-bezier(0.22, 1.08, 0.36, 1); }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-lines { perspective: 1100px; perspective-origin: 50% var(--aur-anchor-y, 40%); }
 .aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line {
-	transform: perspective(700px) translate3d(0, calc(var(--aur-y, 0px) - var(--dd, 0) * var(--ad, 0) * 0.1em), 0) rotateX(calc(var(--dd, 0) * -21deg)) scale(calc(var(--aur-s) - var(--ad, 0) * 0.03));
-	transform-origin: 50% 50%; /* vanishing point in the middle of the line, like a real drum */
+	transform: translate3d(0, calc(var(--aur-y, 0px) - var(--dd, 0) * var(--ad, 0) * 0.09em), calc(var(--ad, 0) * -0.35em)) rotateX(calc(var(--dd, 0) * -19deg));
+	transform-origin: 50% 50%;
 	backface-visibility: hidden;
 }
-.aur-root[data-anim="wheel"] .aur-line { --aur-s: 1; }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.62 - var(--ad, 0) * 0.12); }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.6 - var(--ad, 0) * 0.11); }
 .aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
 .aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; }
 .aur-line[data-d="-6"] { --dd: -6; --ad: 6; }
@@ -699,25 +712,29 @@
    state it's going to: the old line leaves quickly, the new one arrives slowly and a beat
    later. Transition order: opacity, transform, filter, color, text-shadow. */
 
-/* ---- Swipe (stack): the old line slides off to the left as the new one glides in from the
-   right. Distances are in em, so short and long lines travel the same way. */
+/* ---- Swipe (stack): the old line whooshes off to the left (leaning into the motion, with a
+   touch of motion blur) as the new one glides in from the right and snaps into place with a
+   small overshoot. Distances are in em, so short and long lines travel the same way. */
 .aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line {
-	transform: translate(1.6em, -50%) scale(0.98);
+	transform: translate(1.8em, -50%) skewX(-8deg) scale(0.97);
+	filter: blur(4px);
 	transition-duration: 0.5s, 0.8s, 0.6s, 0.5s, 0.6s;
 	transition-timing-function: ease, cubic-bezier(0.22, 1, 0.36, 1), ease, ease, ease;
 }
 .aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
-	transform: translate(-1.6em, -50%) scale(0.98);
-	transition-duration: 0.3s, 0.55s, 0.4s, 0.3s, 0.3s;
-	transition-timing-function: ease-in, cubic-bezier(0.55, 0, 0.8, 0.4), ease, ease, ease;
+	transform: translate(-1.8em, -50%) skewX(8deg) scale(0.97);
+	filter: blur(6px);
+	transition-duration: 0.32s, 0.5s, 0.4s, 0.3s, 0.3s;
+	transition-timing-function: ease-in, cubic-bezier(0.55, 0, 0.8, 0.4), ease-in, ease, ease;
 	transition-delay: 0s;
 }
 .aur-root[data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line.is-active {
-	transform: translate(0, -50%) scale(1);
-	transition-duration: 0.55s, 0.9s, 0.6s, 0.5s, 0.6s;
-	transition-delay: 0.1s, 0.08s, 0.1s, 0s, 0s;
+	transform: translate(0, -50%) skewX(0deg) scale(1);
+	filter: none;
+	transition-duration: 0.5s, 0.95s, 0.55s, 0.5s, 0.6s;
+	transition-timing-function: ease-out, cubic-bezier(0.18, 1.25, 0.4, 1), ease-out, ease, ease;
+	transition-delay: 0.08s, 0.08s, 0.08s, 0s, 0s;
 }
-.aur-root[data-depth="on"][data-anim="swipe"] .aur-stage[data-mode="synced"] .aur-line[data-d]:not(.is-active) { filter: blur(5px); }
 
 /* ---- Zoom (stack): sung lines rush past the viewer; the next line arrives from far away,
    coming into focus as it settles. */
@@ -742,24 +759,28 @@
 }
 
 /* ---- Flip (stack): a split-flap board. Lines hang from a hinge along their top edge: the
-   new line swings down into place with a small bounce, the old one folds up and away. */
+   new line swings down into place with a small bounce, lit up as it faces you (it starts in
+   shadow), while the old one folds up and away into the dark. */
 .aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line {
 	transform-origin: 50% 0%;
-	transform: translateY(-50%) perspective(900px) rotateX(-92deg);
+	transform: translateY(-50%) perspective(700px) rotateX(-95deg);
+	filter: brightness(0.3);
 	backface-visibility: hidden;
 	transition-duration: 0.4s, 0.8s, 0.5s, 0.5s, 0.5s;
 }
 .aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
-	transform: translateY(-50%) perspective(900px) rotateX(80deg);
-	transition-duration: 0.25s, 0.5s, 0.3s, 0.3s, 0.3s;
-	transition-timing-function: ease-in, cubic-bezier(0.5, 0, 0.9, 0.5), ease, ease, ease;
+	transform: translateY(-58%) perspective(700px) rotateX(75deg);
+	filter: brightness(0.45);
+	transition-duration: 0.28s, 0.5s, 0.4s, 0.3s, 0.3s;
+	transition-timing-function: ease-in, cubic-bezier(0.5, 0, 0.9, 0.5), ease-in, ease, ease;
 	transition-delay: 0s;
 }
 .aur-root[data-anim="flip"] .aur-stage[data-mode="synced"] .aur-line.is-active {
-	transform: translateY(-50%) perspective(900px) rotateX(0deg);
-	transition-duration: 0.35s, 0.85s, 0.5s, 0.5s, 0.5s;
-	transition-timing-function: ease-out, cubic-bezier(0.2, 1.35, 0.35, 1), ease, ease, ease;
-	transition-delay: 0.12s, 0.12s, 0s, 0s, 0s;
+	transform: translateY(-50%) perspective(700px) rotateX(0deg);
+	filter: brightness(1);
+	transition-duration: 0.22s, 0.9s, 0.65s, 0.5s, 0.5s;
+	transition-timing-function: ease-out, cubic-bezier(0.2, 1.45, 0.35, 1), ease-out, ease, ease;
+	transition-delay: 0.1s, 0.1s, 0.1s, 0s, 0s;
 }
 
 /* ============================================================== context off */
@@ -2105,3 +2126,222 @@
 .aur-tabs-dots[style*="--d:5"] i:nth-child(-n + 5) { background: var(--aur-green); }
 .aur-tabs-actions { display: flex; gap: 8px; margin-top: 14px; }
 .aur-tabs-actions .aur-btn { flex: 1; justify-content: center; }
+
+/* ============================================================== theme ambience
+   Each theme gets its own atmosphere, drawn in three spare layers (.aur-fx-a/b/c) between the
+   background and the lyrics. data-fx is the last theme picked (it stays when you tweak
+   settings afterwards) and "none" when ambience is off. Gradients only, no filters; motion
+   is transform / opacity and pauses with the animated background (reduced motion stops it). */
+.aur-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.aur-fx > i { position: absolute; display: none; }
+.aur-root[data-bganim="off"] .aur-fx > i { animation-play-state: paused; }
+@keyframes aur-fx-pulse { 50% { opacity: 0.6; } }
+@keyframes aur-fx-breathe { 50% { transform: scale(1.12); opacity: 0.7; } }
+@keyframes aur-fx-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+
+/* Aurora: two slow ribbons of light drifting across the sky. */
+.aur-root[data-fx="aurora"] :is(.aur-fx-a, .aur-fx-b) {
+	display: block;
+	inset: -25% -35%;
+	background: linear-gradient(100deg, transparent 28%, color-mix(in oklab, var(--aur-accent) 55%, #7b5cff) 40%, transparent 52%, color-mix(in oklab, var(--aur-c1) 55%, #2ee6a8) 64%, transparent 76%);
+	opacity: 0.2;
+	mix-blend-mode: screen;
+	animation: aur-fx-ribbon 28s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="aurora"] .aur-fx-b { opacity: 0.13; animation-duration: 37s; animation-direction: alternate-reverse; transform: scaleX(-1); }
+@keyframes aur-fx-ribbon {
+	from { transform: translate3d(-8%, 5%, 0) skewY(-12deg); }
+	to { transform: translate3d(8%, -6%, 0) skewY(-5deg); }
+}
+
+/* Neon: a glowing tube frame around the screen, breathing, with a cyan floor glow. */
+.aur-root[data-fx="neon"] .aur-fx-a {
+	display: block;
+	inset: 0;
+	box-shadow:
+		inset 0 0 14vmin color-mix(in oklab, var(--aur-accent) 38%, transparent),
+		inset 0 0 0 2px color-mix(in oklab, var(--aur-accent) 55%, transparent);
+	animation: aur-fx-pulse 4.5s ease-in-out infinite;
+}
+.aur-root[data-fx="neon"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 45%; background: radial-gradient(60% 100% at 50% 100%, rgba(34, 211, 238, 0.22), transparent 70%); mix-blend-mode: screen; }
+
+/* Minimal: nothing added, and a lighter grain. */
+.aur-root[data-fx="minimal"] .aur-bg-grain { opacity: 0.04; }
+
+/* Karaoke: a warm spotlight swinging gently over a glowing stage floor. */
+.aur-root[data-fx="karaoke"] .aur-fx-a {
+	display: block;
+	top: -10%;
+	left: 15%;
+	right: 15%;
+	bottom: 0;
+	background: conic-gradient(from 180deg at 50% 0%, transparent 160deg, rgba(255, 238, 205, 0.12) 172deg, rgba(255, 238, 205, 0.2) 180deg, rgba(255, 238, 205, 0.12) 188deg, transparent 200deg);
+	transform-origin: 50% 0%;
+	animation: aur-fx-sway 10s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="karaoke"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 40%; background: radial-gradient(55% 70% at 50% 100%, color-mix(in oklab, var(--aur-accent) 32%, transparent), transparent 75%); }
+
+/* Cinema: letterbox bars, a deep vignette and a lively film grain. */
+.aur-root[data-fx="cinema"] :is(.aur-fx-a, .aur-fx-b) { display: block; left: 0; right: 0; height: 7vh; background: #000; }
+.aur-root[data-fx="cinema"] .aur-fx-a { top: 0; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); }
+.aur-root[data-fx="cinema"] .aur-fx-b { bottom: 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6); }
+.aur-root[data-fx="cinema"] .aur-fx-c { display: block; inset: 0; background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); }
+.aur-root[data-fx="cinema"] .aur-bg-grain { opacity: 0.14; animation: aur-fx-grain 0.6s steps(3) infinite; }
+@keyframes aur-fx-grain {
+	0% { background-position: 0 0; }
+	33% { background-position: -47px 31px; }
+	66% { background-position: 29px -53px; }
+	100% { background-position: 0 0; }
+}
+
+/* Lounge: warm lamp light and slowly rising dust specks. */
+.aur-root[data-fx="lounge"] .aur-fx-a {
+	display: block;
+	inset: 0;
+	background: radial-gradient(ellipse at 28% 18%, rgba(255, 170, 90, 0.2), transparent 60%), linear-gradient(rgba(120, 60, 20, 0.1), rgba(40, 15, 5, 0.25));
+	animation: aur-fx-pulse 7s ease-in-out infinite;
+}
+.aur-root[data-fx="lounge"] .aur-fx-b {
+	display: block;
+	inset: -30% 0 0;
+	background-image:
+		radial-gradient(1.6px 1.6px at 40px 60px, rgba(255, 228, 196, 0.55), transparent),
+		radial-gradient(1.2px 1.2px at 170px 210px, rgba(255, 228, 196, 0.45), transparent),
+		radial-gradient(2px 2px at 260px 90px, rgba(255, 228, 196, 0.35), transparent),
+		radial-gradient(1.3px 1.3px at 110px 280px, rgba(255, 228, 196, 0.4), transparent);
+	background-size: 320px 320px;
+	animation: aur-fx-rise 60s linear infinite;
+}
+@keyframes aur-fx-rise { to { transform: translateY(-320px); } }
+
+/* Retro: CRT scanlines, a curved-glass vignette with an amber phosphor tint, and a slow
+   rolling refresh bar. */
+.aur-root[data-fx="retro"] .aur-fx-a { display: block; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px); opacity: 0.55; }
+.aur-root[data-fx="retro"] .aur-fx-b {
+	display: block;
+	inset: 0;
+	background: radial-gradient(ellipse at 50% 45%, rgba(255, 176, 0, 0.09), transparent 65%), radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+}
+.aur-root[data-fx="retro"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 22%;
+	background: linear-gradient(transparent, rgba(255, 200, 120, 0.05), transparent);
+	animation: aur-fx-roll 8s linear infinite;
+}
+@keyframes aur-fx-roll { from { transform: translateY(-30vh); } to { transform: translateY(130vh); } }
+
+/* Synthwave: a striped retro sun sinking into a scrolling neon grid, with a glowing horizon. */
+.aur-root[data-fx="synthwave"] .aur-fx-a {
+	display: block;
+	left: 50%;
+	bottom: 22%;
+	width: 30vmin;
+	height: 30vmin;
+	margin-left: -15vmin;
+	border-radius: 50%;
+	background: linear-gradient(#ffd23f, #ff7a59 45%, #ff4fd8 80%);
+	opacity: 0.32;
+	-webkit-mask-image: linear-gradient(#000 52%, transparent 52%), repeating-linear-gradient(#000 0 6%, transparent 6% 9%);
+	mask-image: linear-gradient(#000 52%, transparent 52%), repeating-linear-gradient(#000 0 6%, transparent 6% 9%);
+}
+.aur-root[data-fx="synthwave"] .aur-fx-b {
+	display: block;
+	left: -50%;
+	right: -50%;
+	bottom: 0;
+	height: 58%;
+	background:
+		repeating-linear-gradient(90deg, color-mix(in oklab, var(--aur-accent) 55%, transparent) 0 2px, transparent 2px 90px),
+		repeating-linear-gradient(0deg, color-mix(in oklab, var(--aur-accent) 55%, transparent) 0 2px, transparent 2px 90px);
+	transform: perspective(320px) rotateX(62deg);
+	transform-origin: 50% 100%;
+	opacity: 0.5;
+	-webkit-mask-image: linear-gradient(to top, #000 35%, transparent 95%);
+	mask-image: linear-gradient(to top, #000 35%, transparent 95%);
+	animation: aur-fx-grid 2.6s linear infinite;
+}
+@keyframes aur-fx-grid { to { background-position: 0 0, 0 90px; } }
+.aur-root[data-fx="synthwave"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	bottom: 22%;
+	height: 2px;
+	background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--aur-accent) 80%, #fff), transparent);
+	box-shadow: 0 0 24px 6px color-mix(in oklab, var(--aur-accent) 45%, transparent);
+	opacity: 0.8;
+}
+
+/* Concert: two stage beams sweeping from the rig, and warm haze over the crowd. */
+.aur-root[data-fx="concert"] :is(.aur-fx-a, .aur-fx-b) {
+	display: block;
+	top: -20%;
+	width: 60%;
+	height: 150%;
+	background: conic-gradient(from 160deg at 20% 0%, transparent 0deg, rgba(255, 255, 255, 0.08) 8deg, rgba(255, 244, 214, 0.15) 12deg, rgba(255, 255, 255, 0.08) 16deg, transparent 24deg);
+	transform-origin: 20% 0%;
+	animation: aur-fx-beam 11s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="concert"] .aur-fx-a { left: -8%; }
+.aur-root[data-fx="concert"] .aur-fx-b { right: -8%; transform: scaleX(-1); animation-name: aur-fx-beam-r; animation-duration: 13s; }
+@keyframes aur-fx-beam { from { transform: rotate(-14deg); } to { transform: rotate(10deg); } }
+@keyframes aur-fx-beam-r { from { transform: scaleX(-1) rotate(-12deg); } to { transform: scaleX(-1) rotate(12deg); } }
+.aur-root[data-fx="concert"] .aur-fx-c {
+	display: block;
+	inset: 0;
+	background: radial-gradient(ellipse at 50% 115%, color-mix(in oklab, var(--aur-accent) 28%, transparent), transparent 60%);
+	animation: aur-fx-pulse 6s ease-in-out infinite;
+}
+
+/* Zen: one soft pool of light, breathing very slowly; almost no grain. */
+.aur-root[data-fx="zen"] .aur-fx-a {
+	display: block;
+	inset: -20%;
+	background: radial-gradient(40% 40% at 50% 45%, color-mix(in oklab, var(--aur-accent) 20%, transparent), transparent 70%);
+	animation: aur-fx-breathe 14s ease-in-out infinite;
+}
+.aur-root[data-fx="zen"] .aur-bg-grain { opacity: 0.05; }
+
+/* Sunset: a low warm sun and its glow on the horizon, dusk above. */
+.aur-root[data-fx="sunset"] .aur-fx-a {
+	display: block;
+	left: -10%;
+	right: -10%;
+	bottom: -30%;
+	height: 75%;
+	background: radial-gradient(50% 60% at 50% 100%, rgba(255, 150, 70, 0.42), rgba(255, 80, 120, 0.18) 45%, transparent 75%);
+	animation: aur-fx-breathe 16s ease-in-out infinite;
+}
+.aur-root[data-fx="sunset"] .aur-fx-b {
+	display: block;
+	left: 50%;
+	bottom: -14vmin;
+	width: 42vmin;
+	height: 42vmin;
+	margin-left: -21vmin;
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(255, 214, 160, 0.5), rgba(255, 140, 80, 0.16) 55%, transparent 70%);
+}
+.aur-root[data-fx="sunset"] .aur-fx-c { display: block; inset: 0; background: linear-gradient(to bottom, rgba(90, 20, 60, 0.25), transparent 50%); }
+
+/* Midnight: two layers of twinkling stars and a faint moon glow. */
+.aur-root[data-fx="midnight"] :is(.aur-fx-a, .aur-fx-b) {
+	display: block;
+	inset: 0;
+	background-image:
+		radial-gradient(1.3px 1.3px at 30px 40px, rgba(255, 255, 255, 0.9), transparent),
+		radial-gradient(1px 1px at 120px 150px, rgba(255, 255, 255, 0.7), transparent),
+		radial-gradient(1.6px 1.6px at 260px 70px, rgba(220, 230, 255, 0.85), transparent),
+		radial-gradient(1px 1px at 330px 260px, rgba(255, 255, 255, 0.6), transparent),
+		radial-gradient(1.2px 1.2px at 190px 330px, rgba(255, 255, 255, 0.75), transparent),
+		radial-gradient(0.9px 0.9px at 70px 250px, rgba(255, 255, 255, 0.6), transparent);
+	background-size: 380px 380px;
+	opacity: 0.55;
+	animation: aur-fx-twinkle 5s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="midnight"] .aur-fx-b { background-size: 260px 260px; background-position: 90px 130px; animation-duration: 7s; animation-delay: -3s; }
+@keyframes aur-fx-twinkle { from { opacity: 0.4; } to { opacity: 0.95; } }
+.aur-root[data-fx="midnight"] .aur-fx-c { display: block; inset: 0; background: radial-gradient(circle at 86% 12%, rgba(200, 220, 255, 0.18), transparent 26%); }

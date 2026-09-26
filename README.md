@@ -78,7 +78,7 @@ With the mouse:
 ### Layouts and themes
 
 - **Layouts** (*Look → Layout*): Split, Mirrored, Poster, Vinyl (a spinning record), Stage, Captions, and Lyrics only.
-- **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge, Retro (amber terminal), Synthwave, Concert, Zen, Sunset and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back.
+- **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge, Retro (amber terminal), Synthwave, Concert, Zen, Sunset and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back. Each theme also brings its own **ambience**: aurora ribbons, CRT scanlines (Retro), a neon grid and sun (Synthwave), stage spotlights (Concert), letterbox bars (Cinema), twinkling stars (Midnight) and more. Turn it off with *Look → Theme → Theme ambience*.
 - **Accent colour**: taken from the album cover, or pick your own.
 - Eight fonts (including Mono and Condensed), four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient or solid).
 
