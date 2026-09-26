@@ -1,0 +1,532 @@
+// Side drawer with two tabs:
+//  - Settings: generated from SCHEMA (segmented controls, style cards, font tiles,
+//    filled sliders, switches), applied live.
+//  - This track: paste / import .lrc or .txt lyrics for the current track.
+
+import { h } from "./util.js";
+import { SCHEMA, FONTS, PROVIDER_INFO, settings } from "./settings.js";
+import { ICONS, STYLE_ART, ARROWS } from "./icons.js";
+
+const MAX_IMPORT_BYTES = 512 * 1024;
+const SEGMENT_ICONS = { left: ICONS.alignLeft, center: ICONS.alignCenter, right: ICONS.alignRight };
+
+const loadedFonts = new Set();
+/** Load a Google web font the first time it is needed (no-op for local stacks). */
+export function ensureFont(key) {
+	const f = FONTS[key];
+	if (!f?.web || loadedFonts.has(key)) return;
+	loadedFonts.add(key);
+	document.head.append(h("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${f.web}&display=swap`, "data-fal-font": key }));
+}
+
+function fmtValue(entry, v) {
+	if (entry.key === "bgOpacity") return `${Math.round(v * 100)}%`;
+	if (entry.key === "offset") return `${v > 0 ? "+" : ""}${v} ms`;
+	if (entry.unit === "em") return `${Number(v).toFixed(2)}em`;
+	if (entry.key === "autoHideDelay") return `${(v / 1000).toFixed(1)} s`;
+	return `${v}${entry.unit ? ` ${entry.unit}` : ""}`;
+}
+
+/** A group of radio-like buttons; returns { el, sync }. */
+function choiceGroup(entry, className, renderOption) {
+	const buttons = new Map();
+	const el = h(
+		"div",
+		{ class: className, role: "radiogroup", "aria-label": entry.label },
+		entry.options.map(([v, label]) => {
+			const btn = renderOption(v, label);
+			btn.setAttribute("role", "radio");
+			btn.addEventListener("click", () => settings.set(entry.key, v));
+			buttons.set(v, btn);
+			return btn;
+		}),
+	);
+	const sync = (value) => {
+		for (const [v, btn] of buttons) btn.setAttribute("aria-checked", String(v === value));
+	};
+	sync(settings.get(entry.key));
+	return { el, sync };
+}
+
+function buildControl(entry) {
+	const id = `fal-set-${entry.key}`;
+	const value = settings.get(entry.key);
+	const labelEl = (extra) => h("div", { class: "fal-row-label" }, h("span", null, entry.label), extra);
+
+	if (entry.type === "providers") {
+		// Ordered provider list: rank, name (+ WORD badge), description, move up/down, on/off.
+		const list = h("div", { class: "fal-prov-list" });
+		const render = (providers) => {
+			const set = (next) => settings.set(entry.key, next);
+			list.replaceChildren(
+				...providers.map((p, i) => {
+					const info = PROVIDER_INFO.find((x) => x.id === p.id);
+					const move = (d) => {
+						const next = [...providers];
+						[next[i], next[i + d]] = [next[i + d], next[i]];
+						set(next);
+					};
+					return h(
+						"div",
+						{ class: p.on ? "fal-prov" : "fal-prov is-off" },
+						h("span", { class: "fal-prov-rank" }, String(i + 1)),
+						h("div", null, h("div", { class: "fal-prov-name" }, info.label, info.words ? h("span", { class: "fal-prov-badge", title: "Can provide word-by-word timing" }, "WORD") : null), h("div", { class: "fal-prov-desc" }, info.desc)),
+						h(
+							"div",
+							{ class: "fal-prov-move" },
+							h("button", { title: "Move up", "aria-label": `Move ${info.label} up`, html: ARROWS.up(), disabled: i === 0, onclick: () => move(-1) }),
+							h("button", { title: "Move down", "aria-label": `Move ${info.label} down`, html: ARROWS.down(), disabled: i === providers.length - 1, onclick: () => move(1) }),
+						),
+						h("input", {
+							type: "checkbox",
+							class: "fal-switch",
+							checked: p.on,
+							"aria-label": `Use ${info.label}`,
+							onchange: (e) => set(providers.map((q) => (q.id === p.id ? { ...q, on: e.target.checked } : q))),
+						}),
+					);
+				}),
+			);
+		};
+		render(value);
+		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), list), sync: render };
+	}
+
+	if (entry.type === "toggle") {
+		const input = h("input", { type: "checkbox", id, class: "fal-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
+		return { row: h("label", { class: "fal-row fal-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
+	}
+
+	if (entry.type === "select" && entry.ui === "segmented") {
+		const { el, sync } = choiceGroup(entry, "fal-segmented", (v, label) =>
+			h("button", { class: "fal-seg", title: label, html: SEGMENT_ICONS[v] && entry.key === "textAlign" ? SEGMENT_ICONS[v]() : null }, SEGMENT_ICONS[v] && entry.key === "textAlign" ? null : label),
+		);
+		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+	}
+
+	if (entry.type === "select" && entry.ui === "cards") {
+		const { el, sync } = choiceGroup(entry, "fal-cards", (v, label) =>
+			h("button", { class: "fal-card" }, h("span", { class: "fal-card-art", html: STYLE_ART[v] || "" }), h("span", { class: "fal-card-name" }, label), h("span", { class: "fal-card-hint" }, entry.hints?.[v] || "")),
+		);
+		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+	}
+
+	if (entry.type === "select" && entry.ui === "fonts") {
+		const { el, sync } = choiceGroup(entry, "fal-fonts", (v, label) => {
+			const f = FONTS[v];
+			return h(
+				"button",
+				{ class: "fal-font", title: f.web ? `${label} (web font, loaded from Google Fonts)` : label, onpointerenter: () => ensureFont(v), onfocus: () => ensureFont(v) },
+				h("span", { class: "fal-font-sample", style: { fontFamily: f.stack } }, "Aa"),
+				h("span", { class: "fal-font-name" }, label),
+			);
+		});
+		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+	}
+
+	if (entry.type === "select") {
+		const select = h(
+			"select",
+			{ id, class: "fal-select", onchange: (e) => settings.set(entry.key, e.target.value) },
+			entry.options.map(([v, label]) => h("option", { value: v, selected: v === value }, label)),
+		);
+		return { row: h("label", { class: "fal-row", for: id }, h("span", null, entry.label), select), sync: (v) => (select.value = v) };
+	}
+
+	// range — the filled part of the track is drawn from --p (0..100%)
+	const out = h("output", { class: "fal-range-value" }, fmtValue(entry, value));
+	const input = h("input", { type: "range", id, min: String(entry.min), max: String(entry.max), step: String(entry.step), class: "fal-range" });
+	const paint = (v) => {
+		input.style.setProperty("--p", `${((v - entry.min) / (entry.max - entry.min)) * 100}%`);
+		out.textContent = fmtValue(entry, v);
+	};
+	input.addEventListener("input", (e) => {
+		const v = Number(e.target.value);
+		paint(v);
+		settings.set(entry.key, v);
+	});
+	input.value = String(value);
+	paint(value);
+	return {
+		row: h("label", { class: "fal-row fal-row-range", for: id }, labelEl(out), input),
+		sync: (v) => {
+			input.value = String(v);
+			paint(v);
+		},
+	};
+}
+
+/**
+ * @param {{
+ *   getTrack: () => object|null,
+ *   getLyricsInfo: () => { source: string|null, sourceLabel: string, pinned: boolean, lrc: string, localText: string|null },
+ *   chooseSource: (id: string|null) => Promise<void>,   // null = automatic
+ *   testSources: () => Promise<object>,
+
+ *   saveLocal: (text: string, fileName?: string) => void,
+ *   removeLocal: () => void,
+ *   clearCache: () => number,
+ *   toast: (msg: string) => void,
+ * }} ctx
+ */
+export function createPanel(ctx) {
+	const syncers = new Map();
+
+	// --- Pages ----------------------------------------------------------------
+	// Rail order. "track" = this song's lyrics; the others group SCHEMA sections.
+	const PAGES = [
+		{ id: "track", label: "Lyrics", icon: ICONS.navLyrics, title: "This track", sub: "Source, reload, import" },
+		{ id: "look", label: "Look", icon: ICONS.navLook, title: "Look", sub: "Layout, text and background", sections: ["Layout", "Text", "Background"] },
+		{ id: "motion", label: "Motion", icon: ICONS.navMotion, title: "Motion", sub: "Line and word animation", sections: ["Motion", "Words"] },
+		{ id: "sources", label: "Sources", icon: ICONS.navSources, title: "Sources", sub: "Where lyrics come from, translation", sections: ["Sources", "Translation"] },
+		{ id: "general", label: "General", icon: ICONS.navGeneral, title: "General", sub: "Sync, controls and shortcuts", sections: ["Sync", "Interface"] },
+	];
+
+	const sections = new Map();
+	for (const entry of SCHEMA) {
+		if (!sections.has(entry.section)) sections.set(entry.section, []);
+		const { row, sync } = buildControl(entry);
+		row.dataset.key = entry.key;
+		// Text the search box matches against: label, section, option names.
+		row.dataset.search = [entry.label, entry.section, ...(entry.options || []).map((o) => o[1]), ...Object.values(entry.hints || {})].join(" ").toLowerCase();
+		syncers.set(entry.key, sync);
+		sections.get(entry.section).push(row);
+	}
+	const bodies = {};
+	for (const page of PAGES.filter((pg) => pg.sections)) {
+		bodies[page.id] = h(
+			"div",
+			{ class: "fal-tab-body", "data-tab": page.id, hidden: true },
+			page.sections.map((name) => h("div", { class: "fal-section", "data-section": name }, h("h3", null, name), h("div", { class: "fal-section-card" }, sections.get(name) || []))),
+		);
+	}
+	bodies.general.append(
+		h("div", { class: "fal-section" }, h("h3", null, "Shortcuts"), h(
+			"div",
+			{ class: "fal-keys" },
+			[
+				["Alt L", "Open / close"],
+				["Esc", "Close"],
+				["[ ]", "Offset ∓100 ms"],
+				["F", "Fullscreen"],
+				["Wheel", "Browse lyrics"],
+				["Click line", "Jump there"],
+			].map(([k, d]) => h("div", { class: "fal-key" }, h("kbd", null, k), h("span", null, d))),
+		)),
+		h(
+			"div",
+			{ class: "fal-section" },
+			h("h3", null, "Maintenance"),
+			h(
+				"div",
+				{ class: "fal-panel-actions" },
+				h("button", { class: "fal-btn", onclick: () => ctx.toast(`Cleared ${ctx.clearCache()} cached lyrics`) }, "Clear lyrics cache"),
+				h("button", { class: "fal-btn fal-btn-ghost", onclick: () => (settings.reset(), ctx.toast("Settings reset")) }, "Reset to defaults"),
+			),
+		),
+	);
+	const settingsBodies = Object.values(bodies);
+	const noResults = h("div", { class: "fal-no-results", hidden: true }, "No settings match your search.");
+
+	const syncDisabled = (all) => {
+		for (const b of settingsBodies) b.querySelector('[data-key="autoHideDelay"]')?.classList.toggle("is-disabled", !all.autoHideControls);
+	};
+	const unsubscribe = settings.subscribe((key, v, all) => {
+		if (key === "*") for (const [k, fn] of syncers) fn(all[k]);
+		else syncers.get(key)?.(v);
+		syncDisabled(all);
+	});
+	syncDisabled(settings.all());
+
+	// --- This track tab ------------------------------------------------------
+	// "Load lyrics from": Auto + one button per provider. Picking one pins it to this track.
+	const sourceGrid = h("div", { class: "fal-src-grid" });
+	const testBtn = h(
+		"button",
+		{
+			class: "fal-btn fal-btn-ghost fal-test-btn",
+			title: "Ask every source for this song and show what each one returns (doesn't change your settings)",
+			onclick: async () => {
+				testBtn.disabled = true;
+				testBtn.textContent = "Testing sources…";
+				await ctx.testSources();
+				testBtn.disabled = false;
+				testBtn.textContent = "Test all sources";
+				refreshSources();
+			},
+		},
+		"Test all sources",
+	);
+	const trackInfo = h("div", null, h("div", { class: "fal-src-title" }, "Load lyrics from"), sourceGrid, testBtn, h("div", { class: "fal-src-title" }, "Edit or import"));
+	const textarea = h("textarea", {
+		class: "fal-textarea",
+		spellcheck: "false",
+		placeholder: "Paste lyrics here.\n\nSynced (LRC):\n[00:12.30]First line\n[00:15.80]Second line\n\nEnhanced LRC (word timing):\n[00:12.30]<00:12.30>First <00:12.70>line<00:13.40>\n\nOr plain text for unsynced lyrics.",
+	});
+	const fileInput = h("input", {
+		type: "file",
+		accept: ".lrc,.txt,text/plain",
+		hidden: true,
+		onchange: async (e) => {
+			const file = e.target.files?.[0];
+			e.target.value = "";
+			if (!file) return;
+			if (file.size > MAX_IMPORT_BYTES) return ctx.toast("File is too large (max 512 KB)");
+			textarea.value = await file.text();
+			textarea.dataset.fileName = file.name;
+			ctx.toast(`Loaded ${file.name} — press Save to use it`);
+		},
+	});
+	const removeBtn = h("button", { class: "fal-btn fal-btn-danger", onclick: () => (ctx.removeLocal(), refreshTrack()) }, "Remove imported");
+
+	// Dropping a file anywhere on the editor imports it.
+	textarea.addEventListener("dragover", (e) => (e.preventDefault(), textarea.classList.add("is-drop")));
+	textarea.addEventListener("dragleave", () => textarea.classList.remove("is-drop"));
+	textarea.addEventListener("drop", async (e) => {
+		e.preventDefault();
+		textarea.classList.remove("is-drop");
+		const file = e.dataTransfer?.files?.[0];
+		if (!file) return;
+		if (file.size > MAX_IMPORT_BYTES) return ctx.toast("File is too large (max 512 KB)");
+		textarea.value = await file.text();
+		textarea.dataset.fileName = file.name;
+		ctx.toast(`Loaded ${file.name} — press Save to use it`);
+	});
+
+	const trackBody = h(
+		"div",
+		{ class: "fal-tab-body", "data-tab": "track", hidden: true },
+		trackInfo,
+		textarea,
+		h(
+			"div",
+			{ class: "fal-panel-actions" },
+			h("button", { class: "fal-btn", onclick: () => fileInput.click(), html: `${ICONS.upload()}<span>Import file</span>` }),
+			h(
+				"button",
+				{
+					class: "fal-btn fal-btn-ghost",
+					title: "Copy the currently shown lyrics into the editor (e.g. to fix timings)",
+					onclick: () => {
+						const { lrc } = ctx.getLyricsInfo();
+						if (!lrc) return ctx.toast("No lyrics loaded to copy");
+						textarea.value = lrc;
+					},
+				},
+				"Start from current",
+			),
+		),
+		h(
+			"div",
+			{ class: "fal-panel-actions" },
+			h(
+				"button",
+				{
+					class: "fal-btn fal-btn-primary",
+					onclick: () => {
+						const text = textarea.value.trim();
+						if (!text) return ctx.toast("Nothing to save");
+						ctx.saveLocal(text, textarea.dataset.fileName);
+						refreshTrack();
+					},
+				},
+				"Save for this track",
+			),
+			removeBtn,
+		),
+		h("p", { class: "fal-hint" }, "Drop an .lrc or .txt file on the editor, or paste text. Imported lyrics are stored locally, always take priority over online sources, and also apply to the same song on other albums."),
+		fileInput,
+	);
+
+	function refreshSources() {
+		const info = ctx.getLyricsInfo();
+		const current = info.pinned ? info.source : "auto";
+		// Hint per source: what the last search found there, else what it can provide.
+		const outcome = (id) => {
+			const r = info.report?.[id];
+			if (!r) return null;
+			if (r.status === "found") return r.quality === 3 ? "word sync" : r.quality === 2 ? "line sync" : "plain text";
+			return { notfound: "no lyrics", error: "unreachable", skipped: "busy, retry later" }[r.status] || null;
+		};
+		// Sources switched off in settings are still pickable here, but say so.
+		const enabled = new Set(settings.enabledProviders());
+		const hintFor = (p) => {
+			const o = outcome(p.id);
+			if (o) return o;
+			if (!enabled.has(p.id)) return "off in settings";
+			return p.words ? "can word sync" : "";
+		};
+		const options = [["auto", "Auto", "best match"], ...PROVIDER_INFO.map((p) => [p.id, p.label, hintFor(p)])];
+		sourceGrid.replaceChildren(
+			...options.map(([id, label, hint]) => {
+				const btn = h(
+					"button",
+					{
+						class: `fal-src-btn${id === current ? " is-current" : ""}`,
+						title: id === "auto" ? "Search all enabled sources in order" : `Use ${label} for this track`,
+						onclick: async () => {
+							btn.classList.add("is-loading");
+							btn.lastChild.textContent = "loading…";
+							await ctx.chooseSource(id === "auto" ? null : id);
+							refreshSources();
+						},
+					},
+					h("span", null, label),
+					h("small", null, id === info.source ? (info.pinned || id === "auto" ? "✓ in use" : "in use") : hint),
+				);
+				return btn;
+			}),
+		);
+	}
+
+	function refreshTrack() {
+		const info = ctx.getLyricsInfo();
+		refreshSources();
+		textarea.value = info.localText || "";
+		delete textarea.dataset.fileName;
+		removeBtn.disabled = !info.localText;
+	}
+
+	// --- Shell: rail + header (title, search, close) + pages --------------------
+	const nowPlaying = h("div", { class: "fal-np" });
+	function setNowPlaying(track, sourceLabel) {
+		nowPlaying.hidden = !track;
+		if (!track) return;
+		nowPlaying.replaceChildren(
+			track.image ? h("img", { src: track.image, alt: "" }) : null,
+			h("div", { class: "fal-np-text" }, h("div", { class: "fal-np-title" }, track.title), h("div", { class: "fal-np-sub" }, [track.artist, track.album].filter(Boolean).join(" • "))),
+			h("span", { class: "fal-np-chip", title: "Lyrics source" }, sourceLabel || "No lyrics"),
+		);
+	}
+	trackBody.prepend(nowPlaying);
+
+	const railButtons = new Map();
+	const rail = h(
+		"nav",
+		{ class: "fal-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "Settings pages" },
+		h("span", { class: "fal-rail-pill", "aria-hidden": "true" }),
+		PAGES.map((pg) => {
+			const btn = h("button", { class: "fal-rail-btn", role: "tab", title: pg.title, onclick: () => ((search.value = ""), show(pg.id)) }, h("span", { class: "fal-rail-icon", html: pg.icon() }), h("span", { class: "fal-rail-label" }, pg.label));
+			railButtons.set(pg.id, btn);
+			return btn;
+		}),
+	);
+	const titleEl = h("div", { class: "fal-panel-title" });
+	const subEl = h("div", { class: "fal-panel-sub" });
+	const search = h("input", { type: "search", class: "fal-search", placeholder: "Search settings", "aria-label": "Search settings", spellcheck: "false" });
+	search.addEventListener("input", () => applySearch());
+	const el = h(
+		"div",
+		{ class: "fal-panel", role: "dialog", "aria-label": "Lyrics settings" },
+		rail,
+		h(
+			"div",
+			{ class: "fal-panel-main" },
+			h(
+				"div",
+				{ class: "fal-panel-head" },
+				h("div", { class: "fal-panel-heading" }, titleEl, subEl),
+				h("button", { class: "fal-icon-btn fal-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
+				h("label", { class: "fal-search-wrap" }, h("span", { class: "fal-search-icon", html: ICONS.search() }), search),
+			),
+			h("div", { class: "fal-panel-scroll" }, trackBody, settingsBodies, noResults),
+		),
+	);
+	// Keep typing in the panel from triggering Spotify / overlay shortcuts.
+	el.addEventListener("keydown", (e) => {
+		if (e.key === "Escape" && search.value) {
+			e.stopPropagation();
+			search.value = "";
+			applySearch();
+			return;
+		}
+		if (e.key !== "Escape") e.stopPropagation();
+	});
+	// Wheel inside the panel scrolls the panel, not the lyrics.
+	el.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+
+	let current = "look";
+	let lastSettingsPage = "look";
+	function show(tab) {
+		current = tab;
+		if (tab !== "track") lastSettingsPage = tab;
+		el.dataset.tab = tab;
+		const page = PAGES.find((pg) => pg.id === tab);
+		titleEl.textContent = page.title;
+		subEl.textContent = page.sub;
+		PAGES.forEach((pg, i) => {
+			const on = pg.id === tab;
+			railButtons.get(pg.id).setAttribute("aria-selected", String(on));
+			if (on) rail.style.setProperty("--i", String(i));
+		});
+		trackBody.hidden = tab !== "track";
+		for (const [id, body] of Object.entries(bodies)) body.hidden = id !== tab;
+		noResults.hidden = true;
+		el.querySelector(".fal-panel-scroll").scrollTop = 0;
+		if (tab === "track") refreshTrack();
+	}
+
+	/** Filter rows on every settings page; empty query returns to the current page. */
+	function applySearch() {
+		const q = search.value.trim().toLowerCase();
+		el.dataset.searching = q ? "true" : "false";
+		if (!q) {
+			for (const b of settingsBodies) for (const r of b.querySelectorAll("[data-search]")) r.hidden = false;
+			for (const sec of el.querySelectorAll(".fal-section")) sec.hidden = false;
+			return show(current);
+		}
+		titleEl.textContent = "Search";
+		subEl.textContent = `Results for “${search.value.trim()}”`;
+		for (const btn of railButtons.values()) btn.setAttribute("aria-selected", "false");
+		trackBody.hidden = true;
+		let any = false;
+		for (const body of settingsBodies) {
+			body.hidden = false;
+			for (const sec of body.querySelectorAll(".fal-section")) {
+				const rows = [...sec.querySelectorAll("[data-search]")];
+				let visible = 0;
+				for (const r of rows) {
+					r.hidden = !q.split(/\s+/).every((w) => r.dataset.search.includes(w));
+					if (!r.hidden) visible++;
+				}
+				sec.hidden = rows.length ? visible === 0 : true;
+				any ||= visible > 0;
+			}
+		}
+		noResults.hidden = any;
+	}
+
+	function open(tab = current) {
+		if (tab === "settings") tab = lastSettingsPage;
+		if (search.value) {
+			search.value = "";
+			el.dataset.searching = "false";
+		}
+		show(tab);
+		el.classList.add("is-open");
+	}
+	function close() {
+		el.classList.remove("is-open");
+	}
+
+	show("look");
+	return {
+		el,
+		open,
+		close,
+		/** toggle("settings" | "track" | page id): close if that page is already showing. */
+		toggle(tab) {
+			const want = tab === "settings" ? (current === "track" ? lastSettingsPage : current) : tab;
+			if (el.classList.contains("is-open") && (!tab || want === current)) close();
+			else open(want);
+		},
+		isOpen: () => el.classList.contains("is-open"),
+		onTrackChange: () => current === "track" && el.classList.contains("is-open") && refreshTrack(),
+		/** Update the now-playing card (and the source picker if visible). */
+		setNowPlaying(track, sourceLabel) {
+			setNowPlaying(track, sourceLabel);
+			if (current === "track" && el.classList.contains("is-open")) refreshSources();
+		},
+		destroy: unsubscribe,
+	};
+}

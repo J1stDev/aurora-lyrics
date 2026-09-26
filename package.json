@@ -1,0 +1,15 @@
+{
+	"name": "aurora-lyrics",
+	"version": "2.0.0",
+	"description": "Full-screen animated, synced lyrics overlay for Spotify (Spicetify extension).",
+	"author": "yamac",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node build.mjs",
+		"watch": "node build.mjs --watch",
+		"test": "node --test \"test/*.test.mjs\"",
+		"preview": "node dev/serve.mjs"
+	}
+}

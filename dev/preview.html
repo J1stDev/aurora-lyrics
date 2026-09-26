@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Lyrics Preview</title>
+		<style>
+			:root { color-scheme: dark; }
+			body { margin: 0; height: 100vh; display: grid; grid-template-rows: 56px 1fr 72px; background: #000; color: #fff; font: 14px system-ui, sans-serif; }
+			#mock-topbar { display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #121212; }
+			#mock-topbar b { margin-right: auto; opacity: .6; font-weight: 600; }
+			.mock-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 0; background: #1f1f1f; color: #fff; cursor: pointer; }
+			.mock-btn.active { color: #1ed760; }
+			main { display: grid; grid-template-columns: 1fr 380px; gap: 16px; padding: 16px; background: linear-gradient(#1a1a1a, #121212); min-height: 0; }
+			main > div { opacity: .55; }
+			.mock-npv { overflow: auto; background: #121212; border-radius: 8px; padding: 16px; }
+			.main-nowPlayingView-panel { display: flex; flex-direction: column; gap: 16px; }
+			.mock-widget { display: flex; flex-direction: column; gap: 10px; }
+			.mock-cover { aspect-ratio: 1; border-radius: 8px; background: linear-gradient(135deg, #ff7a59, #5b2a86); }
+			.mock-spotify-card { background: #303038; border-radius: 8px; padding: 16px; }
+			.mock-about { background: #242424; border-radius: 8px; padding: 16px; height: 120px; opacity: .6; }
+			footer { display: flex; align-items: center; gap: 12px; padding: 0 16px; background: #181818; border-top: 1px solid #282828; }
+			footer button { border: 0; border-radius: 999px; padding: 8px 14px; background: #2a2a2a; color: #fff; cursor: pointer; }
+			footer input { flex: 1; accent-color: #1ed760; }
+			#now { min-width: 220px; opacity: .8; }
+			#time { font-variant-numeric: tabular-nums; opacity: .7; min-width: 90px; text-align: right; }
+		</style>
+	</head>
+	<body>
+		<div id="mock-topbar"><b>Mock Spotify (preview harness)</b></div>
+		<main>
+			<div>
+				<h2>Spotify main view placeholder</h2>
+				<p>Click the lyrics button in the top bar, or press Alt+L.</p>
+			</div>
+			<!-- Mimics Spotify's right-hand Now Playing panel (same classes / test id as the real one). -->
+			<aside class="NowPlayingView mock-npv">
+				<div class="main-nowPlayingView-panel">
+					<div class="main-nowPlayingView-nowPlayingWidget mock-widget"><div class="mock-cover"></div><b id="npv-title">Track</b></div>
+					<div class="main-nowPlayingView-section mock-spotify-card" data-testid="lyrics-npv-section">
+						<div class="main-nowPlayingView-sectionHeader"><h2>Lyrics preview</h2></div>
+						<p>Spotify's own preview card (should be hidden)</p>
+						<button>Show lyrics</button>
+					</div>
+					<div class="mock-about">About the artist</div>
+				</div>
+			</aside>
+		</main>
+		<footer>
+			<span id="now"></span>
+			<button id="prev">⏮</button>
+			<button id="play">⏯</button>
+			<button id="next">⏭</button>
+			<input id="seek" type="range" min="0" max="1000" value="0" />
+			<span id="time"></span>
+		</footer>
+		<script src="./mock-spicetify.js"></script>
+		<script src="../dist/aurora-lyrics.js"></script>
+		<script>
+			const { Player, pos, state, TRACKS } = window.mock;
+			const seekEl = document.getElementById("seek");
+			let dragging = false;
+			seekEl.addEventListener("input", () => (dragging = true));
+			seekEl.addEventListener("change", () => {
+				Player.seek((seekEl.value / 1000) * TRACKS[state.idx].dur);
+				dragging = false;
+			});
+			document.getElementById("play").onclick = Player.togglePlay;
+			document.getElementById("next").onclick = Player.next;
+			document.getElementById("prev").onclick = Player.back;
+			// ?demo: open the overlay on a nice moment (used to render docs/preview.png).
+			if (/[?&]demo(&|$)/.test(location.search)) {
+				localStorage.setItem("fullscreen-animated-lyrics:settings", JSON.stringify({ seenTip: true, autoHideControls: false }));
+				const start = () => {
+					if (!window.FullscreenLyrics) return setTimeout(start, 100); // wait for the extension
+					Player.seek(13100);
+					FullscreenLyrics.open();
+					setTimeout(() => state.playing && Player.togglePlay(), 3500);
+				};
+				start();
+			}
+						setInterval(() => {
+				const t = TRACKS[state.idx];
+				document.getElementById("now").textContent = `${t.name} — ${t.artist}`;
+				document.getElementById("time").textContent = `${(pos() / 1000).toFixed(1)}s / ${t.dur / 1000}s`;
+				if (!dragging) seekEl.value = String((pos() / t.dur) * 1000);
+			}, 100);
+		</script>
+	</body>
+</html>

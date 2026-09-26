@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Live Providers</title>
+		<style>
+			body { margin: 0; background: #111; color: #eee; font: 13px ui-monospace, Consolas, monospace; }
+			pre { padding: 16px; white-space: pre-wrap; }
+		</style>
+	</head>
+	<body>
+		<pre id="out">running…</pre>
+		<!-- Real network, fake player: checks what each provider returns from a browser (CORS enforced). -->
+		<script type="module">
+			const mem = new Map();
+			window.Spicetify = { LocalStorage: { get: (k) => mem.get(k) ?? null, set: (k, v) => mem.set(k, v), remove: (k) => mem.delete(k) }, Config: { version: "live" } };
+			const { resolveLyrics, lyricsQuality } = await import("../src/providers.js");
+			const { lyricsCache } = await import("../src/cache.js");
+			const { DEFAULTS } = await import("../src/settings.js");
+			const out = document.getElementById("out");
+			const log = (s) => (out.textContent += "\n" + s);
+			const names = ["none", "plain", "line", "WORD"];
+			const origFetch = window.fetch.bind(window);
+			window.fetch = async (url, opts) => {
+				const t0 = performance.now();
+				try {
+					const r = await origFetch(url, opts);
+					log(`  ${r.status} ${Math.round(performance.now() - t0)}ms ${String(url).slice(0, 110)}`);
+					return r;
+				} catch (e) {
+					log(`  FAIL ${e.message} ${String(url).slice(0, 110)}`);
+					throw e;
+				}
+			};
+			out.textContent = "";
+			for (const s of [{ title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", duration: 200040 }]) {
+				const track = { ...s, uri: "spotify:track:live", id: null, isTrack: true };
+				for (const id of ["musixmatch", "netease", "lrclib", "unison"]) {
+					lyricsCache.clear();
+					log(`# ${id}`);
+					const r = await resolveLyrics(track, DEFAULTS, { only: id });
+					log(`→ ${r.lyrics ? names[lyricsQuality(r.lyrics)] : JSON.stringify(r.report?.[id] || r.error)}`);
+				}
+			}
+			log("done");
+		</script>
+	</body>
+</html>
