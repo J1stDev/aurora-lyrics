@@ -46,6 +46,42 @@ export function getCurrentTrack() {
 	};
 }
 
+/**
+ * A queue entry → { uri, title, artist, image }, or null for delimiters / empty entries.
+ * Accepts Spicetify.Queue.nextTracks items ({ contextTrack: { uri, metadata } }) and
+ * Player.data.nextItems items ({ uri, name, artists, album: { images }, metadata }).
+ */
+export function describeQueueItem(raw) {
+	const item = raw?.contextTrack || raw;
+	const uri = item?.uri;
+	if (!uri || uri.includes("delimiter") || raw?.provider === "unavailable") return null;
+	const meta = item.metadata || {};
+	const artists = Array.isArray(item.artists) ? item.artists.map((a) => a?.name).filter(Boolean) : [];
+	const images = item.album?.images || item.images || [];
+	const biggest = images.length ? [...images].sort((a, b) => (b.width || 0) - (a.width || 0))[0]?.url : null;
+	const title = item.name || meta.title || "";
+	if (!title) return null;
+	return {
+		uri,
+		title,
+		artist: artists.length ? artists.join(", ") : meta.artist_name || "",
+		image: imageUrl(biggest) || imageUrl(meta.image_large_url) || imageUrl(meta.image_url) || imageUrl(meta.image_xlarge_url),
+	};
+}
+
+/** The track that plays next (queue first, then the context), or null if unknown. */
+export function getNextTrack() {
+	const S = globalThis.Spicetify;
+	for (const list of [S?.Queue?.nextTracks, S?.Player?.data?.nextItems]) {
+		if (!Array.isArray(list)) continue;
+		for (const raw of list.slice(0, 5)) {
+			const t = describeQueueItem(raw);
+			if (t) return t;
+		}
+	}
+	return null;
+}
+
 /** Current playback position in ms, interpolated between player state updates. */
 export function getPosition() {
 	const P = globalThis.Spicetify?.Player;
@@ -100,7 +136,7 @@ export function setVolume(v) {
 	try {
 		globalThis.Spicetify?.Player?.setVolume?.(Math.min(1, Math.max(0, v)));
 	} catch (e) {
-		console.warn("[fal] setVolume failed", e);
+		console.warn("[aurora-lyrics] setVolume failed", e);
 	}
 }
 
@@ -109,7 +145,7 @@ export function playerCommand(name) {
 	try {
 		globalThis.Spicetify?.Player?.[name]?.();
 	} catch (e) {
-		console.warn(`[fal] Player.${name} failed`, e);
+		console.warn(`[aurora-lyrics] Player.${name} failed`, e);
 	}
 }
 
@@ -117,6 +153,6 @@ export function seek(ms) {
 	try {
 		globalThis.Spicetify?.Player?.seek?.(Math.max(0, Math.round(ms)));
 	} catch (e) {
-		console.warn("[fal] seek failed", e);
+		console.warn("[aurora-lyrics] seek failed", e);
 	}
 }

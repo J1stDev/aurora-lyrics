@@ -1,6 +1,6 @@
 // Settings schema, defaults, validation and persistence.
 // The schema also drives the settings panel UI (see panel.js):
-//   type: "range" | "select" | "toggle"
+//   type: "range" | "select" | "toggle" | "color" | "providers"
 //   ui (select only): "segmented" | "cards" | "fonts" | undefined (dropdown)
 
 import { EXT_ID, clamp } from "./util.js";
@@ -55,14 +55,17 @@ export const SCHEMA = [
 		hints: { split: "Cover left", mirror: "Cover right", poster: "Full-bleed art", vinyl: "Spinning record", stage: "Cover on top", captions: "Big art, 2 lines", lyrics: "Just the words" },
 		default: "split",
 	},
+	// Theme ("accent" = "album" or a "#rrggbb" colour; used for glow, tints, karaoke, gradient)
+	{ key: "accent", section: "Theme", label: "Accent colour", type: "color", default: "album" },
 	// Text
 	{ key: "font", section: "Text", label: "Font", type: "select", ui: "fonts", options: Object.entries(FONTS).map(([k, f]) => [k, f.label]), default: "spotify" },
 	{ key: "fontSize", section: "Text", label: "Size", type: "range", min: 24, max: 104, step: 2, unit: "px", default: 56 },
 	{ key: "fontWeight", section: "Text", label: "Weight", type: "select", ui: "segmented", options: [["500", "Medium"], ["700", "Bold"], ["800", "Heavy"], ["900", "Black"]], default: "800" },
 	{ key: "lineSpacing", section: "Text", label: "Line spacing", type: "range", min: 0.1, max: 1.5, step: 0.05, unit: "em", default: 0.55 },
 	{ key: "textAlign", section: "Text", label: "Alignment", type: "select", ui: "segmented", options: [["left", "Left"], ["center", "Center"], ["right", "Right"]], default: "left" },
-	{ key: "textColor", section: "Text", label: "Colour", type: "select", ui: "segmented", options: [["white", "White"], ["accent", "Album tint"]], default: "white" },
+	{ key: "textColor", section: "Text", label: "Colour", type: "select", ui: "segmented", options: [["white", "White"], ["accent", "Accent tint"]], default: "white" },
 	{ key: "glow", section: "Text", label: "Glow", type: "select", ui: "segmented", options: [["off", "Off"], ["soft", "Soft"], ["radiant", "Radiant"]], default: "soft" },
+	{ key: "duetColors", section: "Text", label: "Colour each singer in duets", type: "toggle", default: true },
 	{ key: "showContext", section: "Text", label: "Show surrounding lines", type: "toggle", default: true },
 	// Motion
 	{
@@ -99,7 +102,7 @@ export const SCHEMA = [
 			["letters", "Letters"],
 			["karaoke", "Karaoke"],
 		],
-		hints: { fill: "Soft sweep + lift", glow: "Light up + bloom", pop: "Swell on each word", rise: "Float into place", letters: "Letter wave", karaoke: "Album-colour wipe" },
+		hints: { fill: "Soft sweep + lift", glow: "Light up + bloom", pop: "Swell on each word", rise: "Float into place", letters: "Letter wave", karaoke: "Accent-colour wipe" },
 		default: "fill",
 	},
 	{ key: "estimateWords", section: "Words", label: "Estimate word timing for line-synced lyrics", type: "toggle", default: false },
@@ -115,6 +118,8 @@ export const SCHEMA = [
 	{ key: "offset", section: "Sync", label: "Lyric offset (+ = earlier)", type: "range", min: -5000, max: 5000, step: 50, unit: "ms", default: 0 },
 	// Interface
 	{ key: "showTransport", section: "Interface", label: "Playback controls & progress", type: "toggle", default: true },
+	{ key: "queuePeek", section: "Interface", label: "Show the next track near the end of a song", type: "toggle", default: true },
+	{ key: "miniLyrics", section: "Interface", label: "Mini lyrics over Spotify while fullscreen is closed (Alt+M)", type: "toggle", default: false },
 	{ key: "npvCard", section: "Interface", label: "Replace Spotify's lyrics card in the Now Playing panel", type: "toggle", default: true },
 	{ key: "showTrackInfo", section: "Interface", label: "Track info", type: "toggle", default: true },
 	{ key: "autoHideControls", section: "Interface", label: "Auto-hide controls", type: "toggle", default: true },
@@ -139,6 +144,42 @@ export const SCHEMA = [
 	},
 ];
 
+/**
+ * Themes: one-click bundles of the settings that make up the look. Keys in LOOK_KEYS that a
+ * theme doesn't list take their defaults, so applying a theme always gives the same result.
+ * Font size and line spacing are left alone (they're about readability, not style).
+ * swatch = colours for the theme card's preview.
+ */
+export const LOOK_KEYS = ["view", "font", "fontWeight", "textAlign", "textColor", "glow", "accent", "animation", "wordAnim", "depthBlur", "bgStyle", "bgOpacity"];
+export const THEMES = [
+	{ id: "aurora", label: "Aurora", hint: "The default look", swatch: ["#6d3bd1", "#1b2a6b"], values: {} },
+	{ id: "neon", label: "Neon", hint: "Radiant, vivid", swatch: ["#ff2fb3", "#2a0a5e"], values: { font: "outfit", fontWeight: "900", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.35 } },
+	{ id: "minimal", label: "Minimal", hint: "Quiet and clean", swatch: ["#26262b", "#0d0d10"], values: { view: "lyrics", font: "system", fontWeight: "700", glow: "off", animation: "slide", depthBlur: false, bgStyle: "solid" } },
+	{ id: "karaoke", label: "Karaoke", hint: "Big centred captions", swatch: ["#ffb13d", "#8a1f5c"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", animation: "fade", wordAnim: "karaoke" } },
+	{ id: "cinema", label: "Cinema", hint: "One line, serif", swatch: ["#3a3226", "#0b0a08"], values: { view: "lyrics", font: "serif", fontWeight: "700", textAlign: "center", animation: "cinematic", wordAnim: "rise", bgOpacity: 0.65 } },
+	{ id: "lounge", label: "Lounge", hint: "Spinning vinyl", swatch: ["#c0703a", "#2b1408"], values: { view: "vinyl", font: "serif", fontWeight: "700", animation: "flow", wordAnim: "letters" } },
+	{ id: "midnight", label: "Midnight", hint: "Cool blue", swatch: ["#7aa2ff", "#0b1330"], values: { font: "inter", textColor: "accent", accent: "#7aa2ff", bgStyle: "gradient", bgOpacity: 0.6 } },
+];
+
+/** The full look a theme produces (defaults + its own values). */
+export function themeLook(theme) {
+	return Object.fromEntries(LOOK_KEYS.map((k) => [k, k in theme.values ? theme.values[k] : DEFAULTS[k]]));
+}
+
+function pickLook(all) {
+	const out = {};
+	for (const k of LOOK_KEYS) {
+		const entry = SCHEMA.find((s) => s.key === k);
+		out[k] = k in all ? validate(entry, all[k]) : DEFAULTS[k];
+	}
+	return out;
+}
+
+/** Id of the theme whose look equals `all`, or null. */
+export function matchTheme(all) {
+	return THEMES.find((t) => Object.entries(themeLook(t)).every(([k, v]) => all[k] === v))?.id || null;
+}
+
 /** Normalise a stored provider list: known ids only, no duplicates, new providers appended. */
 function validateProviders(value) {
 	const out = [];
@@ -157,7 +198,9 @@ function validateProviders(value) {
 export const DEFAULTS = Object.fromEntries(SCHEMA.map((s) => [s.key, s.default]));
 
 /** Non-schema UI state that is persisted alongside settings. */
-const EXTRA_DEFAULTS = { pinControls: false, seenTip: false };
+// customLook: the user's own look, saved when a theme replaces it (so "Custom" can bring it back).
+// miniPos: centre of the mini lyrics pill as fractions of the window ({ x, y }), null = default.
+const EXTRA_DEFAULTS = { pinControls: false, seenTip: false, customLook: null, miniPos: null };
 
 /** Coerce and clamp a raw value against its schema entry. */
 function validate(entry, value) {
@@ -172,6 +215,8 @@ function validate(entry, value) {
 			return entry.options.some(([v]) => v === value) ? value : entry.default;
 		case "providers":
 			return validateProviders(value);
+		case "color":
+			return value === "album" || /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value).toLowerCase() : entry.default;
 		default:
 			return entry.default;
 	}
@@ -192,6 +237,9 @@ function load() {
 		);
 	}
 	for (const [k, d] of Object.entries(EXTRA_DEFAULTS)) out[k] = typeof saved[k] === typeof d ? saved[k] : d;
+	const mp = saved.miniPos;
+	out.miniPos = mp && Number.isFinite(mp.x) && Number.isFinite(mp.y) ? { x: clamp(mp.x, 0, 1), y: clamp(mp.y, 0, 1) } : null;
+	out.customLook = saved.customLook && typeof saved.customLook === "object" ? pickLook(saved.customLook) : null;
 	return out;
 }
 
@@ -207,12 +255,39 @@ export const settings = {
 		return current.providers.filter((p) => p.on).map((p) => p.id);
 	},
 	set(key, value) {
-		const entry = SCHEMA.find((s) => s.key === key);
-		const v = entry ? validate(entry, value) : value;
-		if (current[key] === v || (typeof v === "object" && JSON.stringify(current[key]) === JSON.stringify(v))) return;
-		current = { ...current, [key]: v };
+		this.setMany({ [key]: value });
+	},
+	/** Change several settings at once: one save, then one notification per changed key. */
+	setMany(values) {
+		const changed = [];
+		const next = { ...current };
+		for (const [key, value] of Object.entries(values)) {
+			const entry = SCHEMA.find((s) => s.key === key);
+			const v = entry ? validate(entry, value) : value;
+			if (next[key] === v || (typeof v === "object" && JSON.stringify(next[key]) === JSON.stringify(v))) continue;
+			next[key] = v;
+			changed.push(key);
+		}
+		if (!changed.length) return;
+		current = next;
 		store.setJSON(SETTINGS_KEY, current);
-		for (const fn of listeners) fn(key, v, current);
+		for (const key of changed) for (const fn of listeners) fn(key, current[key], current);
+	},
+	/** Id of the theme the current look matches exactly, or null (a custom look). */
+	currentTheme() {
+		return matchTheme(current);
+	},
+	/** Apply a theme; "custom" restores the look saved when a theme first replaced it. */
+	applyTheme(id) {
+		if (id === "custom") {
+			if (current.customLook) this.setMany(current.customLook);
+			return;
+		}
+		const theme = THEMES.find((t) => t.id === id);
+		if (!theme) return;
+		// Leaving a look of the user's own: keep it so it can be restored.
+		if (!matchTheme(current)) this.setMany({ customLook: pickLook(current) });
+		this.setMany(themeLook(theme));
 	},
 	reset() {
 		current = { ...DEFAULTS, ...EXTRA_DEFAULTS, seenTip: current.seenTip };

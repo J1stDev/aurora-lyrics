@@ -301,7 +301,7 @@ async function resolveLyricsNow(track, s, { force = false, only, probe = false, 
 		report[id] = { status: r.status, message: r.message };
 		if (r.status === "error") {
 			errors.push({ id, message: r.message });
-			console.warn(`[fal] ${r.message}`);
+			console.warn(`[aurora-lyrics] ${r.message}`);
 		} else if (r.status !== "skipped") tried.push(id);
 
 		if (r.status === "found") {

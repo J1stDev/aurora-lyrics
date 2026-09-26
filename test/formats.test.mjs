@@ -204,7 +204,7 @@ test("pickItunesSong skips remixes / other artists / other lengths", async () =>
 });
 
 test("settings: a newly added provider is inserted at its default rank", async () => {
-	const mem = new Map([["fullscreen-animated-lyrics:settings", JSON.stringify({ providers: [{ id: "unison", on: true }, { id: "lrclib", on: true }] })]]);
+	const mem = new Map([["aurora-lyrics:settings", JSON.stringify({ providers: [{ id: "unison", on: true }, { id: "lrclib", on: true }] })]]);
 	globalThis.Spicetify = { LocalStorage: { get: (k) => mem.get(k) ?? null, set: (k, v) => mem.set(k, v), remove: (k) => mem.delete(k) } };
 	const { settings } = await import(`../src/settings.js?fresh=${Date.now()}`);
 	const ids = settings.get("providers").map((p) => p.id);

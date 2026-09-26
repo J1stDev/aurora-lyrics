@@ -194,6 +194,30 @@ function attrs(tag) {
 const stripParens = (s) => s.replace(/^\s*\(\s*/, "").replace(/\s*\)\s*$/, "");
 
 /**
+ * Duet singers from TTML agents: <ttm:agent type="person|group" xml:id="v1"/> declared in the
+ * head, referenced as <p ttm:agent="v1">. People get singer 0, 1, 0, … in order of their first
+ * line (so whoever sings first is the lead); group agents get 2. Returns agentId → singer|null.
+ * Songs with a single agent return null for everything (nothing to colour).
+ */
+function ttmlSingers(xml) {
+	const types = new Map();
+	for (const m of xml.matchAll(/<(?:[\w-]+:)?agent\b([^>]*)>/g)) {
+		const a = attrs(m[1]);
+		if (a.id) types.set(a.id, a.type || "person");
+	}
+	const order = [];
+	for (const m of xml.matchAll(/<p\b([^>]*)>/g)) {
+		const id = attrs(m[1]).agent;
+		if (id && !order.includes(id)) order.push(id);
+	}
+	if (order.length < 2) return () => null;
+	const map = new Map();
+	let people = 0;
+	for (const id of order) map.set(id, types.get(id) === "group" ? 2 : people++ % 2);
+	return (id) => (id && map.has(id) ? map.get(id) : null);
+}
+
+/**
  * Small regex-based TTML reader (no DOMParser needed). Handles <p begin end> lines,
  * timed <span> words/syllables (with or without spaces between them), and
  * <span ttm:role="x-bg"> background vocals. Untimed TTML becomes plain text.
@@ -202,6 +226,7 @@ export function parseTTML(xml, duration) {
 	const body = String(xml || "");
 	const lines = [];
 	let anyTimed = false;
+	const singerOf = ttmlSingers(body);
 	for (const pm of body.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p>/g)) {
 		const pa = attrs(pm[1]);
 		const buckets = { main: { words: [], text: "" }, bg: { words: [], text: "" } };
@@ -243,7 +268,8 @@ export function parseTTML(xml, duration) {
 			bgWords[0].text = bgWords[0].text.replace(/^\s*\(/, "");
 			bgWords[bgWords.length - 1].text = bgWords[bgWords.length - 1].text.replace(/\)\s*$/, "");
 		}
-		lines.push({ time: begin, text: mainText, words: mainWords, bg: bgText ? { text: bgText, words: bgWords } : null });
+		const singer = singerOf(pa.agent);
+		lines.push({ time: begin, text: mainText, words: mainWords, bg: bgText ? { text: bgText, words: bgWords } : null, singer, opposite: singer === 1 });
 	}
 	if (!lines.length) return null;
 	if (!anyTimed || lines.every((l) => l.time == null)) return parsePlain(lines.map((l) => l.text).join("\n"));
@@ -287,6 +313,7 @@ export function fromPaxsenixApple(json, duration) {
 			words: wordSynced && main.length ? main : null,
 			bg: bgText ? { text: bgText, words: wordSynced && bg.length ? bg : null } : null,
 			opposite: !!l.oppositeTurn,
+			singer: l.oppositeTurn ? 1 : 0, // the only duet info this API gives
 		};
 	});
 	return finalizeSynced(lines.sort(byTime), {}, duration);

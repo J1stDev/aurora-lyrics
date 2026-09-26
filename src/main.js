@@ -4,6 +4,7 @@ import { EXT_ID, sleep } from "./util.js";
 import { ICONS } from "./icons.js";
 import { createOverlay } from "./overlay.js";
 import { createNowPlayingCard } from "./npv.js";
+import { createMiniLyrics } from "./mini.js";
 import { CSS } from "./styles.js";
 
 async function waitForSpicetify(timeoutMs = 60000) {
@@ -17,8 +18,8 @@ async function waitForSpicetify(timeoutMs = 60000) {
 }
 
 export async function main() {
-	if (globalThis.__falLoaded) return; // guard against double injection
-	globalThis.__falLoaded = true;
+	if (globalThis.__auroraLyricsLoaded) return; // guard against double injection
+	globalThis.__auroraLyricsLoaded = true;
 
 	const S = await waitForSpicetify();
 
@@ -29,16 +30,30 @@ export async function main() {
 
 	let playbarBtn = null;
 	let card = null;
+	let mini = null;
 	const overlay = createOverlay({
 		onOpenChange: (open) => {
 			if (playbarBtn) playbarBtn.active = open;
 			if (!open) card?.onOverlayClosed();
+			mini?.refresh();
 		},
 		onLyrics: (uri, lyrics, source) => card?.useLyrics(uri, lyrics, source),
 	});
+	const isOverlayOpen = () => overlay.isOpen();
+	// Mini lyrics: a floating pill over Spotify (fed by the Now Playing card's lookup).
+	try {
+		mini = createMiniLyrics({ openOverlay: () => overlay.open(), isOverlayOpen });
+	} catch (e) {
+		console.warn(`[${EXT_ID}] mini lyrics unavailable`, e);
+	}
 	// Our lyrics card in Spotify's right-hand Now Playing panel.
 	try {
-		card = createNowPlayingCard({ openOverlay: () => overlay.open(), isOverlayOpen: () => overlay.isOpen() });
+		card = createNowPlayingCard({
+			openOverlay: () => overlay.open(),
+			isOverlayOpen,
+			onState: (uri, lyrics, message) => mini?.setLyrics(uri, lyrics, message),
+			toggleMini: () => mini?.toggle(),
+		});
 	} catch (e) {
 		console.warn(`[${EXT_ID}] Now Playing card unavailable`, e);
 	}
@@ -57,10 +72,10 @@ export async function main() {
 	}
 
 	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange()));
-	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause()));
-	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress()));
+	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause(), mini?.onPlayPause()));
+	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress(), mini?.onProgress()));
 
-	// Small public handle for debugging from DevTools: window.FullscreenLyrics.open()
-	globalThis.FullscreenLyrics = { open: overlay.open, close: overlay.close, toggle: overlay.toggle, testSources: overlay.testSources };
+	// Small public handle for debugging from DevTools: window.AuroraLyrics.open()
+	globalThis.AuroraLyrics = { open: overlay.open, close: overlay.close, toggle: overlay.toggle, testSources: overlay.testSources, toggleMini: () => mini?.toggle() };
 	console.info(`[${EXT_ID}] loaded`);
 }

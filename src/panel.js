@@ -4,11 +4,12 @@
 //  - This track: paste / import .lrc or .txt lyrics for the current track.
 
 import { h } from "./util.js";
-import { SCHEMA, FONTS, PROVIDER_INFO, settings } from "./settings.js";
+import { SCHEMA, FONTS, PROVIDER_INFO, THEMES, DEFAULTS, settings } from "./settings.js";
 import { ICONS, STYLE_ART, ARROWS } from "./icons.js";
 
 const MAX_IMPORT_BYTES = 512 * 1024;
 const SEGMENT_ICONS = { left: ICONS.alignLeft, center: ICONS.alignCenter, right: ICONS.alignRight };
+const ACCENT_SWATCHES = ["#ff5fa2", "#ff7a45", "#ffc93d", "#3ddc84", "#2ec5ff", "#7aa2ff", "#b388ff", "#ffffff"];
 
 const loadedFonts = new Set();
 /** Load a Google web font the first time it is needed (no-op for local stacks). */
@@ -16,7 +17,7 @@ export function ensureFont(key) {
 	const f = FONTS[key];
 	if (!f?.web || loadedFonts.has(key)) return;
 	loadedFonts.add(key);
-	document.head.append(h("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${f.web}&display=swap`, "data-fal-font": key }));
+	document.head.append(h("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${f.web}&display=swap`, "data-aur-font": key }));
 }
 
 function fmtValue(entry, v) {
@@ -49,13 +50,13 @@ function choiceGroup(entry, className, renderOption) {
 }
 
 function buildControl(entry) {
-	const id = `fal-set-${entry.key}`;
+	const id = `aur-set-${entry.key}`;
 	const value = settings.get(entry.key);
-	const labelEl = (extra) => h("div", { class: "fal-row-label" }, h("span", null, entry.label), extra);
+	const labelEl = (extra) => h("div", { class: "aur-row-label" }, h("span", null, entry.label), extra);
 
 	if (entry.type === "providers") {
 		// Ordered provider list: rank, name (+ WORD badge), description, move up/down, on/off.
-		const list = h("div", { class: "fal-prov-list" });
+		const list = h("div", { class: "aur-prov-list" });
 		const render = (providers) => {
 			const set = (next) => settings.set(entry.key, next);
 			list.replaceChildren(
@@ -68,18 +69,18 @@ function buildControl(entry) {
 					};
 					return h(
 						"div",
-						{ class: p.on ? "fal-prov" : "fal-prov is-off" },
-						h("span", { class: "fal-prov-rank" }, String(i + 1)),
-						h("div", null, h("div", { class: "fal-prov-name" }, info.label, info.words ? h("span", { class: "fal-prov-badge", title: "Can provide word-by-word timing" }, "WORD") : null), h("div", { class: "fal-prov-desc" }, info.desc)),
+						{ class: p.on ? "aur-prov" : "aur-prov is-off" },
+						h("span", { class: "aur-prov-rank" }, String(i + 1)),
+						h("div", null, h("div", { class: "aur-prov-name" }, info.label, info.words ? h("span", { class: "aur-prov-badge", title: "Can provide word-by-word timing" }, "WORD") : null), h("div", { class: "aur-prov-desc" }, info.desc)),
 						h(
 							"div",
-							{ class: "fal-prov-move" },
+							{ class: "aur-prov-move" },
 							h("button", { title: "Move up", "aria-label": `Move ${info.label} up`, html: ARROWS.up(), disabled: i === 0, onclick: () => move(-1) }),
 							h("button", { title: "Move down", "aria-label": `Move ${info.label} down`, html: ARROWS.down(), disabled: i === providers.length - 1, onclick: () => move(1) }),
 						),
 						h("input", {
 							type: "checkbox",
-							class: "fal-switch",
+							class: "aur-switch",
 							checked: p.on,
 							"aria-label": `Use ${info.label}`,
 							onchange: (e) => set(providers.map((q) => (q.id === p.id ? { ...q, on: e.target.checked } : q))),
@@ -89,53 +90,75 @@ function buildControl(entry) {
 			);
 		};
 		render(value);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), list), sync: render };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), list), sync: render };
+	}
+
+	if (entry.type === "color") {
+		// "Album" (colour from the cover art), a few presets, and a custom picker.
+		const picker = h("input", { type: "color", class: "aur-swatch-input", "aria-label": "Pick a custom colour", oninput: (e) => settings.set(entry.key, e.target.value) });
+		const customBtn = h("label", { class: "aur-swatch is-custom", title: "Custom colour", role: "radio" }, picker);
+		const albumBtn = h("button", { class: "aur-swatch is-album", title: "From the album cover", role: "radio", onclick: () => settings.set(entry.key, "album") }, "Album");
+		const presetBtns = ACCENT_SWATCHES.map((c) =>
+			h("button", { class: "aur-swatch", title: c, role: "radio", "aria-label": `Accent ${c}`, style: `--sw:${c}`, "data-color": c, onclick: () => settings.set(entry.key, c) }),
+		);
+		const sync = (v) => {
+			const preset = ACCENT_SWATCHES.includes(v);
+			albumBtn.setAttribute("aria-checked", String(v === "album"));
+			for (const b of presetBtns) b.setAttribute("aria-checked", String(b.dataset.color === v));
+			const custom = v !== "album" && !preset;
+			customBtn.setAttribute("aria-checked", String(custom));
+			customBtn.style.setProperty("--sw", custom ? v : "transparent");
+			if (v !== "album") picker.value = v;
+		};
+		sync(value);
+		const el = h("div", { class: "aur-swatches", role: "radiogroup", "aria-label": entry.label }, albumBtn, presetBtns, customBtn);
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "toggle") {
-		const input = h("input", { type: "checkbox", id, class: "fal-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
-		return { row: h("label", { class: "fal-row fal-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
+		const input = h("input", { type: "checkbox", id, class: "aur-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
+		return { row: h("label", { class: "aur-row aur-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
 	}
 
 	if (entry.type === "select" && entry.ui === "segmented") {
-		const { el, sync } = choiceGroup(entry, "fal-segmented", (v, label) =>
-			h("button", { class: "fal-seg", title: label, html: SEGMENT_ICONS[v] && entry.key === "textAlign" ? SEGMENT_ICONS[v]() : null }, SEGMENT_ICONS[v] && entry.key === "textAlign" ? null : label),
+		const { el, sync } = choiceGroup(entry, "aur-segmented", (v, label) =>
+			h("button", { class: "aur-seg", title: label, html: SEGMENT_ICONS[v] && entry.key === "textAlign" ? SEGMENT_ICONS[v]() : null }, SEGMENT_ICONS[v] && entry.key === "textAlign" ? null : label),
 		);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select" && entry.ui === "cards") {
-		const { el, sync } = choiceGroup(entry, "fal-cards", (v, label) =>
-			h("button", { class: "fal-card" }, h("span", { class: "fal-card-art", html: STYLE_ART[v] || "" }), h("span", { class: "fal-card-name" }, label), h("span", { class: "fal-card-hint" }, entry.hints?.[v] || "")),
+		const { el, sync } = choiceGroup(entry, "aur-cards", (v, label) =>
+			h("button", { class: "aur-card" }, h("span", { class: "aur-card-art", html: STYLE_ART[v] || "" }), h("span", { class: "aur-card-name" }, label), h("span", { class: "aur-card-hint" }, entry.hints?.[v] || "")),
 		);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select" && entry.ui === "fonts") {
-		const { el, sync } = choiceGroup(entry, "fal-fonts", (v, label) => {
+		const { el, sync } = choiceGroup(entry, "aur-fonts", (v, label) => {
 			const f = FONTS[v];
 			return h(
 				"button",
-				{ class: "fal-font", title: f.web ? `${label} (web font, loaded from Google Fonts)` : label, onpointerenter: () => ensureFont(v), onfocus: () => ensureFont(v) },
-				h("span", { class: "fal-font-sample", style: { fontFamily: f.stack } }, "Aa"),
-				h("span", { class: "fal-font-name" }, label),
+				{ class: "aur-font", title: f.web ? `${label} (web font, loaded from Google Fonts)` : label, onpointerenter: () => ensureFont(v), onfocus: () => ensureFont(v) },
+				h("span", { class: "aur-font-sample", style: { fontFamily: f.stack } }, "Aa"),
+				h("span", { class: "aur-font-name" }, label),
 			);
 		});
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select") {
 		const select = h(
 			"select",
-			{ id, class: "fal-select", onchange: (e) => settings.set(entry.key, e.target.value) },
+			{ id, class: "aur-select", onchange: (e) => settings.set(entry.key, e.target.value) },
 			entry.options.map(([v, label]) => h("option", { value: v, selected: v === value }, label)),
 		);
-		return { row: h("label", { class: "fal-row", for: id }, h("span", null, entry.label), select), sync: (v) => (select.value = v) };
+		return { row: h("label", { class: "aur-row", for: id }, h("span", null, entry.label), select), sync: (v) => (select.value = v) };
 	}
 
 	// range — the filled part of the track is drawn from --p (0..100%)
-	const out = h("output", { class: "fal-range-value" }, fmtValue(entry, value));
-	const input = h("input", { type: "range", id, min: String(entry.min), max: String(entry.max), step: String(entry.step), class: "fal-range" });
+	const out = h("output", { class: "aur-range-value" }, fmtValue(entry, value));
+	const input = h("input", { type: "range", id, min: String(entry.min), max: String(entry.max), step: String(entry.step), class: "aur-range" });
 	const paint = (v) => {
 		input.style.setProperty("--p", `${((v - entry.min) / (entry.max - entry.min)) * 100}%`);
 		out.textContent = fmtValue(entry, v);
@@ -148,7 +171,7 @@ function buildControl(entry) {
 	input.value = String(value);
 	paint(value);
 	return {
-		row: h("label", { class: "fal-row fal-row-range", for: id }, labelEl(out), input),
+		row: h("label", { class: "aur-row aur-row-range", for: id }, labelEl(out), input),
 		sync: (v) => {
 			input.value = String(v);
 			paint(v);
@@ -176,7 +199,7 @@ export function createPanel(ctx) {
 	// Rail order. "track" = this song's lyrics; the others group SCHEMA sections.
 	const PAGES = [
 		{ id: "track", label: "Lyrics", icon: ICONS.navLyrics, title: "This track", sub: "Source, reload, import" },
-		{ id: "look", label: "Look", icon: ICONS.navLook, title: "Look", sub: "Layout, text and background", sections: ["Layout", "Text", "Background"] },
+		{ id: "look", label: "Look", icon: ICONS.navLook, title: "Look", sub: "Layout, text and background", sections: ["Theme", "Layout", "Text", "Background"] },
 		{ id: "motion", label: "Motion", icon: ICONS.navMotion, title: "Motion", sub: "Line and word animation", sections: ["Motion", "Words"] },
 		{ id: "sources", label: "Sources", icon: ICONS.navSources, title: "Sources", sub: "Where lyrics come from, translation", sections: ["Sources", "Translation"] },
 		{ id: "general", label: "General", icon: ICONS.navGeneral, title: "General", sub: "Sync, controls and shortcuts", sections: ["Sync", "Interface"] },
@@ -192,41 +215,84 @@ export function createPanel(ctx) {
 		syncers.set(entry.key, sync);
 		sections.get(entry.section).push(row);
 	}
+	// Theme cards: one-click looks. "Custom" appears once the user has a look of their own
+	// (it restores what a theme replaced).
+	const themeCards = new Map();
+	const themeCard = (id, label, hint, swatch, font) => {
+		const btn = h(
+			"button",
+			{
+				class: "aur-card aur-theme",
+				role: "radio",
+				title: hint,
+				onpointerenter: () => ensureFont(font),
+				onclick: () => {
+					if (btn.getAttribute("aria-checked") === "true") return;
+					settings.applyTheme(id);
+					ctx.toast(id === "custom" ? "Your custom look is back" : `Theme: ${label}`);
+				},
+			},
+			h("span", { class: "aur-theme-art", style: `--t1:${swatch[0]};--t2:${swatch[1]}` }, h("span", { style: { fontFamily: FONTS[font]?.stack } }, "Aa")),
+			h("span", { class: "aur-card-name" }, label),
+			h("span", { class: "aur-card-hint" }, hint),
+		);
+		themeCards.set(id, btn);
+		return btn;
+	};
+	const themeGrid = h(
+		"div",
+		{ class: "aur-cards aur-themes", role: "radiogroup", "aria-label": "Theme" },
+		THEMES.map((t) => themeCard(t.id, t.label, t.hint, t.swatch, t.values.font || DEFAULTS.font)),
+		themeCard("custom", "Custom", "Your own look", ["#3a3a44", "#16161c"], DEFAULTS.font),
+	);
+	const syncThemes = (all) => {
+		const active = settings.currentTheme() || "custom";
+		for (const [id, btn] of themeCards) btn.setAttribute("aria-checked", String(id === active));
+		themeCards.get("custom").hidden = active !== "custom" && !all.customLook;
+	};
+	const themeRow = h("div", { class: "aur-row aur-row-stack" }, h("div", { class: "aur-row-label" }, h("span", null, "Theme")), themeGrid);
+	themeRow.dataset.search = ["theme preset look style", ...THEMES.map((t) => `${t.label} ${t.hint}`)].join(" ").toLowerCase();
+	sections.get("Theme").unshift(themeRow);
+	syncThemes(settings.all());
+
 	const bodies = {};
 	for (const page of PAGES.filter((pg) => pg.sections)) {
 		bodies[page.id] = h(
 			"div",
-			{ class: "fal-tab-body", "data-tab": page.id, hidden: true },
-			page.sections.map((name) => h("div", { class: "fal-section", "data-section": name }, h("h3", null, name), h("div", { class: "fal-section-card" }, sections.get(name) || []))),
+			{ class: "aur-tab-body", "data-tab": page.id, hidden: true },
+			page.sections.map((name) => h("div", { class: "aur-section", "data-section": name }, h("h3", null, name), h("div", { class: "aur-section-card" }, sections.get(name) || []))),
 		);
 	}
 	bodies.general.append(
-		h("div", { class: "fal-section" }, h("h3", null, "Shortcuts"), h(
+		h("div", { class: "aur-section" }, h("h3", null, "Shortcuts"), h(
 			"div",
-			{ class: "fal-keys" },
+			{ class: "aur-keys" },
 			[
 				["Alt L", "Open / close"],
 				["Esc", "Close"],
 				["[ ]", "Offset ∓100 ms"],
 				["F", "Fullscreen"],
+				["S", "Share lyrics"],
+				["Alt M", "Mini lyrics"],
+				["Right-click line", "Share that line"],
 				["Wheel", "Browse lyrics"],
 				["Click line", "Jump there"],
-			].map(([k, d]) => h("div", { class: "fal-key" }, h("kbd", null, k), h("span", null, d))),
+			].map(([k, d]) => h("div", { class: "aur-key" }, h("kbd", null, k), h("span", null, d))),
 		)),
 		h(
 			"div",
-			{ class: "fal-section" },
+			{ class: "aur-section" },
 			h("h3", null, "Maintenance"),
 			h(
 				"div",
-				{ class: "fal-panel-actions" },
-				h("button", { class: "fal-btn", onclick: () => ctx.toast(`Cleared ${ctx.clearCache()} cached lyrics`) }, "Clear lyrics cache"),
-				h("button", { class: "fal-btn fal-btn-ghost", onclick: () => (settings.reset(), ctx.toast("Settings reset")) }, "Reset to defaults"),
+				{ class: "aur-panel-actions" },
+				h("button", { class: "aur-btn", onclick: () => ctx.toast(`Cleared ${ctx.clearCache()} cached lyrics`) }, "Clear lyrics cache"),
+				h("button", { class: "aur-btn aur-btn-ghost", onclick: () => (settings.reset(), ctx.toast("Settings reset")) }, "Reset to defaults"),
 			),
 		),
 	);
 	const settingsBodies = Object.values(bodies);
-	const noResults = h("div", { class: "fal-no-results", hidden: true }, "No settings match your search.");
+	const noResults = h("div", { class: "aur-no-results", hidden: true }, "No settings match your search.");
 
 	const syncDisabled = (all) => {
 		for (const b of settingsBodies) b.querySelector('[data-key="autoHideDelay"]')?.classList.toggle("is-disabled", !all.autoHideControls);
@@ -235,16 +301,17 @@ export function createPanel(ctx) {
 		if (key === "*") for (const [k, fn] of syncers) fn(all[k]);
 		else syncers.get(key)?.(v);
 		syncDisabled(all);
+		syncThemes(all);
 	});
 	syncDisabled(settings.all());
 
 	// --- This track tab ------------------------------------------------------
 	// "Load lyrics from": Auto + one button per provider. Picking one pins it to this track.
-	const sourceGrid = h("div", { class: "fal-src-grid" });
+	const sourceGrid = h("div", { class: "aur-src-grid" });
 	const testBtn = h(
 		"button",
 		{
-			class: "fal-btn fal-btn-ghost fal-test-btn",
+			class: "aur-btn aur-btn-ghost aur-test-btn",
 			title: "Ask every source for this song and show what each one returns (doesn't change your settings)",
 			onclick: async () => {
 				testBtn.disabled = true;
@@ -257,9 +324,9 @@ export function createPanel(ctx) {
 		},
 		"Test all sources",
 	);
-	const trackInfo = h("div", null, h("div", { class: "fal-src-title" }, "Load lyrics from"), sourceGrid, testBtn, h("div", { class: "fal-src-title" }, "Edit or import"));
+	const trackInfo = h("div", null, h("div", { class: "aur-src-title" }, "Load lyrics from"), sourceGrid, testBtn, h("div", { class: "aur-src-title" }, "Edit or import"));
 	const textarea = h("textarea", {
-		class: "fal-textarea",
+		class: "aur-textarea",
 		spellcheck: "false",
 		placeholder: "Paste lyrics here.\n\nSynced (LRC):\n[00:12.30]First line\n[00:15.80]Second line\n\nEnhanced LRC (word timing):\n[00:12.30]<00:12.30>First <00:12.70>line<00:13.40>\n\nOr plain text for unsynced lyrics.",
 	});
@@ -277,7 +344,7 @@ export function createPanel(ctx) {
 			ctx.toast(`Loaded ${file.name} — press Save to use it`);
 		},
 	});
-	const removeBtn = h("button", { class: "fal-btn fal-btn-danger", onclick: () => (ctx.removeLocal(), refreshTrack()) }, "Remove imported");
+	const removeBtn = h("button", { class: "aur-btn aur-btn-danger", onclick: () => (ctx.removeLocal(), refreshTrack()) }, "Remove imported");
 
 	// Dropping a file anywhere on the editor imports it.
 	textarea.addEventListener("dragover", (e) => (e.preventDefault(), textarea.classList.add("is-drop")));
@@ -295,17 +362,17 @@ export function createPanel(ctx) {
 
 	const trackBody = h(
 		"div",
-		{ class: "fal-tab-body", "data-tab": "track", hidden: true },
+		{ class: "aur-tab-body", "data-tab": "track", hidden: true },
 		trackInfo,
 		textarea,
 		h(
 			"div",
-			{ class: "fal-panel-actions" },
-			h("button", { class: "fal-btn", onclick: () => fileInput.click(), html: `${ICONS.upload()}<span>Import file</span>` }),
+			{ class: "aur-panel-actions" },
+			h("button", { class: "aur-btn", onclick: () => fileInput.click(), html: `${ICONS.upload()}<span>Import file</span>` }),
 			h(
 				"button",
 				{
-					class: "fal-btn fal-btn-ghost",
+					class: "aur-btn aur-btn-ghost",
 					title: "Copy the currently shown lyrics into the editor (e.g. to fix timings)",
 					onclick: () => {
 						const { lrc } = ctx.getLyricsInfo();
@@ -318,11 +385,11 @@ export function createPanel(ctx) {
 		),
 		h(
 			"div",
-			{ class: "fal-panel-actions" },
+			{ class: "aur-panel-actions" },
 			h(
 				"button",
 				{
-					class: "fal-btn fal-btn-primary",
+					class: "aur-btn aur-btn-primary",
 					onclick: () => {
 						const text = textarea.value.trim();
 						if (!text) return ctx.toast("Nothing to save");
@@ -334,7 +401,7 @@ export function createPanel(ctx) {
 			),
 			removeBtn,
 		),
-		h("p", { class: "fal-hint" }, "Drop an .lrc or .txt file on the editor, or paste text. Imported lyrics are stored locally, always take priority over online sources, and also apply to the same song on other albums."),
+		h("p", { class: "aur-hint" }, "Drop an .lrc or .txt file on the editor, or paste text. Imported lyrics are stored locally, always take priority over online sources, and also apply to the same song on other albums."),
 		fileInput,
 	);
 
@@ -362,7 +429,7 @@ export function createPanel(ctx) {
 				const btn = h(
 					"button",
 					{
-						class: `fal-src-btn${id === current ? " is-current" : ""}`,
+						class: `aur-src-btn${id === current ? " is-current" : ""}`,
 						title: id === "auto" ? "Search all enabled sources in order" : `Use ${label} for this track`,
 						onclick: async () => {
 							btn.classList.add("is-loading");
@@ -388,14 +455,14 @@ export function createPanel(ctx) {
 	}
 
 	// --- Shell: rail + header (title, search, close) + pages --------------------
-	const nowPlaying = h("div", { class: "fal-np" });
+	const nowPlaying = h("div", { class: "aur-np" });
 	function setNowPlaying(track, sourceLabel) {
 		nowPlaying.hidden = !track;
 		if (!track) return;
 		nowPlaying.replaceChildren(
 			track.image ? h("img", { src: track.image, alt: "" }) : null,
-			h("div", { class: "fal-np-text" }, h("div", { class: "fal-np-title" }, track.title), h("div", { class: "fal-np-sub" }, [track.artist, track.album].filter(Boolean).join(" • "))),
-			h("span", { class: "fal-np-chip", title: "Lyrics source" }, sourceLabel || "No lyrics"),
+			h("div", { class: "aur-np-text" }, h("div", { class: "aur-np-title" }, track.title), h("div", { class: "aur-np-sub" }, [track.artist, track.album].filter(Boolean).join(" • "))),
+			h("span", { class: "aur-np-chip", title: "Lyrics source" }, sourceLabel || "No lyrics"),
 		);
 	}
 	trackBody.prepend(nowPlaying);
@@ -403,33 +470,33 @@ export function createPanel(ctx) {
 	const railButtons = new Map();
 	const rail = h(
 		"nav",
-		{ class: "fal-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "Settings pages" },
-		h("span", { class: "fal-rail-pill", "aria-hidden": "true" }),
+		{ class: "aur-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "Settings pages" },
+		h("span", { class: "aur-rail-pill", "aria-hidden": "true" }),
 		PAGES.map((pg) => {
-			const btn = h("button", { class: "fal-rail-btn", role: "tab", title: pg.title, onclick: () => ((search.value = ""), show(pg.id)) }, h("span", { class: "fal-rail-icon", html: pg.icon() }), h("span", { class: "fal-rail-label" }, pg.label));
+			const btn = h("button", { class: "aur-rail-btn", role: "tab", title: pg.title, onclick: () => ((search.value = ""), show(pg.id)) }, h("span", { class: "aur-rail-icon", html: pg.icon() }), h("span", { class: "aur-rail-label" }, pg.label));
 			railButtons.set(pg.id, btn);
 			return btn;
 		}),
 	);
-	const titleEl = h("div", { class: "fal-panel-title" });
-	const subEl = h("div", { class: "fal-panel-sub" });
-	const search = h("input", { type: "search", class: "fal-search", placeholder: "Search settings", "aria-label": "Search settings", spellcheck: "false" });
+	const titleEl = h("div", { class: "aur-panel-title" });
+	const subEl = h("div", { class: "aur-panel-sub" });
+	const search = h("input", { type: "search", class: "aur-search", placeholder: "Search settings", "aria-label": "Search settings", spellcheck: "false" });
 	search.addEventListener("input", () => applySearch());
 	const el = h(
 		"div",
-		{ class: "fal-panel", role: "dialog", "aria-label": "Lyrics settings" },
+		{ class: "aur-panel", role: "dialog", "aria-label": "Lyrics settings" },
 		rail,
 		h(
 			"div",
-			{ class: "fal-panel-main" },
+			{ class: "aur-panel-main" },
 			h(
 				"div",
-				{ class: "fal-panel-head" },
-				h("div", { class: "fal-panel-heading" }, titleEl, subEl),
-				h("button", { class: "fal-icon-btn fal-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
-				h("label", { class: "fal-search-wrap" }, h("span", { class: "fal-search-icon", html: ICONS.search() }), search),
+				{ class: "aur-panel-head" },
+				h("div", { class: "aur-panel-heading" }, titleEl, subEl),
+				h("button", { class: "aur-icon-btn aur-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
+				h("label", { class: "aur-search-wrap" }, h("span", { class: "aur-search-icon", html: ICONS.search() }), search),
 			),
-			h("div", { class: "fal-panel-scroll" }, trackBody, settingsBodies, noResults),
+			h("div", { class: "aur-panel-scroll" }, trackBody, settingsBodies, noResults),
 		),
 	);
 	// Keep typing in the panel from triggering Spotify / overlay shortcuts.
@@ -462,7 +529,7 @@ export function createPanel(ctx) {
 		trackBody.hidden = tab !== "track";
 		for (const [id, body] of Object.entries(bodies)) body.hidden = id !== tab;
 		noResults.hidden = true;
-		el.querySelector(".fal-panel-scroll").scrollTop = 0;
+		el.querySelector(".aur-panel-scroll").scrollTop = 0;
 		if (tab === "track") refreshTrack();
 	}
 
@@ -472,7 +539,7 @@ export function createPanel(ctx) {
 		el.dataset.searching = q ? "true" : "false";
 		if (!q) {
 			for (const b of settingsBodies) for (const r of b.querySelectorAll("[data-search]")) r.hidden = false;
-			for (const sec of el.querySelectorAll(".fal-section")) sec.hidden = false;
+			for (const sec of el.querySelectorAll(".aur-section")) sec.hidden = false;
 			return show(current);
 		}
 		titleEl.textContent = "Search";
@@ -482,7 +549,7 @@ export function createPanel(ctx) {
 		let any = false;
 		for (const body of settingsBodies) {
 			body.hidden = false;
-			for (const sec of body.querySelectorAll(".fal-section")) {
+			for (const sec of body.querySelectorAll(".aur-section")) {
 				const rows = [...sec.querySelectorAll("[data-search]")];
 				let visible = 0;
 				for (const r of rows) {

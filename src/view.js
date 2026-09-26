@@ -8,11 +8,11 @@
 //  - All motion is CSS transitions on transform / opacity / filter.
 //
 // Layouts:
-//  - "list"  (flow, slide, scale): lines in a column. The list publishes --fal-y (the
+//  - "list"  (flow, slide, scale): lines in a column. The list publishes --aur-y (the
 //            scroll offset); every line applies it in its own transform, so each line can
 //            transition with its own delay — that's the staggered "wave" in Flow.
 //  - "stack" (fade, cinematic): lines absolutely stacked at the centre; the active line's
-//            height is published as --fal-ah so neighbours sit above/below it.
+//            height is published as --aur-ah so neighbours sit above/below it.
 
 import { h, clamp, nextFrame } from "./util.js";
 import { findLineIndex } from "./lrc.js";
@@ -30,13 +30,14 @@ const WORD_LEAD_MS = 40; // highlight words slightly early to cover render laten
 export class LyricsView {
 	/**
 	 * @param {HTMLElement} stage
-	 * @param {{ onSeek?: (ms:number)=>void }} opts
+	 * @param {{ onSeek?: (ms:number)=>void, onShare?: (lineIndex:number)=>void }} opts
 	 */
 	constructor(stage, opts = {}) {
 		this.stage = stage;
 		this.onSeek = opts.onSeek;
-		this.list = h("div", { class: "fal-lines" });
-		this.message = h("div", { class: "fal-message", role: "status" });
+		this.onShare = opts.onShare;
+		this.list = h("div", { class: "aur-lines" });
+		this.message = h("div", { class: "aur-message", role: "status" });
 		stage.append(this.list, this.message);
 		stage.dataset.mode = "none";
 
@@ -133,19 +134,19 @@ export class LyricsView {
 			this.message.dataset.kind = kind;
 			const parts = [
 				opts.image
-					? h("div", { class: "fal-message-art" }, h("img", { src: opts.image, alt: "", decoding: "async" }))
-					: h("div", { class: "fal-message-icon", html: opts.icon || "" }),
-				kind === "loading" && h("div", { class: "fal-spinner", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
-				h("div", { class: "fal-message-title" }, title),
-				h("div", { class: "fal-message-detail" }, detail || ""),
-				opts.action && h("button", { class: "fal-btn fal-btn-primary fal-message-action", onclick: opts.action.onClick }, opts.action.label),
+					? h("div", { class: "aur-message-art" }, h("img", { src: opts.image, alt: "", decoding: "async" }))
+					: h("div", { class: "aur-message-icon", html: opts.icon || "" }),
+				kind === "loading" && h("div", { class: "aur-spinner", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
+				h("div", { class: "aur-message-title" }, title),
+				h("div", { class: "aur-message-detail" }, detail || ""),
+				opts.action && h("button", { class: "aur-btn aur-btn-primary aur-message-action", onclick: opts.action.onClick }, opts.action.label),
 			];
 			this.message.replaceChildren(...parts.filter(Boolean)); // replaceChildren would stringify null
 		});
 	}
 
 	setStatus(text) {
-		const el = this.message.querySelector(".fal-message-detail");
+		const el = this.message.querySelector(".aur-message-detail");
 		if (el) el.textContent = text || "";
 	}
 
@@ -181,10 +182,10 @@ export class LyricsView {
 				const long = w.end - w.time >= LONG_WORD_MS;
 				const chars = Array.from(m[2]);
 				const split = (letters || long) && chars.length > 1 && chars.length <= 16;
-				const content = split ? chars.map((ch, ci) => h("span", { class: "fal-c", style: `--i:${ci};--n:${chars.length}` }, ch)) : m[2];
-				const span = h("span", { class: `fal-w${long ? " is-long" : ""}${split ? " has-chars" : ""}` }, content);
+				const content = split ? chars.map((ch, ci) => h("span", { class: "aur-c", style: `--i:${ci};--n:${chars.length}` }, ch)) : m[2];
+				const span = h("span", { class: `aur-w${long ? " is-long" : ""}${split ? " has-chars" : ""}` }, content);
 				if (!group) {
-					group = h("span", { class: "fal-wg" });
+					group = h("span", { class: "aur-wg" });
 					container.append(group);
 				}
 				group.append(span);
@@ -202,10 +203,13 @@ export class LyricsView {
 			let words = null;
 			if (line.gap) {
 				// Instrumental break: three dots that fill up over the gap's duration.
-				el = h("div", { class: "fal-line is-gap", "aria-hidden": "true" }, h("span", { class: "fal-dots" }, h("i"), h("i"), h("i")));
+				el = h("div", { class: "aur-line is-gap", "aria-hidden": "true" }, h("span", { class: "aur-dots" }, h("i"), h("i"), h("i")));
 			} else {
-				const main = h("div", { class: "fal-main" });
-				el = h("div", { class: line.opposite ? "fal-line is-opposite" : "fal-line" }, main);
+				const main = h("div", { class: "aur-main" });
+				el = h("div", { class: line.opposite ? "aur-line is-opposite" : "aur-line" }, main);
+				// Duets: who sings it (colours per singer; older cached lyrics only have `opposite`).
+				const singer = line.singer ?? (line.opposite ? 1 : null);
+				if (singer) el.dataset.singer = String(singer);
 				let pairs = [];
 				if (line.words) {
 					el.classList.add("has-words");
@@ -215,7 +219,7 @@ export class LyricsView {
 				}
 				// Background vocals: a smaller line under the main one, filled in time with it.
 				if (line.bg && this.showBg) {
-					const bgEl = h("div", { class: "fal-bgv" });
+					const bgEl = h("div", { class: "aur-bgv" });
 					if (line.bg.words) {
 						el.classList.add("has-words");
 						pairs = pairs.concat(addWords(bgEl, line.bg.words));
@@ -236,6 +240,12 @@ export class LyricsView {
 				el.addEventListener("click", () => {
 					this.stopBrowsing(true);
 					this.onSeek(line.time);
+				});
+			}
+			if (!line.gap && this.onShare) {
+				el.addEventListener("contextmenu", (e) => {
+					e.preventDefault();
+					this.onShare(i);
 				});
 			}
 			this.lineEls.push(el);
@@ -261,13 +271,13 @@ export class LyricsView {
 	}
 
 	applyTranslations() {
-		for (const el of this.list.querySelectorAll(".fal-tr")) el.remove();
+		for (const el of this.list.querySelectorAll(".aur-tr")) el.remove();
 		const tr = this.tr;
 		if (!tr || !this.lyrics || tr.length !== this.lyrics.lines.length) return;
 		this.lineEls.forEach((el, i) => {
 			if (!tr[i] || el.classList.contains("is-gap")) return;
-			const node = h("div", { class: "fal-tr", lang: "" }, tr[i]);
-			const bg = el.querySelector(".fal-bgv");
+			const node = h("div", { class: "aur-tr", lang: "" }, tr[i]);
+			const bg = el.querySelector(".aur-bgv");
 			bg ? el.insertBefore(node, bg) : el.append(node);
 		});
 	}
@@ -309,7 +319,7 @@ export class LyricsView {
 		const line = lyrics.lines[idx];
 		if (line.gap) {
 			const p = clamp((pos - line.time) / Math.max(1, line.end - line.time), 0, 1);
-			this.lineEls[idx].style.setProperty("--fal-gp", p.toFixed(3));
+			this.lineEls[idx].style.setProperty("--aur-gp", p.toFixed(3));
 		} else if (this.wordEls[idx] && this.wordSync) {
 			this.updateWords(idx, pos);
 		}
@@ -351,18 +361,18 @@ export class LyricsView {
 	position(instant = false) {
 		if (!this.lyrics?.synced || !this.lineEls.length) return;
 		const focus = this.lineEls[Math.max(this.active, 0)];
-		if (instant) this.stage.classList.add("fal-no-anim");
+		if (instant) this.stage.classList.add("aur-no-anim");
 
 		if (this.layout === "stack") {
-			this.stage.style.setProperty("--fal-ah", `${focus.offsetHeight}px`);
+			this.stage.style.setProperty("--aur-ah", `${focus.offsetHeight}px`);
 		} else {
 			this.y = Math.round(this.stage.clientHeight * ANCHOR - (focus.offsetTop + focus.offsetHeight / 2));
-			if (!this.browsing) this.list.style.setProperty("--fal-y", `${this.y}px`);
+			if (!this.browsing) this.list.style.setProperty("--aur-y", `${this.y}px`);
 		}
 
 		if (instant) {
 			void this.list.offsetHeight; // flush so no-anim applies to this change only
-			nextFrame(() => this.stage.classList.remove("fal-no-anim"));
+			nextFrame(() => this.stage.classList.remove("aur-no-anim"));
 		}
 	}
 
@@ -372,7 +382,7 @@ export class LyricsView {
 	 * element's own (untransformed) coordinates.
 	 */
 	measureHalo(el) {
-		const main = el.querySelector(".fal-main");
+		const main = el.querySelector(".aur-main");
 		if (!main || !main.firstChild) return;
 		const range = document.createRange();
 		range.selectNodeContents(main);
@@ -410,7 +420,7 @@ export class LyricsView {
 			this.browsing = true;
 			this.stage.classList.add("is-browsing");
 		}
-		this.list.style.setProperty("--fal-y", `${Math.round(this.browseY)}px`);
+		this.list.style.setProperty("--aur-y", `${Math.round(this.browseY)}px`);
 		clearTimeout(this.browseTimer);
 		this.browseTimer = setTimeout(() => this.stopBrowsing(), BROWSE_RESUME);
 	}
@@ -423,7 +433,7 @@ export class LyricsView {
 		this.stage.classList.remove("is-browsing");
 		if (instant) return;
 		this.list.dataset.dir = this.browseY > this.y ? "up" : "down";
-		this.list.style.setProperty("--fal-y", `${this.y}px`);
+		this.list.style.setProperty("--aur-y", `${this.y}px`);
 	}
 
 	// -------------------------------------------------------------------------
@@ -435,13 +445,13 @@ export class LyricsView {
 		if (!data) return;
 		for (const s of data.spans) {
 			s.classList.remove("sung", "now");
-			s.style.removeProperty("--fal-wp");
+			s.style.removeProperty("--aur-wp");
 		}
 	}
 
 	/**
 	 * Word-level progress for the active line (main + background words, time-ordered).
-	 * Every word carries one continuous value, --fal-wp: 0 = upcoming, 0..1 = being sung,
+	 * Every word carries one continuous value, --aur-wp: 0 = upcoming, 0..1 = being sung,
 	 * 1 = sung. All word styling (sweep, colour, lift, glow, scale, letter wave) is derived
 	 * from it in CSS, so nothing ever snaps between states. Only the current word is
 	 * written every frame; others change once when the current word moves on.
@@ -457,15 +467,15 @@ export class LyricsView {
 				const span = spans[i];
 				span.classList.toggle("sung", i < k);
 				span.classList.toggle("now", i === k);
-				if (i < k) span.style.setProperty("--fal-wp", "1");
-				else if (i > k) span.style.removeProperty("--fal-wp");
+				if (i < k) span.style.setProperty("--aur-wp", "1");
+				else if (i > k) span.style.removeProperty("--aur-wp");
 			}
 			this.wordIdx = k;
 		}
 		if (k >= 0 && k < spans.length) {
 			const w = words[k];
 			const p = w.end > w.time ? Math.min(1, Math.max(0, (pos - w.time) / (w.end - w.time))) : 1;
-			spans[k].style.setProperty("--fal-wp", p.toFixed(4));
+			spans[k].style.setProperty("--aur-wp", p.toFixed(4));
 		}
 	}
 

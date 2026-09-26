@@ -20,6 +20,40 @@ function backend() {
 	return { get: (k) => (memory.has(k) ? memory.get(k) : null), set: (k, v) => memory.set(k, v), remove: (k) => memory.delete(k) };
 }
 
+/**
+ * One-time move of data saved under the extension's old name ("fullscreen-animated-lyrics:…")
+ * to the current prefix. Matches the prefix anywhere in the key, so it also works if the
+ * storage layer adds its own namespace in front. Existing new keys are never overwritten.
+ * @param {Storage} ls  anything with length / key() / getItem() / setItem() / removeItem()
+ * @returns {number} keys moved
+ */
+export function migrateLegacyKeys(ls, from = "fullscreen-animated-lyrics:", to = "aurora-lyrics:") {
+	let moved = 0;
+	try {
+		const keys = [];
+		for (let i = 0; i < ls.length; i++) {
+			const k = ls.key(i);
+			if (k && k.includes(from)) keys.push(k);
+		}
+		for (const k of keys) {
+			const next = k.replace(from, to);
+			if (ls.getItem(next) == null) {
+				ls.setItem(next, ls.getItem(k));
+				moved++;
+			}
+			ls.removeItem(k);
+		}
+	} catch (e) {
+		console.warn("[aurora-lyrics] could not migrate old settings", e);
+	}
+	return moved;
+}
+try {
+	if (globalThis.localStorage && typeof window !== "undefined") migrateLegacyKeys(globalThis.localStorage);
+} catch {
+	/* storage blocked */
+}
+
 export const store = {
 	getJSON(key, fallback = null) {
 		try {
@@ -35,7 +69,7 @@ export const store = {
 			backend().set(key, JSON.stringify(value));
 			return true;
 		} catch (e) {
-			console.warn("[fal] storage write failed", key, e);
+			console.warn("[aurora-lyrics] storage write failed", key, e);
 			return false;
 		}
 	},

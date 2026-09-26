@@ -1,6 +1,6 @@
 // Small shared helpers. No Spicetify access here so this stays testable in Node.
 
-export const EXT_ID = "fullscreen-animated-lyrics";
+export const EXT_ID = "aurora-lyrics";
 
 export function clamp(v, min, max) {
 	return Math.min(max, Math.max(min, v));

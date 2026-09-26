@@ -133,7 +133,7 @@ export const musixmatchProvider = {
 			if (matcherCode === 404) return { status: "notfound" };
 			const matched = calls?.["matcher.track.get"]?.message?.body?.track;
 			if (!mxmMatches(track, matched)) {
-				console.warn(`[fal] Musixmatch matched a different song ("${matched?.track_name}" by ${matched?.artist_name}); ignoring it`);
+				console.warn(`[aurora-lyrics] Musixmatch matched a different song ("${matched?.track_name}" by ${matched?.artist_name}); ignoring it`);
 				return { status: "notfound" };
 			}
 			const res = fromMusixmatch(calls, track.duration);

@@ -3,19 +3,21 @@
 
 import { h, clamp, nextFrame } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO } from "./settings.js";
-import { getCurrentTrack, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
+import { getCurrentTrack, getNextTrack, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
 import { lyricsCache, localLyrics } from "./cache.js";
 import { toLRC, estimateWords } from "./lrc.js";
 import { translateLyrics, resolveTarget } from "./translate.js";
 import { LyricsView } from "./view.js";
 import { createPanel, ensureFont } from "./panel.js";
+import { createShareSheet } from "./share.js";
 import { ICONS } from "./icons.js";
 
 const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.css
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
 const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
+const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {
 	return !!target?.closest?.("input, textarea, select, [contenteditable='true']");
@@ -67,92 +69,92 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	// DOM
 	// ---------------------------------------------------------------------------
 	function build() {
-		const bgStack = h("div", { class: "fal-bg-stack" });
+		const bgStack = h("div", { class: "aur-bg-stack" });
 		const bg = h(
 			"div",
-			{ class: "fal-bg", "aria-hidden": "true" },
+			{ class: "aur-bg", "aria-hidden": "true" },
 			bgStack,
-			h("div", { class: "fal-bg-gradient" }),
-			h("div", { class: "fal-bg-shade" }),
-			h("div", { class: "fal-bg-grain" }),
+			h("div", { class: "aur-bg-gradient" }),
+			h("div", { class: "aur-bg-shade" }),
+			h("div", { class: "aur-bg-grain" }),
 		);
 
-		const cover = h("img", { class: "fal-cover", alt: "" });
-		const title = h("div", { class: "fal-title" });
-		const artist = h("div", { class: "fal-artist" });
-		const header = h("div", { class: "fal-header fal-chrome" }, cover, h("div", { class: "fal-meta" }, title, artist));
+		const cover = h("img", { class: "aur-cover", alt: "" });
+		const title = h("div", { class: "aur-title" });
+		const artist = h("div", { class: "aur-artist" });
+		const header = h("div", { class: "aur-header aur-chrome" }, cover, h("div", { class: "aur-meta" }, title, artist));
 
-		const stage = h("div", { class: "fal-stage", role: "main" });
+		const stage = h("div", { class: "aur-stage", role: "main" });
 
 		// Split view: big cover (click = play/pause) + track info beside the lyrics.
-		const artA = h("img", { class: "fal-art", alt: "", decoding: "async" });
-		const artB = h("img", { class: "fal-art", alt: "", decoding: "async" });
-		const artHint = h("span", { class: "fal-art-hint", html: ICONS.pause() });
-		// .fal-disc holds the art (it spins in the Vinyl layout); grooves/shine only show there.
-		const disc = h("span", { class: "fal-disc" }, artA, artB, h("span", { class: "fal-disc-grooves", "aria-hidden": "true" }));
+		const artA = h("img", { class: "aur-art", alt: "", decoding: "async" });
+		const artB = h("img", { class: "aur-art", alt: "", decoding: "async" });
+		const artHint = h("span", { class: "aur-art-hint", html: ICONS.pause() });
+		// .aur-disc holds the art (it spins in the Vinyl layout); grooves/shine only show there.
+		const disc = h("span", { class: "aur-disc" }, artA, artB, h("span", { class: "aur-disc-grooves", "aria-hidden": "true" }));
 		const artWrap = h(
 			"button",
-			{ class: "fal-art-wrap", title: "Play / pause", "aria-label": "Play / pause", onclick: () => (playerCommand("togglePlay"), setTimeout(kick, 60)) },
+			{ class: "aur-art-wrap", title: "Play / pause", "aria-label": "Play / pause", onclick: () => (playerCommand("togglePlay"), setTimeout(kick, 60)) },
 			disc,
-			h("span", { class: "fal-disc-shine", "aria-hidden": "true" }),
+			h("span", { class: "aur-disc-shine", "aria-hidden": "true" }),
 			artHint,
 		);
-		const sideTitle = h("div", { class: "fal-side-title" });
-		const sideArtist = h("div", { class: "fal-side-artist" });
-		const sideAlbum = h("div", { class: "fal-side-album" });
-		const side = h("div", { class: "fal-side", role: "region", "aria-label": "Now playing" }, artWrap, h("div", { class: "fal-side-meta" }, sideTitle, sideArtist, sideAlbum));
+		const sideTitle = h("div", { class: "aur-side-title" });
+		const sideArtist = h("div", { class: "aur-side-artist" });
+		const sideAlbum = h("div", { class: "aur-side-album" });
+		const side = h("div", { class: "aur-side", role: "region", "aria-label": "Now playing" }, artWrap, h("div", { class: "aur-side-meta" }, sideTitle, sideArtist, sideAlbum));
 
-		const iconBtn = (label, icon, onclick, cls = "fal-icon-btn") => h("button", { class: cls, title: label, "aria-label": label, html: icon, onclick });
+		const iconBtn = (label, icon, onclick, cls = "aur-icon-btn") => h("button", { class: cls, title: label, "aria-label": label, html: icon, onclick });
 
 		// ---- Player (bottom centre): progress + transport. Lyrics info bottom-left, actions right.
-		const elapsed = h("span", { class: "fal-time" }, "0:00");
-		const remaining = h("span", { class: "fal-time is-right" }, "-0:00");
-		const tip = h("span", { class: "fal-progress-tip", "aria-hidden": "true" }, "0:00");
+		const elapsed = h("span", { class: "aur-time" }, "0:00");
+		const remaining = h("span", { class: "aur-time is-right" }, "-0:00");
+		const tip = h("span", { class: "aur-progress-tip", "aria-hidden": "true" }, "0:00");
 		const bar = h(
 			"div",
-			{ class: "fal-progress", role: "slider", "aria-label": "Seek", tabindex: "0", "aria-valuemin": "0" },
-			h("div", { class: "fal-progress-track" }, h("div", { class: "fal-progress-fill" })),
-			h("div", { class: "fal-progress-knob-rail" }, h("div", { class: "fal-progress-knob" })),
+			{ class: "aur-progress", role: "slider", "aria-label": "Seek", tabindex: "0", "aria-valuemin": "0" },
+			h("div", { class: "aur-progress-track" }, h("div", { class: "aur-progress-fill" })),
+			h("div", { class: "aur-progress-knob-rail" }, h("div", { class: "aur-progress-knob" })),
 			tip,
 		);
-		const scrub = h("div", { class: "fal-scrub" }, bar, h("div", { class: "fal-times" }, elapsed, remaining));
+		const scrub = h("div", { class: "aur-scrub" }, bar, h("div", { class: "aur-times" }, elapsed, remaining));
 
 		const act = (fn) => () => (fn(), setTimeout(() => (state.psAt = 0), 120), setTimeout(kick, 60));
 		// Play/pause: both icons live in the button and cross-fade/rotate (no icon swap flash).
 		const playBtn = h(
 			"button",
-			{ class: "fal-play-btn", title: "Play / pause", "aria-label": "Play / pause", onclick: act(() => playerCommand("togglePlay")) },
-			h("span", { class: "fal-pp is-play", html: ICONS.play() }),
-			h("span", { class: "fal-pp is-pause", html: ICONS.pause() }),
+			{ class: "aur-play-btn", title: "Play / pause", "aria-label": "Play / pause", onclick: act(() => playerCommand("togglePlay")) },
+			h("span", { class: "aur-pp is-play", html: ICONS.play() }),
+			h("span", { class: "aur-pp is-pause", html: ICONS.pause() }),
 		);
-		const shuffleBtn = iconBtn("Shuffle", ICONS.shuffle(), act(() => playerCommand("toggleShuffle")), "fal-icon-btn fal-toggle");
-		const repeatBtn = iconBtn("Repeat", ICONS.repeat(), act(() => playerCommand("toggleRepeat")), "fal-icon-btn fal-toggle");
+		const shuffleBtn = iconBtn("Shuffle", ICONS.shuffle(), act(() => playerCommand("toggleShuffle")), "aur-icon-btn aur-toggle");
+		const repeatBtn = iconBtn("Repeat", ICONS.repeat(), act(() => playerCommand("toggleRepeat")), "aur-icon-btn aur-toggle");
 		const transport = h(
 			"div",
-			{ class: "fal-transport" },
+			{ class: "aur-transport" },
 			shuffleBtn,
-			iconBtn("Previous", ICONS.prev(), act(() => playerCommand("back")), "fal-icon-btn fal-skip"),
+			iconBtn("Previous", ICONS.prev(), act(() => playerCommand("back")), "aur-icon-btn aur-skip"),
 			playBtn,
-			iconBtn("Next", ICONS.next(), act(() => playerCommand("next")), "fal-icon-btn fal-skip"),
+			iconBtn("Next", ICONS.next(), act(() => playerCommand("next")), "aur-icon-btn aur-skip"),
 			repeatBtn,
 		);
 
 		// Lyrics info: source chip (opens the source picker) + timing offset.
-		const source = h("button", { class: "fal-source", title: "Lyrics source: choose, reload, import", onclick: () => panel.toggle("track") }, "—");
-		const offsetOut = h("button", { class: "fal-offset", title: "Lyric offset (+ = earlier). Click to reset.", onclick: () => settings.set("offset", 0) });
-		const trBtn = iconBtn("Translate lyrics (T)", ICONS.translate(), () => settings.set("translate", !settings.get("translate")), "fal-icon-btn fal-toggle fal-tr-btn");
+		const source = h("button", { class: "aur-source", title: "Lyrics source: choose, reload, import", onclick: () => panel.toggle("track") }, "—");
+		const offsetOut = h("button", { class: "aur-offset", title: "Lyric offset (+ = earlier). Click to reset.", onclick: () => settings.set("offset", 0) });
+		const trBtn = iconBtn("Translate lyrics (T)", ICONS.translate(), () => settings.set("translate", !settings.get("translate")), "aur-icon-btn aur-toggle aur-tr-btn");
 		const offsetGroup = h(
 			"div",
-			{ class: "fal-offset-group", role: "group", "aria-label": "Lyric offset" },
-			iconBtn("Lyrics later by 100 ms ( [ )", ICONS.minus(), () => nudgeOffset(-100), "fal-mini-btn"),
+			{ class: "aur-offset-group", role: "group", "aria-label": "Lyric offset" },
+			iconBtn("Lyrics later by 100 ms ( [ )", ICONS.minus(), () => nudgeOffset(-100), "aur-mini-btn"),
 			offsetOut,
-			iconBtn("Lyrics earlier by 100 ms ( ] )", ICONS.plus(), () => nudgeOffset(100), "fal-mini-btn"),
+			iconBtn("Lyrics earlier by 100 ms ( ] )", ICONS.plus(), () => nudgeOffset(100), "aur-mini-btn"),
 		);
 
 		// Actions: like, volume, settings, fullscreen, close.
-		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "fal-icon-btn fal-heart");
+		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "aur-icon-btn aur-heart");
 		const muteBtn = iconBtn("Mute", ICONS.volHigh(), act(() => playerCommand("toggleMute")));
-		const vol = h("input", { type: "range", class: "fal-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
+		const vol = h("input", { type: "range", class: "aur-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
 		vol.addEventListener("input", () => {
 			state.volDragging = true;
 			vol.style.setProperty("--v", vol.value);
@@ -163,22 +165,24 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const dock = h(
 			"div",
-			{ class: "fal-player fal-chrome", role: "toolbar", "aria-label": "Playback controls" },
-			h("div", { class: "fal-player-side is-left" }, source, trBtn, offsetGroup),
-			h("div", { class: "fal-player-center" }, scrub, transport),
+			{ class: "aur-player aur-chrome", role: "toolbar", "aria-label": "Playback controls" },
+			h("div", { class: "aur-player-side is-left" }, source, trBtn, offsetGroup),
+			h("div", { class: "aur-player-center" }, scrub, transport),
 			h(
 				"div",
-				{ class: "fal-player-side is-right" },
+				{ class: "aur-player-side is-right" },
 				heartBtn,
-				h("div", { class: "fal-volume" }, muteBtn, vol),
-				h("span", { class: "fal-sep", "aria-hidden": "true" }),
+				h("div", { class: "aur-volume" }, muteBtn, vol),
+				h("span", { class: "aur-sep", "aria-hidden": "true" }),
+				iconBtn("Share lyrics as an image (S)", ICONS.share(), () => openShare()),
+				iconBtn("Mini lyrics (Alt+M)", ICONS.mini(), () => (settings.set("miniLyrics", true), close())),
 				iconBtn("Settings", ICONS.settings(), () => panel.toggle("settings")),
 				fsBtn,
 				iconBtn("Close (Esc)", ICONS.close(), close),
 			),
 		);
 		// Hairline progress at the very bottom, visible only while the controls are hidden.
-		const miniProgress = h("div", { class: "fal-mini-progress", "aria-hidden": "true" }, h("div", { class: "fal-mini-fill" }));
+		const miniProgress = h("div", { class: "aur-mini-progress", "aria-hidden": "true" }, h("div", { class: "aur-mini-fill" }));
 		for (const el of [dock, header]) {
 			el.addEventListener("mouseenter", () => (state.hoverChrome = true));
 			el.addEventListener("mouseleave", () => ((state.hoverChrome = false), wake()));
@@ -224,7 +228,20 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			setTimeout(kick, 60);
 		});
 
-		const toastEl = h("div", { class: "fal-toast", role: "status", "aria-live": "polite" });
+		const toastEl = h("div", { class: "aur-toast", role: "status", "aria-live": "polite" });
+
+		// Queue peek: the next track, shown near the end of the current one. Click to skip to it.
+		const upArt = h("img", { class: "aur-upnext-art", alt: "", decoding: "async" });
+		const upTitle = h("div", { class: "aur-upnext-title" });
+		const upArtist = h("div", { class: "aur-upnext-artist" });
+		const upWhen = h("span", { class: "aur-upnext-when" });
+		const upNext = h(
+			"button",
+			{ class: "aur-upnext", "aria-live": "polite", onclick: act(() => playerCommand("next")) },
+			upArt,
+			h("div", { class: "aur-upnext-text" }, h("div", { class: "aur-upnext-label" }, "Up next", upWhen), upTitle, upArtist),
+			h("span", { class: "aur-upnext-skip", html: ICONS.next() }),
+		);
 
 		const panel = createPanel({
 			getTrack: () => state.track,
@@ -265,21 +282,30 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			toast,
 		});
 
+		const share = createShareSheet({
+			getContext: () => ({ track: state.track, lyrics: state.lyrics, active: ui?.view.active ?? -1, root }),
+			toast,
+			onClose: () => root.focus({ preventScroll: true }),
+		});
+
 		const root = h(
 			"div",
-			{ id: "fal-root", class: "fal-root", role: "dialog", "aria-modal": "true", "aria-label": "Aurora Lyrics", tabindex: "-1", hidden: true },
+			{ id: "aur-root", class: "aur-root", role: "dialog", "aria-modal": "true", "aria-label": "Aurora Lyrics", tabindex: "-1", hidden: true },
 			bg,
-			h("div", { class: "fal-drag", "aria-hidden": "true" }), // keeps the window draggable
+			h("div", { class: "aur-drag", "aria-hidden": "true" }), // keeps the window draggable
 			header,
 			side,
 			stage,
 			dock,
 			miniProgress,
 			panel.el,
+			share.el,
+			upNext,
 			toastEl,
 		);
 
 		const view = new LyricsView(stage, {
+			onShare: (i) => openShare(i),
 			onSeek: (t) => {
 				// Seek so that the *effective* (offset-adjusted) position lands on the line.
 				seek(t - settings.get("offset") + 20);
@@ -312,7 +338,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, panel, view };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -330,11 +356,13 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const { root, view } = ui;
 		const st = root.style;
 		ensureFont(all.font);
-		st.setProperty("--fal-font", FONTS[all.font]?.stack || FONTS.spotify.stack);
-		st.setProperty("--fal-fs", `${all.fontSize}px`);
-		st.setProperty("--fal-gap", `${all.lineSpacing}em`);
-		st.setProperty("--fal-fw", all.fontWeight);
-		st.setProperty("--fal-shade", String(all.bgOpacity));
+		st.setProperty("--aur-font", FONTS[all.font]?.stack || FONTS.spotify.stack);
+		st.setProperty("--aur-fs", `${all.fontSize}px`);
+		st.setProperty("--aur-gap", `${all.lineSpacing}em`);
+		st.setProperty("--aur-fw", all.fontWeight);
+		st.setProperty("--aur-shade", String(all.bgOpacity));
+		if (all.accent === "album") st.removeProperty("--aur-user-accent");
+		else st.setProperty("--aur-user-accent", all.accent);
 
 		const layout = all.animation === "fade" || all.animation === "cinematic" ? "stack" : "list";
 		const reduced = reducedMotion(all);
@@ -345,6 +373,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			color: all.textColor,
 			context: all.showContext ? "on" : "off",
 			glow: all.glow,
+			duet: all.duetColors ? "on" : "off",
+			accent: all.accent === "album" ? "album" : "custom",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
@@ -364,11 +394,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		if (key === "view") {
 			// Cross-fade into the new layout instead of jumping.
-			root.classList.remove("fal-view-swap");
+			root.classList.remove("aur-view-swap");
 			void root.offsetWidth;
-			root.classList.add("fal-view-swap");
+			root.classList.add("aur-view-swap");
 			clearTimeout(state.viewSwapTimer);
-			state.viewSwapTimer = setTimeout(() => root.classList.remove("fal-view-swap"), 900);
+			state.viewSwapTimer = setTimeout(() => root.classList.remove("aur-view-swap"), 900);
 		}
 		if (RELAYOUT_KEYS.has(key)) nextFrame(() => view.relayout());
 		if (SOURCE_KEYS.has(key) && state.open) loadLyrics();
@@ -401,16 +431,16 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const { clientWidth: w, clientHeight: hgt } = ui.root;
 		if (!w || !hgt) return;
 		const scale = (Math.max(w, hgt) * 1.9) / BG_SIZE;
-		ui.root.style.setProperty("--fal-bg-scale", scale.toFixed(3));
-		ui.root.style.setProperty("--fal-bg-blur", `${(settings.get("blur") / scale).toFixed(2)}px`);
+		ui.root.style.setProperty("--aur-bg-scale", scale.toFixed(3));
+		ui.root.style.setProperty("--aur-bg-blur", `${(settings.get("blur") / scale).toFixed(2)}px`);
 	}
 
 	function updateBackground(track) {
 		const url = track?.image;
 		if (!url || url === state.bgUrl) return;
 		state.bgUrl = url;
-		const blobs = ["b1", "b2", "b3"].map((c) => h("img", { class: `fal-blob ${c}`, alt: "", src: url, width: BG_SIZE, height: BG_SIZE }));
-		const layer = h("div", { class: "fal-bg-layer" }, blobs);
+		const blobs = ["b1", "b2", "b3"].map((c) => h("img", { class: `aur-blob ${c}`, alt: "", src: url, width: BG_SIZE, height: BG_SIZE }));
+		const layer = h("div", { class: "aur-bg-layer" }, blobs);
 		ui.bgStack.append(layer);
 		const reveal = () => {
 			if (state.bgUrl !== url) return layer.remove();
@@ -428,9 +458,10 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				.then((c) => {
 					if (!c || state.track?.uri !== track.uri) return;
 					const st = ui.root.style;
-					st.setProperty("--fal-c1", c.VIBRANT || c.PROMINENT || "#4b3b78");
-					st.setProperty("--fal-c2", c.DARK_VIBRANT || c.DESATURATED || "#14203a");
-					st.setProperty("--fal-accent", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#ffffff");
+					// Album colours; styles.css swaps in the user's accent when one is chosen.
+					st.setProperty("--aur-album-c1", c.VIBRANT || c.PROMINENT || "#4b3b78");
+					st.setProperty("--aur-album-c2", c.DARK_VIBRANT || c.DESATURATED || "#14203a");
+					st.setProperty("--aur-album-accent", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#ffffff");
 				})
 				.catch(() => {});
 		}
@@ -617,7 +648,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 	/**
 	 * Ask every source for the current track (ignoring on/off switches, cache and pins) and
-	 * record what each returned. Shown in the ✎ panel; also exposed as FullscreenLyrics.testSources().
+	 * record what each returned. Shown in the ✎ panel; also exposed as AuroraLyrics.testSources().
 	 */
 	async function testSources() {
 		const track = getCurrentTrack();
@@ -693,6 +724,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			ui.elapsed.textContent = fmtTime(pos);
 			ui.remaining.textContent = `-${fmtTime(dur - pos)}`;
 			ui.bar.setAttribute("aria-valuemax", String(Math.round(dur / 1000)));
+			updateUpNext(pos, dur);
 		}
 		const playing = isPlaying();
 		if (playing !== state.playing) {
@@ -707,6 +739,28 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			state.psAt = now;
 			renderPlayerState(playerState());
 		}
+	}
+
+	/** Show / fill / hide the "Up next" card (called once per second of playback). */
+	function updateUpNext(pos, dur) {
+		const left = dur - pos;
+		const next =
+			settings.get("queuePeek") && dur > 45000 && left <= UP_NEXT_MS && left > 700 && state.ps.repeat !== 2 && !state.scrubbing ? getNextTrack() : null;
+		const card = ui.upNext;
+		if (!next || next.uri === state.track?.uri) {
+			card.classList.remove("is-on");
+			return;
+		}
+		if (card.dataset.uri !== next.uri) {
+			card.dataset.uri = next.uri;
+			ui.upTitle.textContent = next.title;
+			ui.upArtist.textContent = next.artist;
+			ui.upArt.hidden = !next.image;
+			if (next.image) ui.upArt.src = next.image;
+			card.title = `Play “${next.title}” now`;
+		}
+		ui.upWhen.textContent = ` · in ${Math.max(1, Math.ceil(left / 1000))}s`;
+		card.classList.add("is-on");
 	}
 
 	function renderPlayerState(ps) {
@@ -816,6 +870,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (!state.open) return;
 		state.open = false;
 		ui.panel.close();
+		ui.share.close();
 		ui.view.stopBrowsing(true);
 		ui.root.classList.remove("is-open");
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -823,6 +878,13 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		kick(); // cancels pending frames because state.open is false
 		state.lastFocus?.focus?.({ preventScroll: true });
 		onOpenChange?.(false);
+	}
+
+	/** Share sheet; `lineIdx` preselects that line (right-click on a line). */
+	function openShare(lineIdx) {
+		if (!ui) return;
+		ui.panel.close();
+		ui.share.open(lineIdx);
 	}
 
 	async function toggleFullscreen() {
@@ -834,7 +896,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			}
 		} catch (e) {
 			toast("Fullscreen isn't available here");
-			console.warn("[fal] fullscreen failed", e);
+			console.warn("[aurora-lyrics] fullscreen failed", e);
 		}
 	}
 
@@ -854,16 +916,18 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (e.key === "Escape") {
 				e.preventDefault();
 				e.stopPropagation();
-				if (ui.panel.isOpen()) ui.panel.close();
+				if (ui.share.isOpen()) ui.share.close();
+				else if (ui.panel.isOpen()) ui.panel.close();
 				else if (ui.view.browsing) ui.view.stopBrowsing();
 				else close();
 				return;
 			}
-			if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+			if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey || ui.share.isOpen()) return;
 			if (e.key === "[") nudgeOffset(-100);
 			else if (e.key === "]") nudgeOffset(100);
 			else if (e.key === "f" || e.key === "F") toggleFullscreen();
 			else if (e.key === "t" || e.key === "T") settings.set("translate", !settings.get("translate"));
+			else if (e.key === "s" || e.key === "S") openShare();
 			else return;
 			e.preventDefault();
 			e.stopPropagation();

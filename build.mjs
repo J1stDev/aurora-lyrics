@@ -40,8 +40,10 @@ const ORDER = [
 	"styles.js", // virtual, generated from styles.css
 	"view.js",
 	"panel.js",
+	"share.js",
 	"overlay.js",
 	"npv.js",
+	"mini.js",
 	"main.js",
 ];
 

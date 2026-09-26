@@ -33,10 +33,11 @@
 		[28000, "Hold on hold on hold on", 400],
 	];
 	const ECHO = [
-		[1500, "Shout into the canyon", 500, "echo, echo"],
-		[5200, "Hear it coming back to me", 420, "back to me"],
-		[9000, "Every word a little softer", 430],
-		[12800, "Till it fades into the sea", 520, "into the sea"],
+		// 5th field: TTML agent, so this track is a duet (v1 lead, v2 second singer, v1000 both).
+		[1500, "Shout into the canyon", 500, "echo, echo", "v1"],
+		[5200, "Hear it coming back to me", 420, "back to me", "v2"],
+		[9000, "Every word a little softer", 430, null, "v1000"],
+		[12800, "Till it fades into the sea", 520, "into the sea", "v1"],
 	];
 	const wordsOf = (start, text, step) => text.split(" ").map((w, i, arr) => ({ t: start + i * step, d: step, w: w + (i < arr.length - 1 ? " " : "") }));
 
@@ -61,14 +62,14 @@
 	// TTML (Unison) with background vocals in <span ttm:role="x-bg">.
 	const clock = (ms) => `${String(Math.floor(ms / 60000)).padStart(2, "0")}:${((ms % 60000) / 1000).toFixed(3).padStart(6, "0")}`;
 	const ttml = (lines) =>
-		`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><div>` +
+		`<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><head><metadata><ttm:agent type="person" xml:id="v1"/><ttm:agent type="person" xml:id="v2"/><ttm:agent type="group" xml:id="v1000"/></metadata></head><body><div>` +
 		lines
-			.map(([t, text, step, bg]) => {
+			.map(([t, text, step, bg, agent]) => {
 				const ws = wordsOf(t, text, step);
 				const end = t + ws.length * step;
 				const main = ws.map((x) => `<span begin="${clock(x.t)}" end="${clock(x.t + x.d)}">${x.w.trim()}</span>`).join(" ");
 				const back = bg ? `<span ttm:role="x-bg">` + wordsOf(end, bg, 450).map((x, i, a) => `<span begin="${clock(x.t)}" end="${clock(x.t + x.d)}">${i === 0 ? "(" : ""}${x.w.trim()}${i === a.length - 1 ? ")" : ""}</span>`).join(" ") + `</span>` : "";
-				return `<p begin="${clock(t)}" end="${clock(end + (bg ? 1400 : 0))}">${main}${back}</p>`;
+				return `<p begin="${clock(t)}" end="${clock(end + (bg ? 1400 : 0))}"${agent ? ` ttm:agent="${agent}"` : ""}>${main}${back}</p>`;
 			})
 			.join("") +
 		`</div></body></tt>`;
@@ -240,6 +241,16 @@
 		Topbar: { Button },
 		Playbar: { Button },
 		Config: { version: "mock" },
+		// Queue in Spicetify.Queue's shape (a delimiter first, like the real one sometimes has).
+		get Queue() {
+			const n = TRACKS[(state.idx + 1) % TRACKS.length];
+			return {
+				nextTracks: [
+					{ contextTrack: { uri: "spotify:delimiter", metadata: {} }, provider: "context" },
+					{ contextTrack: { uri: n.uri, metadata: { title: n.name, artist_name: n.artist, image_url: n.img } }, provider: "context" },
+				],
+			};
+		},
 		colorExtractor: async (uri) => {
 			const c = { mock1: ["#ff7a59", "#5b2a86", "#ffc4a8"], mock2: ["#00c2ff", "#1b1464", "#a8e6ff"], mock3: ["#2ecc71", "#0b3d2e", "#b4f5cc"], mock4: ["#f5c451", "#7a3e00", "#ffe7a8"], mock5: ["#ff5fa2", "#2a1450", "#ffc2dc"] }[uri.split(":")[2]];
 			return { VIBRANT: c[0], DARK_VIBRANT: c[1], LIGHT_VIBRANT: c[2] };

@@ -23,6 +23,9 @@ A full-screen, animated, synced lyrics overlay for Spotify Desktop.
 
   Wide layouts need at least 900×540 and Stage/Captions at least 600px of height; smaller windows fall back to lyrics only.
 - **Word-by-word animation** in five styles: **Fill** (smooth sweep), **Glow** (word lights up), **Pop** (springy bounce), **Rise** (words float into place), and **Letters** (a letter-by-letter wave). Held words swell and glow. Background vocals appear as a smaller line under the main one and fill in time with it. Instrumental breaks show three dots that fill up over the gap.
+- **Duet colours**: in duets, each singer gets their own colour and the second singer's lines sit on the opposite side. Works with Apple Music and TTML lyrics, and with `v1:` / `v2:` voice tags in LRC files. Turn it off under *Look → Text*.
+- **Themes**: one-click looks under *Look → Theme*: Aurora (default), Neon, Minimal, Karaoke, Cinema, Lounge and Midnight. A theme sets the layout, font, colours, glow, animations and background; it leaves your text size and spacing alone. Your own look is kept as *Custom*, so you can switch back.
+- **Accent colour**: use the album's colour (default) or pick your own. The accent drives the glow, *Accent tint* text, Karaoke wipe, duet colours and the Gradient background.
 - **Estimated word timing** (optional) spreads each line's time across its words, so word animations also work on line-synced lyrics. Estimated timing is labelled *est. words*.
 - **Typography:** Spotify Mix, System, Inter, Outfit, Rounded, and Serif fonts. Four weights. Pure-white text or a tint taken from the album colours.
 - **Transitions:** lyrics cross-fade on track change and rise in with a stagger around the current line. Use the mouse wheel to browse the lyrics; the view returns to the current line after 3 s.
@@ -87,12 +90,15 @@ spicetify apply
 | Lyrics source, reload, import | Click the source chip bottom-left (opens *This track*) |
 | Import lyrics | ✎ button → paste text or import an `.lrc`/`.txt` file → *Save for this track* |
 | Choose the source for this track | ✎ button → *Load lyrics from* (Auto = search all) |
-| See what every source returns | ✎ button → *Test all sources* (or `FullscreenLyrics.testSources()` in DevTools). Ignores on/off switches; changes nothing. |
+| See what every source returns | ✎ button → *Test all sources* (or `AuroraLyrics.testSources()` in DevTools). Ignores on/off switches; changes nothing. |
 | Play / pause (split view) | Click the big cover |
+| Share lyrics as an image | **S**, the share button, or right-click a line. Pick up to 6 lines, a format (Square / Portrait / Story) and a background, then *Copy image* or *Save PNG*. |
+| Mini lyrics | **Alt+M**, the mini button in the control bar or the Now Playing card, or *General → Interface*. A small pill with the current line floats over Spotify while fullscreen is closed. Drag it anywhere; click the text to go fullscreen. Where supported, ⧉ pops it out into an always-on-top window. |
+| Up next | In the last 20 s of a song (over 45 s long) a card shows the next track in the queue; click it to play it now. The mini pill shows it after the last lyric line. Turn off in *General → Interface*. |
 
 Offset sign: **+** shows lyrics **earlier**, which matches the LRC `[offset:]` convention.
 
-From DevTools (`spicetify enable-devtools`) you can also call `FullscreenLyrics.open()`, `.close()`, or `.toggle()`.
+From DevTools (`spicetify enable-devtools`) you can also call `AuroraLyrics.open()`, `.close()`, or `.toggle()`.
 
 ## Develop
 
@@ -111,7 +117,7 @@ src/
   lrc.js         lyrics model, LRC / enhanced LRC / plain parsers, word-timing estimator, LRC serializer
   cache.js       LRU lyrics cache (TTL + negative cache) and imported-lyrics store
   settings.js    settings schema, defaults, validation, persistence
-  storage.js     Spicetify.LocalStorage → localStorage → memory fallback
+  storage.js     Spicetify.LocalStorage → localStorage → memory fallback; moves data saved under the old name
   player.js      defensive wrappers for Spicetify.Player (track info, position)
   icons.js       inline SVG icons
   util.js        helpers

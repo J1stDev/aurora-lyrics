@@ -19,28 +19,35 @@ const NPV_ANCHOR = ".main-nowPlayingView-nowPlayingWidget";
 const ANCHOR_Y = 0.34; // active line position within the card body
 const LEAD_MS = 40;
 
-export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
+export function createNowPlayingCard({ openOverlay, isOverlayOpen, onState, toggleMini }) {
 	const state = { uri: null, lyrics: null, source: null, token: 0, active: -2, wordIdx: -1, raf: 0, timer: 0, visible: false };
 	let lineEls = [];
 	let wordData = []; // per line: { words, spans } | null
 
 	// ---- DOM
-	const src = h("span", { class: "fal-npv-src" });
+	const src = h("span", { class: "aur-npv-src" });
 	const openBtn = h("button", {
-		class: "fal-npv-open",
+		class: "aur-npv-open",
 		title: "Open fullscreen lyrics (Alt+L)",
 		"aria-label": "Open fullscreen lyrics",
 		html: ICONS.fullscreen(),
 		onclick: (e) => (e.stopPropagation(), openOverlay()),
 	});
-	const lines = h("div", { class: "fal-npv-lines" });
-	const msg = h("div", { class: "fal-npv-msg" });
-	const body = h("div", { class: "fal-npv-body", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, lines, msg);
-	const card = h("div", { class: "fal-npv", "data-fal-npv": "" }, h("div", { class: "fal-npv-head" }, h("h2", { class: "fal-npv-title" }, "Lyrics"), src, openBtn), body);
+	const lines = h("div", { class: "aur-npv-lines" });
+	const msg = h("div", { class: "aur-npv-msg" });
+	const body = h("div", { class: "aur-npv-body", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, lines, msg);
+	const miniBtn = h("button", {
+		class: "aur-npv-open",
+		title: "Mini lyrics (Alt+M)",
+		"aria-label": "Mini lyrics",
+		html: ICONS.mini(),
+		onclick: (e) => (e.stopPropagation(), toggleMini?.()),
+	});
+	const card = h("div", { class: "aur-npv", "data-aur-npv": "" }, h("div", { class: "aur-npv-head" }, h("h2", { class: "aur-npv-title" }, "Lyrics"), src, miniBtn, openBtn), body);
 
 	// ---- mounting
 	function unhideSpotify() {
-		for (const el of document.querySelectorAll("[data-fal-hidden]")) el.removeAttribute("data-fal-hidden");
+		for (const el of document.querySelectorAll("[data-aur-hidden]")) el.removeAttribute("data-aur-hidden");
 	}
 	function mount() {
 		if (!settings.get("npvCard")) {
@@ -50,7 +57,7 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		}
 		const spotifyCard = document.querySelector(SPOTIFY_CARD);
 		if (spotifyCard) {
-			if (!spotifyCard.hasAttribute("data-fal-hidden")) spotifyCard.setAttribute("data-fal-hidden", "");
+			if (!spotifyCard.hasAttribute("data-aur-hidden")) spotifyCard.setAttribute("data-aur-hidden", "");
 			if (spotifyCard.previousElementSibling !== card) spotifyCard.before(card);
 		} else {
 			const anchor = document.querySelector(NPV_ANCHOR);
@@ -80,6 +87,7 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (key === "npvCard" || key === "*") mount();
 		if (["providers", "searchUntil", "estimateWords", "*"].includes(key)) load();
 		else if (key === "translate" || key === "translateTo") translateCard();
+		if (key === "duetColors" || key === "*") card.dataset.duet = settings.get("duetColors") ? "on" : "off";
 	});
 
 	// ---- lyrics
@@ -90,6 +98,7 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		wordData = [];
 		state.active = -2;
 		card.classList.remove("is-unsynced");
+		onState?.(state.uri, null, text);
 	}
 
 	async function load() {
@@ -144,6 +153,7 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		const kind = l.synced ? (l.hasWords ? "word sync" : "synced") : "plain";
 		src.textContent = `${SOURCE_LABELS[source] || source} · ${kind}`;
 		card.classList.toggle("is-unsynced", !l.synced);
+		card.dataset.duet = settings.get("duetColors") ? "on" : "off";
 
 		const frag = document.createDocumentFragment();
 		lineEls = [];
@@ -152,20 +162,20 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 			let el;
 			let wd = null;
 			if (line.gap) {
-				el = h("div", { class: "fal-npv-line is-gap" }, "• • •");
+				el = h("div", { class: "aur-npv-line is-gap" }, "• • •");
 			} else if (line.words && l.synced) {
-				el = h("div", { class: "fal-npv-line" });
+				el = h("div", { class: "aur-npv-line" });
 				const spans = line.words.map((w) => {
 					const m = w.text.match(/^(\s*)([\s\S]*?)(\s*)$/);
 					if (m[1]) el.append(m[1]);
-					const span = h("span", { class: "fal-npv-w" }, m[2]);
+					const span = h("span", { class: "aur-npv-w" }, m[2]);
 					el.append(span);
 					if (m[3]) el.append(m[3]);
 					return span;
 				});
 				wd = { words: line.words, spans };
 			} else {
-				el = h("div", { class: "fal-npv-line" }, line.text);
+				el = h("div", { class: "aur-npv-line" }, line.text);
 			}
 			if (l.synced && line.time != null && !line.gap) {
 				el.addEventListener("click", (e) => {
@@ -175,24 +185,27 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 				});
 				el.title = "Jump here";
 			}
+			const singer = line.gap ? null : (line.singer ?? (line.opposite ? 1 : null));
+			if (singer) el.dataset.singer = String(singer);
 			lineEls.push(el);
 			wordData.push(wd);
 			frag.append(el);
 		}
 		lines.replaceChildren(frag);
 		lines.style.transform = "";
+		onState?.(state.uri, l);
 		translateCard();
 		kick();
 	}
 
 	async function translateCard() {
-		for (const el of lines.querySelectorAll(".fal-npv-tr")) el.remove();
+		for (const el of lines.querySelectorAll(".aur-npv-tr")) el.remove();
 		const l = state.lyrics;
 		if (!l || !settings.get("translate")) return;
 		try {
 			const res = await translateLyrics(l, resolveTarget(settings.get("translateTo")));
 			if (state.lyrics !== l || res.sameLanguage) return;
-			res.lines.forEach((t, i) => t && lineEls[i]?.append(h("div", { class: "fal-npv-tr" }, t)));
+			res.lines.forEach((t, i) => t && lineEls[i]?.append(h("div", { class: "aur-npv-tr" }, t)));
 			state.active = -2; // re-measure scroll position with the taller lines
 			kick();
 		} catch {
@@ -212,8 +225,10 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (idx !== state.active) activate(idx);
 		const wd = idx >= 0 ? wordData[idx] : null;
 		if (wd) updateWords(wd, pos + LEAD_MS);
-		if (isPlaying()) state.raf = requestAnimationFrame(tick);
-		else state.timer = setTimeout(tick, 300);
+		if (isPlaying()) {
+			state.raf = requestAnimationFrame(tick);
+			state.timer = setTimeout(tick, 200); // rAF stalls in occluded windows
+		} else state.timer = setTimeout(tick, 300);
 	}
 	function kick() {
 		tick();
@@ -224,7 +239,7 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (prev >= 0 && lineEls[prev]) {
 			lineEls[prev].classList.remove("is-active");
 			const wd = wordData[prev];
-			if (wd) for (const s of wd.spans) s.classList.remove("sung", "now"), s.style.removeProperty("--fal-wp");
+			if (wd) for (const s of wd.spans) s.classList.remove("sung", "now"), s.style.removeProperty("--aur-wp");
 		}
 		lineEls.forEach((el, i) => el.classList.toggle("is-past", i < idx));
 		state.active = idx;
@@ -245,18 +260,19 @@ export function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 			spans.forEach((s, i) => {
 				s.classList.toggle("sung", i < k);
 				s.classList.toggle("now", i === k);
-				if (i !== k) s.style.removeProperty("--fal-wp");
+				if (i !== k) s.style.removeProperty("--aur-wp");
 			});
 			state.wordIdx = k;
 		}
 		if (k >= 0 && k < spans.length) {
 			const w = words[k];
 			const p = w.end > w.time ? Math.min(1, Math.max(0, (pos - w.time) / (w.end - w.time))) : 1;
-			spans[k].style.setProperty("--fal-wp", p.toFixed(3));
+			spans[k].style.setProperty("--aur-wp", p.toFixed(3));
 		}
 	}
 
 	mount();
+	if (state.uri !== getCurrentTrack()?.uri) load(); // also feeds mini lyrics when the card is off
 	return {
 		onSongChange: () => load(),
 		onPlayPause: kick,

@@ -10,7 +10,7 @@
 // ---- util.js ---------------------------------------------------------------
 // Small shared helpers. No Spicetify access here so this stays testable in Node.
 
-const EXT_ID = "fullscreen-animated-lyrics";
+const EXT_ID = "aurora-lyrics";
 
 function clamp(v, min, max) {
 	return Math.min(max, Math.max(min, v));
@@ -172,6 +172,40 @@ function backend() {
 	return { get: (k) => (memory.has(k) ? memory.get(k) : null), set: (k, v) => memory.set(k, v), remove: (k) => memory.delete(k) };
 }
 
+/**
+ * One-time move of data saved under the extension's old name ("fullscreen-animated-lyrics:…")
+ * to the current prefix. Matches the prefix anywhere in the key, so it also works if the
+ * storage layer adds its own namespace in front. Existing new keys are never overwritten.
+ * @param {Storage} ls  anything with length / key() / getItem() / setItem() / removeItem()
+ * @returns {number} keys moved
+ */
+function migrateLegacyKeys(ls, from = "fullscreen-animated-lyrics:", to = "aurora-lyrics:") {
+	let moved = 0;
+	try {
+		const keys = [];
+		for (let i = 0; i < ls.length; i++) {
+			const k = ls.key(i);
+			if (k && k.includes(from)) keys.push(k);
+		}
+		for (const k of keys) {
+			const next = k.replace(from, to);
+			if (ls.getItem(next) == null) {
+				ls.setItem(next, ls.getItem(k));
+				moved++;
+			}
+			ls.removeItem(k);
+		}
+	} catch (e) {
+		console.warn("[aurora-lyrics] could not migrate old settings", e);
+	}
+	return moved;
+}
+try {
+	if (globalThis.localStorage && typeof window !== "undefined") migrateLegacyKeys(globalThis.localStorage);
+} catch {
+	/* storage blocked */
+}
+
 const store = {
 	getJSON(key, fallback = null) {
 		try {
@@ -187,7 +221,7 @@ const store = {
 			backend().set(key, JSON.stringify(value));
 			return true;
 		} catch (e) {
-			console.warn("[fal] storage write failed", key, e);
+			console.warn("[aurora-lyrics] storage write failed", key, e);
 			return false;
 		}
 	},
@@ -367,7 +401,7 @@ function translateLyrics(lyrics, target, { signal } = {}) {
 // ---- settings.js -----------------------------------------------------------
 // Settings schema, defaults, validation and persistence.
 // The schema also drives the settings panel UI (see panel.js):
-//   type: "range" | "select" | "toggle"
+//   type: "range" | "select" | "toggle" | "color" | "providers"
 //   ui (select only): "segmented" | "cards" | "fonts" | undefined (dropdown)
 
 
@@ -419,14 +453,17 @@ const SCHEMA = [
 		hints: { split: "Cover left", mirror: "Cover right", poster: "Full-bleed art", vinyl: "Spinning record", stage: "Cover on top", captions: "Big art, 2 lines", lyrics: "Just the words" },
 		default: "split",
 	},
+	// Theme ("accent" = "album" or a "#rrggbb" colour; used for glow, tints, karaoke, gradient)
+	{ key: "accent", section: "Theme", label: "Accent colour", type: "color", default: "album" },
 	// Text
 	{ key: "font", section: "Text", label: "Font", type: "select", ui: "fonts", options: Object.entries(FONTS).map(([k, f]) => [k, f.label]), default: "spotify" },
 	{ key: "fontSize", section: "Text", label: "Size", type: "range", min: 24, max: 104, step: 2, unit: "px", default: 56 },
 	{ key: "fontWeight", section: "Text", label: "Weight", type: "select", ui: "segmented", options: [["500", "Medium"], ["700", "Bold"], ["800", "Heavy"], ["900", "Black"]], default: "800" },
 	{ key: "lineSpacing", section: "Text", label: "Line spacing", type: "range", min: 0.1, max: 1.5, step: 0.05, unit: "em", default: 0.55 },
 	{ key: "textAlign", section: "Text", label: "Alignment", type: "select", ui: "segmented", options: [["left", "Left"], ["center", "Center"], ["right", "Right"]], default: "left" },
-	{ key: "textColor", section: "Text", label: "Colour", type: "select", ui: "segmented", options: [["white", "White"], ["accent", "Album tint"]], default: "white" },
+	{ key: "textColor", section: "Text", label: "Colour", type: "select", ui: "segmented", options: [["white", "White"], ["accent", "Accent tint"]], default: "white" },
 	{ key: "glow", section: "Text", label: "Glow", type: "select", ui: "segmented", options: [["off", "Off"], ["soft", "Soft"], ["radiant", "Radiant"]], default: "soft" },
+	{ key: "duetColors", section: "Text", label: "Colour each singer in duets", type: "toggle", default: true },
 	{ key: "showContext", section: "Text", label: "Show surrounding lines", type: "toggle", default: true },
 	// Motion
 	{
@@ -463,7 +500,7 @@ const SCHEMA = [
 			["letters", "Letters"],
 			["karaoke", "Karaoke"],
 		],
-		hints: { fill: "Soft sweep + lift", glow: "Light up + bloom", pop: "Swell on each word", rise: "Float into place", letters: "Letter wave", karaoke: "Album-colour wipe" },
+		hints: { fill: "Soft sweep + lift", glow: "Light up + bloom", pop: "Swell on each word", rise: "Float into place", letters: "Letter wave", karaoke: "Accent-colour wipe" },
 		default: "fill",
 	},
 	{ key: "estimateWords", section: "Words", label: "Estimate word timing for line-synced lyrics", type: "toggle", default: false },
@@ -479,6 +516,8 @@ const SCHEMA = [
 	{ key: "offset", section: "Sync", label: "Lyric offset (+ = earlier)", type: "range", min: -5000, max: 5000, step: 50, unit: "ms", default: 0 },
 	// Interface
 	{ key: "showTransport", section: "Interface", label: "Playback controls & progress", type: "toggle", default: true },
+	{ key: "queuePeek", section: "Interface", label: "Show the next track near the end of a song", type: "toggle", default: true },
+	{ key: "miniLyrics", section: "Interface", label: "Mini lyrics over Spotify while fullscreen is closed (Alt+M)", type: "toggle", default: false },
 	{ key: "npvCard", section: "Interface", label: "Replace Spotify's lyrics card in the Now Playing panel", type: "toggle", default: true },
 	{ key: "showTrackInfo", section: "Interface", label: "Track info", type: "toggle", default: true },
 	{ key: "autoHideControls", section: "Interface", label: "Auto-hide controls", type: "toggle", default: true },
@@ -503,6 +542,42 @@ const SCHEMA = [
 	},
 ];
 
+/**
+ * Themes: one-click bundles of the settings that make up the look. Keys in LOOK_KEYS that a
+ * theme doesn't list take their defaults, so applying a theme always gives the same result.
+ * Font size and line spacing are left alone (they're about readability, not style).
+ * swatch = colours for the theme card's preview.
+ */
+const LOOK_KEYS = ["view", "font", "fontWeight", "textAlign", "textColor", "glow", "accent", "animation", "wordAnim", "depthBlur", "bgStyle", "bgOpacity"];
+const THEMES = [
+	{ id: "aurora", label: "Aurora", hint: "The default look", swatch: ["#6d3bd1", "#1b2a6b"], values: {} },
+	{ id: "neon", label: "Neon", hint: "Radiant, vivid", swatch: ["#ff2fb3", "#2a0a5e"], values: { font: "outfit", fontWeight: "900", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.35 } },
+	{ id: "minimal", label: "Minimal", hint: "Quiet and clean", swatch: ["#26262b", "#0d0d10"], values: { view: "lyrics", font: "system", fontWeight: "700", glow: "off", animation: "slide", depthBlur: false, bgStyle: "solid" } },
+	{ id: "karaoke", label: "Karaoke", hint: "Big centred captions", swatch: ["#ffb13d", "#8a1f5c"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", animation: "fade", wordAnim: "karaoke" } },
+	{ id: "cinema", label: "Cinema", hint: "One line, serif", swatch: ["#3a3226", "#0b0a08"], values: { view: "lyrics", font: "serif", fontWeight: "700", textAlign: "center", animation: "cinematic", wordAnim: "rise", bgOpacity: 0.65 } },
+	{ id: "lounge", label: "Lounge", hint: "Spinning vinyl", swatch: ["#c0703a", "#2b1408"], values: { view: "vinyl", font: "serif", fontWeight: "700", animation: "flow", wordAnim: "letters" } },
+	{ id: "midnight", label: "Midnight", hint: "Cool blue", swatch: ["#7aa2ff", "#0b1330"], values: { font: "inter", textColor: "accent", accent: "#7aa2ff", bgStyle: "gradient", bgOpacity: 0.6 } },
+];
+
+/** The full look a theme produces (defaults + its own values). */
+function themeLook(theme) {
+	return Object.fromEntries(LOOK_KEYS.map((k) => [k, k in theme.values ? theme.values[k] : DEFAULTS[k]]));
+}
+
+function pickLook(all) {
+	const out = {};
+	for (const k of LOOK_KEYS) {
+		const entry = SCHEMA.find((s) => s.key === k);
+		out[k] = k in all ? validate(entry, all[k]) : DEFAULTS[k];
+	}
+	return out;
+}
+
+/** Id of the theme whose look equals `all`, or null. */
+function matchTheme(all) {
+	return THEMES.find((t) => Object.entries(themeLook(t)).every(([k, v]) => all[k] === v))?.id || null;
+}
+
 /** Normalise a stored provider list: known ids only, no duplicates, new providers appended. */
 function validateProviders(value) {
 	const out = [];
@@ -521,7 +596,9 @@ function validateProviders(value) {
 const DEFAULTS = Object.fromEntries(SCHEMA.map((s) => [s.key, s.default]));
 
 /** Non-schema UI state that is persisted alongside settings. */
-const EXTRA_DEFAULTS = { pinControls: false, seenTip: false };
+// customLook: the user's own look, saved when a theme replaces it (so "Custom" can bring it back).
+// miniPos: centre of the mini lyrics pill as fractions of the window ({ x, y }), null = default.
+const EXTRA_DEFAULTS = { pinControls: false, seenTip: false, customLook: null, miniPos: null };
 
 /** Coerce and clamp a raw value against its schema entry. */
 function validate(entry, value) {
@@ -536,6 +613,8 @@ function validate(entry, value) {
 			return entry.options.some(([v]) => v === value) ? value : entry.default;
 		case "providers":
 			return validateProviders(value);
+		case "color":
+			return value === "album" || /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value).toLowerCase() : entry.default;
 		default:
 			return entry.default;
 	}
@@ -556,6 +635,9 @@ function load() {
 		);
 	}
 	for (const [k, d] of Object.entries(EXTRA_DEFAULTS)) out[k] = typeof saved[k] === typeof d ? saved[k] : d;
+	const mp = saved.miniPos;
+	out.miniPos = mp && Number.isFinite(mp.x) && Number.isFinite(mp.y) ? { x: clamp(mp.x, 0, 1), y: clamp(mp.y, 0, 1) } : null;
+	out.customLook = saved.customLook && typeof saved.customLook === "object" ? pickLook(saved.customLook) : null;
 	return out;
 }
 
@@ -571,12 +653,39 @@ const settings = {
 		return current.providers.filter((p) => p.on).map((p) => p.id);
 	},
 	set(key, value) {
-		const entry = SCHEMA.find((s) => s.key === key);
-		const v = entry ? validate(entry, value) : value;
-		if (current[key] === v || (typeof v === "object" && JSON.stringify(current[key]) === JSON.stringify(v))) return;
-		current = { ...current, [key]: v };
+		this.setMany({ [key]: value });
+	},
+	/** Change several settings at once: one save, then one notification per changed key. */
+	setMany(values) {
+		const changed = [];
+		const next = { ...current };
+		for (const [key, value] of Object.entries(values)) {
+			const entry = SCHEMA.find((s) => s.key === key);
+			const v = entry ? validate(entry, value) : value;
+			if (next[key] === v || (typeof v === "object" && JSON.stringify(next[key]) === JSON.stringify(v))) continue;
+			next[key] = v;
+			changed.push(key);
+		}
+		if (!changed.length) return;
+		current = next;
 		store.setJSON(SETTINGS_KEY, current);
-		for (const fn of listeners) fn(key, v, current);
+		for (const key of changed) for (const fn of listeners) fn(key, current[key], current);
+	},
+	/** Id of the theme the current look matches exactly, or null (a custom look). */
+	currentTheme() {
+		return matchTheme(current);
+	},
+	/** Apply a theme; "custom" restores the look saved when a theme first replaced it. */
+	applyTheme(id) {
+		if (id === "custom") {
+			if (current.customLook) this.setMany(current.customLook);
+			return;
+		}
+		const theme = THEMES.find((t) => t.id === id);
+		if (!theme) return;
+		// Leaving a look of the user's own: keep it so it can be restored.
+		if (!matchTheme(current)) this.setMany({ customLook: pickLook(current) });
+		this.setMany(themeLook(theme));
 	},
 	reset() {
 		current = { ...DEFAULTS, ...EXTRA_DEFAULTS, seenTip: current.seenTip };
@@ -600,7 +709,8 @@ const settings = {
 //     meta: { ti?, ar?, al?, by?, offset?, length? },
 //     lines: Line[]
 //   }
-//   Line = { time: ms|null, end: ms|null, text: string, gap?: true, words: Word[]|null }
+//   Line = { time: ms|null, end: ms|null, text: string, gap?: true, words: Word[]|null,
+//            bg?: { text, words }, opposite?: true, singer?: 0|1|2 }   (bg/opposite/singer: optional extras)
 //   Word = { time: ms, end: ms, text: string }   // text keeps its trailing space
 //
 // All times are milliseconds with the LRC [offset:] already applied.
@@ -620,6 +730,15 @@ function toMs(min, sec, frac) {
 	let ms = 0;
 	if (frac) ms = frac.length === 1 ? +frac * 100 : frac.length === 2 ? +frac * 10 : +frac;
 	return (+min * 60 + +sec) * 1000 + ms;
+}
+
+/**
+ * Duet voices. Lines may carry `singer`: 0 = lead, 1 = second singer, 2 = together / group.
+ * A2 LRC numbers voices v1, v2, …; v1000+ is the conventional "all voices" marker.
+ */
+function voiceToSinger(n) {
+	if (n >= 1000) return 2;
+	return n >= 1 ? (n - 1) % 2 : null;
 }
 
 /** True when the text contains at least one line-level LRC timestamp. */
@@ -690,8 +809,14 @@ function parseLRC(text, opts = {}) {
 			continue; // untimed text inside a synced file is ignored
 		}
 
-		// A2 voice markers ("v1:") and stray whitespace.
-		const content = line.slice(contentStart).replace(/^v\d+:\s*/i, "");
+		// A2 voice markers ("v1:", "v2:"): who sings the line in a duet. Stripped from the text.
+		let content = line.slice(contentStart);
+		let singer = null;
+		const voice = content.match(/^v(\d+):\s*/i);
+		if (voice) {
+			singer = voiceToSinger(Number(voice[1]));
+			content = content.slice(voice[0].length);
+		}
 		const parsedWords = parseWords(content);
 		const plain = (parsedWords ? parsedWords.plain : content).replace(/\s+/g, " ").trim();
 
@@ -706,7 +831,7 @@ function parseLRC(text, opts = {}) {
 					text: w.text,
 				}));
 			}
-			lines.push({ time: t, end: null, text: plain, words });
+			lines.push({ time: t, end: null, text: plain, words, singer, opposite: singer === 1 });
 		}
 	}
 
@@ -774,6 +899,7 @@ function finalizeSynced(lines, meta = {}, duration) {
 		const out = { time: l.time, end: null, text: gap ? "" : text, gap: gap || undefined, words: gap ? null : words };
 		if (bg && !gap) out.bg = bg;
 		if (l.opposite && !gap) out.opposite = true; // duet: other singer, shown on the opposite side
+		if (l.singer != null && !gap) out.singer = l.singer; // duet: who sings it (see voiceToSinger)
 		return out;
 	});
 
@@ -1101,6 +1227,30 @@ function attrs(tag) {
 const stripParens = (s) => s.replace(/^\s*\(\s*/, "").replace(/\s*\)\s*$/, "");
 
 /**
+ * Duet singers from TTML agents: <ttm:agent type="person|group" xml:id="v1"/> declared in the
+ * head, referenced as <p ttm:agent="v1">. People get singer 0, 1, 0, … in order of their first
+ * line (so whoever sings first is the lead); group agents get 2. Returns agentId → singer|null.
+ * Songs with a single agent return null for everything (nothing to colour).
+ */
+function ttmlSingers(xml) {
+	const types = new Map();
+	for (const m of xml.matchAll(/<(?:[\w-]+:)?agent\b([^>]*)>/g)) {
+		const a = attrs(m[1]);
+		if (a.id) types.set(a.id, a.type || "person");
+	}
+	const order = [];
+	for (const m of xml.matchAll(/<p\b([^>]*)>/g)) {
+		const id = attrs(m[1]).agent;
+		if (id && !order.includes(id)) order.push(id);
+	}
+	if (order.length < 2) return () => null;
+	const map = new Map();
+	let people = 0;
+	for (const id of order) map.set(id, types.get(id) === "group" ? 2 : people++ % 2);
+	return (id) => (id && map.has(id) ? map.get(id) : null);
+}
+
+/**
  * Small regex-based TTML reader (no DOMParser needed). Handles <p begin end> lines,
  * timed <span> words/syllables (with or without spaces between them), and
  * <span ttm:role="x-bg"> background vocals. Untimed TTML becomes plain text.
@@ -1109,6 +1259,7 @@ function parseTTML(xml, duration) {
 	const body = String(xml || "");
 	const lines = [];
 	let anyTimed = false;
+	const singerOf = ttmlSingers(body);
 	for (const pm of body.matchAll(/<p\b([^>]*)>([\s\S]*?)<\/p>/g)) {
 		const pa = attrs(pm[1]);
 		const buckets = { main: { words: [], text: "" }, bg: { words: [], text: "" } };
@@ -1150,7 +1301,8 @@ function parseTTML(xml, duration) {
 			bgWords[0].text = bgWords[0].text.replace(/^\s*\(/, "");
 			bgWords[bgWords.length - 1].text = bgWords[bgWords.length - 1].text.replace(/\)\s*$/, "");
 		}
-		lines.push({ time: begin, text: mainText, words: mainWords, bg: bgText ? { text: bgText, words: bgWords } : null });
+		const singer = singerOf(pa.agent);
+		lines.push({ time: begin, text: mainText, words: mainWords, bg: bgText ? { text: bgText, words: bgWords } : null, singer, opposite: singer === 1 });
 	}
 	if (!lines.length) return null;
 	if (!anyTimed || lines.every((l) => l.time == null)) return parsePlain(lines.map((l) => l.text).join("\n"));
@@ -1194,6 +1346,7 @@ function fromPaxsenixApple(json, duration) {
 			words: wordSynced && main.length ? main : null,
 			bg: bgText ? { text: bgText, words: wordSynced && bg.length ? bg : null } : null,
 			opposite: !!l.oppositeTurn,
+			singer: l.oppositeTurn ? 1 : 0, // the only duet info this API gives
 		};
 	});
 	return finalizeSynced(lines.sort(byTime), {}, duration);
@@ -1350,6 +1503,42 @@ function getCurrentTrack() {
 	};
 }
 
+/**
+ * A queue entry → { uri, title, artist, image }, or null for delimiters / empty entries.
+ * Accepts Spicetify.Queue.nextTracks items ({ contextTrack: { uri, metadata } }) and
+ * Player.data.nextItems items ({ uri, name, artists, album: { images }, metadata }).
+ */
+function describeQueueItem(raw) {
+	const item = raw?.contextTrack || raw;
+	const uri = item?.uri;
+	if (!uri || uri.includes("delimiter") || raw?.provider === "unavailable") return null;
+	const meta = item.metadata || {};
+	const artists = Array.isArray(item.artists) ? item.artists.map((a) => a?.name).filter(Boolean) : [];
+	const images = item.album?.images || item.images || [];
+	const biggest = images.length ? [...images].sort((a, b) => (b.width || 0) - (a.width || 0))[0]?.url : null;
+	const title = item.name || meta.title || "";
+	if (!title) return null;
+	return {
+		uri,
+		title,
+		artist: artists.length ? artists.join(", ") : meta.artist_name || "",
+		image: imageUrl(biggest) || imageUrl(meta.image_large_url) || imageUrl(meta.image_url) || imageUrl(meta.image_xlarge_url),
+	};
+}
+
+/** The track that plays next (queue first, then the context), or null if unknown. */
+function getNextTrack() {
+	const S = globalThis.Spicetify;
+	for (const list of [S?.Queue?.nextTracks, S?.Player?.data?.nextItems]) {
+		if (!Array.isArray(list)) continue;
+		for (const raw of list.slice(0, 5)) {
+			const t = describeQueueItem(raw);
+			if (t) return t;
+		}
+	}
+	return null;
+}
+
 /** Current playback position in ms, interpolated between player state updates. */
 function getPosition() {
 	const P = globalThis.Spicetify?.Player;
@@ -1404,7 +1593,7 @@ function setVolume(v) {
 	try {
 		globalThis.Spicetify?.Player?.setVolume?.(Math.min(1, Math.max(0, v)));
 	} catch (e) {
-		console.warn("[fal] setVolume failed", e);
+		console.warn("[aurora-lyrics] setVolume failed", e);
 	}
 }
 
@@ -1413,7 +1602,7 @@ function playerCommand(name) {
 	try {
 		globalThis.Spicetify?.Player?.[name]?.();
 	} catch (e) {
-		console.warn(`[fal] Player.${name} failed`, e);
+		console.warn(`[aurora-lyrics] Player.${name} failed`, e);
 	}
 }
 
@@ -1421,7 +1610,7 @@ function seek(ms) {
 	try {
 		globalThis.Spicetify?.Player?.seek?.(Math.max(0, Math.round(ms)));
 	} catch (e) {
-		console.warn("[fal] seek failed", e);
+		console.warn("[aurora-lyrics] seek failed", e);
 	}
 }
 
@@ -1610,7 +1799,7 @@ const musixmatchProvider = {
 			if (matcherCode === 404) return { status: "notfound" };
 			const matched = calls?.["matcher.track.get"]?.message?.body?.track;
 			if (!mxmMatches(track, matched)) {
-				console.warn(`[fal] Musixmatch matched a different song ("${matched?.track_name}" by ${matched?.artist_name}); ignoring it`);
+				console.warn(`[aurora-lyrics] Musixmatch matched a different song ("${matched?.track_name}" by ${matched?.artist_name}); ignoring it`);
 				return { status: "notfound" };
 			}
 			const res = fromMusixmatch(calls, track.duration);
@@ -2074,7 +2263,7 @@ async function resolveLyricsNow(track, s, { force = false, only, probe = false, 
 		report[id] = { status: r.status, message: r.message };
 		if (r.status === "error") {
 			errors.push({ id, message: r.message });
-			console.warn(`[fal] ${r.message}`);
+			console.warn(`[aurora-lyrics] ${r.message}`);
 		} else if (r.status !== "skipped") tried.push(id);
 
 		if (r.status === "found") {
@@ -2120,6 +2309,12 @@ const ICONS = {
 	settings: () => svg('<path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="9.5" cy="17" r="2.3"/>'),
 	reload: () => svg('<path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/>'),
 	edit: () => svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+	// Mini lyrics: a small window with a lyric line; pop out: window with an arrow leaving it.
+	mini: () => svg('<rect x="3" y="5" width="18" height="14" rx="2.5"/><rect x="11" y="12" width="7.5" height="4.5" rx="1.2" fill="currentColor" stroke="none"/>', 18),
+	popOut: () => svg('<path d="M19 13.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4.5"/><path d="M14 4h6v6M20 4l-8 8"/>', 18),
+	share: () => svg('<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 12.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5.5"/>'),
+	copy: () => svg('<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>', 18),
+	download: () => svg('<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4.5 19.5h15"/>', 18),
 	fullscreen: () => svg('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
 	exitFullscreen: () => svg('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
 	pin: () => svg('<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
@@ -2194,7 +2389,7 @@ const ARROWS = {
 };
 
 // ---- styles.js -------------------------------------------------------------
-const CSS = ".fal-root {\n--fal-font: var(--encore-title-font-stack, \"SpotifyMixUITitle\", \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\n--fal-fs: 56px;\n--fal-gap: 0.55em;\n--fal-fw: 800;\n--fal-shade: 0.45;\n--fal-bg-scale: 12;\n--fal-bg-blur: 6px;\n--fal-c1: #4b3b78;\n--fal-c2: #14203a;\n--fal-accent: #ffffff;\n--fal-ah: 1.2em;\n--fal-ui-font: var(--encore-body-font-stack, \"SpotifyMixUI\", \"CircularSp\", \"Segoe UI Variable Text\", system-ui, sans-serif);\n--fal-size: min(var(--fal-fs), 7.4vw, 10.5vh);\n--fal-hi: #fff;\n--fal-dim: color-mix(in srgb, var(--fal-hi) 30%, transparent);\n--fal-glow-tint: color-mix(in oklab, var(--fal-accent) 62%, #fff);\n--fal-glow-k: 1;\n--fal-glow-c: color-mix(in oklab, var(--fal-glow-tint) 45%, transparent);\n--fal-green: #1ed760;\n--fal-origin: 0%;\n--fal-pad: max(7vw, 20px);\n--fal-ease: cubic-bezier(0.22, 1, 0.36, 1);\n--fal-spring: cubic-bezier(0.34, 1.56, 0.64, 1);\n--fal-wave: cubic-bezier(0.3, 1.12, 0.44, 1);\n--fal-stagger: 0ms;\n--fal-move: 0.85s;\n--fal-move-ease: var(--fal-ease);\nposition: fixed;\ninset: 0;\nz-index: 99999;\noverflow: hidden;\noverflow: clip;\nisolation: isolate;\ncolor: #fff;\nbackground: #08080b;\nfont-family: var(--fal-ui-font);\n-webkit-font-smoothing: antialiased;\ntext-rendering: optimizeLegibility;\n-webkit-app-region: no-drag;\noutline: none;\nuser-select: none;\nopacity: 0;\ntransform: scale(1.035);\ntransition:\nopacity 0.42s var(--fal-ease),\ntransform 0.7s var(--fal-ease);\n}\n.fal-root[hidden] { display: none; }\n.fal-root.is-open { opacity: 1; transform: none; }\n.fal-root *, .fal-root *::before, .fal-root *::after { box-sizing: border-box; }\n.fal-root ::selection { background: rgba(255, 255, 255, 0.28); }\n.fal-root[data-align=\"center\"] { --fal-origin: 50%; }\n.fal-root[data-align=\"right\"] { --fal-origin: 100%; }\n.fal-root[data-glow=\"radiant\"] { --fal-glow-k: 1.7; }\n.fal-root[data-glow=\"off\"] { --fal-glow-k: 0; }\n.fal-root[data-color=\"accent\"] { --fal-hi: color-mix(in srgb, var(--fal-accent) 42%, #fff); }\n.fal-root[data-anim=\"flow\"] { --fal-stagger: 36ms; --fal-move: 1.05s; --fal-move-ease: var(--fal-wave); }\n.fal-root[data-anim=\"scale\"] { --fal-stagger: 14ms; --fal-move: 0.95s; --fal-move-ease: cubic-bezier(0.34, 1.3, 0.64, 1); }\n.fal-bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: #0a0a0e; }\n.fal-bg-stack, .fal-bg-layer { position: absolute; inset: 0; }\n.fal-bg-layer { opacity: 0; transition: opacity 1.6s ease; }\n.fal-bg-layer.is-on { opacity: 1; }\n.fal-blob {\nposition: absolute;\nleft: 50%;\ntop: 50%;\nwidth: 256px;\nheight: 256px;\nmax-width: none;\nmargin: -128px 0 0 -128px;\nobject-fit: cover;\nfilter: blur(var(--fal-bg-blur)) saturate(1.7) brightness(0.92);\ntransform: translate(var(--bx, 0), var(--by, 0)) scale(calc(var(--fal-bg-scale) * var(--bs, 1)));\nanimation: fal-spin var(--bt, 120s) linear infinite;\nwill-change: transform;\n}\n.fal-blob.b3 { --bt: 150s; animation-direction: reverse; }\n.fal-blob.b1 { --bx: -20vw; --by: -14vh; --bs: 0.7; --bt: 70s; opacity: 0.85; border-radius: 42%; animation-delay: -20s; }\n.fal-blob.b2 { --bx: 22vw; --by: 16vh; --bs: 0.62; --bt: 95s; opacity: 0.7; border-radius: 46%; animation-direction: reverse; animation-delay: -45s; }\n.fal-root[data-bganim=\"off\"] .fal-blob,\n.fal-root[data-bganim=\"off\"] .fal-bg-gradient { animation-play-state: paused; }\n@keyframes fal-spin { to { rotate: 360deg; } }\n.fal-bg-gradient {\nposition: absolute;\ninset: -30%;\nopacity: 0;\nbackground:\nradial-gradient(42% 42% at 30% 35%, var(--fal-c1) 0%, transparent 70%),\nradial-gradient(48% 48% at 70% 65%, var(--fal-c2) 0%, transparent 72%),\nradial-gradient(35% 35% at 75% 20%, color-mix(in srgb, var(--fal-accent) 40%, transparent) 0%, transparent 70%),\n#0b0b10;\ntransition: opacity 1s ease;\nanimation: fal-drift 36s ease-in-out infinite alternate;\n}\n.fal-root[data-bg=\"gradient\"] .fal-bg-gradient { opacity: 1; }\n.fal-root:not([data-bg=\"gradient\"]) .fal-bg-gradient { animation: none; }\n.fal-root:not([data-bg=\"album\"]) .fal-bg-stack { display: none; }\n@keyframes fal-drift {\nfrom { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1); }\nto { transform: translate3d(3%, 2%, 0) rotate(10deg) scale(1.1); }\n}\n.fal-bg-shade {\nposition: absolute;\ninset: 0;\nbackground:\nlinear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.18) 16%, transparent 34%),\nradial-gradient(ellipse at 42% 40%, rgba(0, 0, 0, calc(var(--fal-shade) * 0.6)) 0%, rgba(0, 0, 0, var(--fal-shade)) 100%);\n}\n.fal-bg-grain {\nposition: absolute;\ninset: 0;\nopacity: 0.08;\nmix-blend-mode: overlay;\nbackground-size: 180px 180px;\nbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\");\npointer-events: none;\n}\n.fal-drag { position: absolute; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; z-index: 1; }\n.fal-header {\nposition: absolute;\ntop: 30px;\nleft: var(--fal-pad);\nz-index: 2;\ndisplay: flex;\nalign-items: center;\ngap: 14px;\nmax-width: min(560px, 55vw);\npointer-events: none;\ntransition: opacity 0.5s ease, transform 0.6s var(--fal-ease);\n}\n.fal-root[data-info=\"off\"] .fal-header { display: none; }\n.fal-cover { width: 54px; height: 54px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }\n.fal-meta { min-width: 0; }\n.fal-title, .fal-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.fal-title { font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; }\n.fal-artist { margin-top: 3px; font-size: 13px; color: rgba(255, 255, 255, 0.62); }\n.fal-stage {\nposition: absolute;\ninset: 0;\npadding: 0 var(--fal-pad);\noverflow: hidden;\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 13%), #000 72%, transparent 93%);\nmask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 13%), #000 72%, transparent 93%);\n}\n.fal-lines { position: relative; }\n.fal-root:not([data-transport=\"off\"]) .fal-stage { bottom: 96px; }\n.fal-root[data-align=\"center\"] .fal-stage { text-align: center; }\n.fal-root[data-align=\"right\"] .fal-stage { text-align: right; }\n.fal-stage > .fal-lines,\n.fal-stage > .fal-message { transition: opacity 0.22s ease, filter 0.22s ease; }\n.fal-stage.is-leaving > .fal-lines,\n.fal-stage.is-leaving > .fal-message { opacity: 0; filter: blur(8px); }\n.fal-line {\n--fal-s: 0.95;\n--fal-k: 0;\nfont-family: var(--fal-font);\nfont-size: var(--fal-size);\nfont-weight: var(--fal-fw);\nline-height: 1.16;\nletter-spacing: -0.022em;\npadding: calc(var(--fal-gap) / 2) 0;\nmax-width: 1400px;\ncolor: var(--fal-hi);\nopacity: 0.1;\ntransform-origin: var(--fal-origin) 50%;\noverflow-wrap: anywhere;\ntext-wrap: balance;\nfont-kerning: normal;\ncursor: pointer;\ntransition:\nopacity 0.7s var(--fal-ease),\ntransform var(--fal-move) var(--fal-move-ease) calc(var(--fal-k) * var(--fal-stagger)),\nfilter 0.7s var(--fal-ease),\ncolor 0.5s ease,\ntext-shadow 0.7s ease;\n}\n.fal-root[data-align=\"center\"] .fal-line { margin-inline: auto; }\n.fal-root[data-align=\"right\"] .fal-line { margin-left: auto; }\n.fal-root .fal-line.is-active { --fal-s: 1; opacity: 1; cursor: default; }\n.fal-root:not([data-glow=\"off\"]) .fal-line.is-active:not(.has-words) .fal-main {\ntext-shadow:\n0 0 0.05em color-mix(in srgb, #fff calc(28% * var(--fal-glow-k)), transparent),\n0 0 0.26em color-mix(in oklab, var(--fal-glow-tint) calc(30% * var(--fal-glow-k)), transparent),\n0 0 0.85em color-mix(in oklab, var(--fal-glow-tint) calc(16% * var(--fal-glow-k)), transparent);\n}\n.fal-main { transition: text-shadow 0.8s ease; }\n.fal-main { position: relative; }\n.fal-main::before {\n--a: calc(13% * var(--fal-glow-k));\ncontent: \"\";\nposition: absolute;\nz-index: -1;\nleft: calc(var(--hx, 0px) - 1.1em);\ntop: calc(var(--hy, 0px) - 0.7em);\nwidth: calc(var(--hw, 100%) + 2.2em);\nheight: calc(var(--hh, 100%) + 1.4em);\npointer-events: none;\nbackground: radial-gradient(closest-side, color-mix(in oklab, var(--fal-glow-tint) var(--a), transparent) 0%, color-mix(in oklab, var(--fal-glow-tint) calc(var(--a) * 0.45), transparent) 55%, transparent 100%);\nopacity: 0;\ntransform: scale(0.85);\ntransition: opacity 1.2s ease, transform 1.6s var(--fal-ease);\n}\n.fal-line.is-active .fal-main::before { opacity: 1; transform: none; }\n.fal-stage[data-mode=\"unsynced\"] .fal-main::before { display: none; }\n@property --fal-wp { syntax: \"<number>\"; inherits: true; initial-value: 0; }\n.fal-wg { display: inline-block; white-space: nowrap; }\n.fal-w, .fal-c { display: inline-block; }\n.fal-root[data-words=\"on\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--p: var(--fal-wp);\n--e: calc(var(--p) * var(--p) * (3 - 2 * var(--p)));\n--hop: sin(calc(var(--e) * 3.14159));\n--edge: 0.75em;\ntransform-origin: 50% 90%;\nwill-change: transform;\n}\n.fal-root[data-words=\"on\"] .is-active.has-words .fal-w .fal-c {\n--wave: 2.6;\n--p: clamp(0, (var(--fal-wp) * (var(--n) + var(--wave)) - var(--i)) / var(--wave), 1);\n--edge: 0.4em;\n}\n.fal-root[data-words=\"on\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\ncolor: color-mix(in srgb, var(--fal-hi) calc(var(--e) * 100%), var(--fal-dim));\ntransform: translateY(calc(0.03em - var(--e) * 0.075em));\n}\n.fal-root:not([data-glow=\"off\"])[data-words=\"on\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--g: calc(var(--e) * var(--fal-glow-k));\nfilter:\ndrop-shadow(0 0 0.04em color-mix(in srgb, #fff calc(32% * var(--g)), transparent))\ndrop-shadow(0 0 0.3em color-mix(in oklab, var(--fal-glow-tint) calc(34% * var(--g)), transparent));\n}\n.fal-root[data-words=\"on\"]:is([data-wordanim=\"fill\"], [data-wordanim=\"rise\"], [data-wordanim=\"karaoke\"], [data-wordanim=\"letters\"]) .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\ncolor: transparent;\nbackground-image: linear-gradient(90deg, var(--fal-ink, var(--fal-hi)) calc(var(--p) * (100% + var(--edge)) - var(--edge)), var(--fal-dim) calc(var(--p) * (100% + var(--edge))));\n-webkit-background-clip: text;\nbackground-clip: text;\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--lit: clamp(0, var(--e) * 3, 1);\ncolor: color-mix(in srgb, var(--fal-hi) calc(var(--lit) * 100%), var(--fal-dim));\ntransform: translateY(calc(0.03em - var(--lit) * 0.07em)) scale(calc(1 + 0.04 * var(--hop)));\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active .fal-w.now:not(.has-chars),\n.fal-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active .fal-w.now .fal-c {\n--gk: max(var(--fal-glow-k), 0.6);\nfilter:\ndrop-shadow(0 0 0.05em color-mix(in srgb, #fff calc((30% + 25% * var(--hop)) * var(--gk)), transparent))\ndrop-shadow(0 0 calc(0.25em + 0.3em * var(--hop)) color-mix(in oklab, var(--fal-glow-tint) calc((32% + 30% * var(--hop)) * var(--gk)), transparent));\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"pop\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--lit: clamp(0, var(--e) * 4, 1);\ncolor: color-mix(in srgb, var(--fal-hi) calc(var(--lit) * 100%), var(--fal-dim));\ntransform: translateY(calc(0.03em - var(--lit) * 0.06em - 0.06em * var(--hop))) scale(calc(1 + 0.12 * var(--hop)));\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"rise\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--up: clamp(0, var(--e) * 2.2, 1);\n--up-e: calc(1 - (1 - var(--up)) * (1 - var(--up)));\nopacity: calc(0.45 + 0.55 * var(--up-e));\ntransform: translateY(calc((1 - var(--up-e)) * 0.2em - 0.04em));\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"karaoke\"] .is-active.has-words :is(.fal-w:not(.has-chars), .fal-c) {\n--fal-ink: color-mix(in srgb, var(--fal-accent) 70%, #fff);\n--edge: 0.18em;\ntransform: none;\n}\n.fal-root[data-words=\"on\"][data-wordanim=\"letters\"] .is-active.has-words .fal-w .fal-c {\ntransform: translateY(calc(0.03em - var(--e) * 0.06em - 0.13em * var(--hop))) scale(calc(1 + 0.09 * var(--hop)));\n}\n.fal-root[data-words=\"on\"]:not([data-wordanim=\"karaoke\"]):not([data-wordanim=\"letters\"]) .is-active .fal-w.is-long .fal-c {\ntransform: translateY(calc(0.03em - var(--e) * 0.075em - 0.08em * var(--hop))) scale(calc(1 + 0.05 * var(--hop)));\n}\n.fal-root[data-words=\"on\"] .is-active .fal-w.is-long.now .fal-c {\nfilter:\ndrop-shadow(0 0 0.05em color-mix(in srgb, #fff calc((20% + 30% * var(--hop)) * var(--fal-glow-k)), transparent))\ndrop-shadow(0 0 calc(0.22em + 0.25em * var(--hop)) color-mix(in oklab, var(--fal-glow-tint) calc((30% + 35% * var(--hop)) * var(--fal-glow-k)), transparent));\n}\n.fal-tr {\nmargin-top: 0.22em;\nfont-family: var(--fal-ui-font);\nfont-size: 0.44em;\nfont-weight: 600;\nline-height: 1.3;\nletter-spacing: 0;\ncolor: rgba(255, 255, 255, 0.62);\ntext-wrap: balance;\ntransition: color 0.5s ease;\n}\n.fal-line.is-active .fal-tr { color: rgba(255, 255, 255, 0.9); }\n.fal-stage[data-mode=\"unsynced\"] .fal-tr { font-size: 0.6em; }\n.fal-root[data-view=\"captions\"] .fal-tr { font-size: 0.5em; }\n.fal-tr-btn.is-on { background: rgba(255, 255, 255, 0.08); }\n.fal-root[data-align=\"left\"] .fal-line.is-opposite { --fal-origin: 100%; text-align: right; margin-left: auto; }\n.fal-root[data-align=\"right\"] .fal-line.is-opposite { --fal-origin: 0%; text-align: left; margin-left: 0; margin-right: auto; }\n.fal-bgv {\nmargin-top: 0.12em;\nfont-size: 0.56em;\nfont-weight: calc(var(--fal-fw) - 100);\nletter-spacing: -0.01em;\nopacity: 0.55;\ntransition: opacity 0.6s ease;\n}\n.fal-line.is-active .fal-bgv { opacity: 0.85; }\n.fal-line.is-gap { cursor: default; }\n.fal-dots { display: inline-flex; align-items: center; gap: 0.32em; height: 1.16em; transform-origin: var(--fal-origin) 50%; }\n.fal-dots i { width: 0.28em; height: 0.28em; border-radius: 50%; background: var(--fal-hi); opacity: 0.3; transform: scale(0.8); transition: opacity 0.4s ease, transform 0.5s var(--fal-spring); }\n.is-active .fal-dots { animation: fal-breathe 3s ease-in-out infinite; }\n.is-active .fal-dots i:nth-child(1) { opacity: calc(0.3 + 0.7 * clamp(0, var(--fal-gp, 0) * 3, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--fal-gp, 0) * 3, 1))); }\n.is-active .fal-dots i:nth-child(2) { opacity: calc(0.3 + 0.7 * clamp(0, var(--fal-gp, 0) * 3 - 1, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--fal-gp, 0) * 3 - 1, 1))); }\n.is-active .fal-dots i:nth-child(3) { opacity: calc(0.3 + 0.7 * clamp(0, var(--fal-gp, 0) * 3 - 2, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--fal-gp, 0) * 3 - 2, 1))); }\n@keyframes fal-breathe {\n0%, 100% { transform: scale(1); }\n50% { transform: scale(1.14); }\n}\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line {\ntransform: translate3d(0, var(--fal-y, 0px), 0) scale(var(--fal-s));\n}\n.fal-root[data-anim=\"flow\"] .fal-line { --fal-s: 0.96; }\n.fal-root[data-anim=\"scale\"] .fal-line { --fal-s: 0.8; }\n.fal-root[data-anim=\"scale\"] .fal-line[data-d=\"-1\"],\n.fal-root[data-anim=\"scale\"] .fal-line[data-d=\"1\"] { --fal-s: 0.86; }\n.fal-root .fal-line.is-active { --fal-s: 1; }\n.fal-root[data-anim=\"scale\"] .fal-line.is-active { --fal-s: 1.04; }\n.fal-root[data-layout=\"list\"] .fal-line[data-d=\"-1\"], .fal-root[data-layout=\"list\"] .fal-line[data-d=\"1\"] { opacity: 0.36; }\n.fal-root[data-layout=\"list\"] .fal-line[data-d=\"-2\"], .fal-root[data-layout=\"list\"] .fal-line[data-d=\"2\"] { opacity: 0.24; }\n.fal-root[data-layout=\"list\"] .fal-line[data-d=\"-3\"], .fal-root[data-layout=\"list\"] .fal-line[data-d=\"3\"] { opacity: 0.17; }\n.fal-root[data-layout=\"list\"] .fal-line[data-d=\"-4\"], .fal-root[data-layout=\"list\"] .fal-line[data-d=\"4\"] { opacity: 0.13; }\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-1\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"1\"] { filter: blur(0.8px); }\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-2\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"2\"] { filter: blur(1.5px); }\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-3\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"3\"] { filter: blur(2.2px); }\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-4\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"4\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-5\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"5\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-6\"],\n.fal-root[data-depth=\"on\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"6\"] { filter: blur(2.8px); }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"-1\"] { --fal-k: 1; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"0\"] { --fal-k: 2; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"1\"] { --fal-k: 3; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"2\"] { --fal-k: 4; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"3\"] { --fal-k: 5; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"4\"] { --fal-k: 6; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"5\"] { --fal-k: 7; }\n.fal-lines[data-dir=\"up\"] .fal-line[data-d=\"6\"],\n.fal-lines[data-dir=\"up\"] .fal-line.is-active ~ .fal-line:not([data-d]) { --fal-k: 8; }\n.fal-lines[data-dir=\"down\"] .fal-line:not([data-d]) { --fal-k: 8; }\n.fal-lines[data-dir=\"down\"] .fal-line.is-active ~ .fal-line:not([data-d]) { --fal-k: 0; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"1\"] { --fal-k: 1; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"0\"] { --fal-k: 2; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-1\"] { --fal-k: 3; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-2\"] { --fal-k: 4; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-3\"] { --fal-k: 5; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-4\"] { --fal-k: 6; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-5\"] { --fal-k: 7; }\n.fal-lines[data-dir=\"down\"] .fal-line[data-d=\"-6\"] { --fal-k: 8; }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-gap) { position: relative; }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-active):not(.is-gap):hover { opacity: 0.82; filter: none; transition-duration: 0.25s, var(--fal-move), 0.25s, 0.3s, 0.3s; }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-gap)::after {\ncontent: \"\";\nposition: absolute;\nz-index: -1;\ninset: 0 -0.32em;\nborder-radius: 0.28em;\nbackground: linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));\nbox-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0.2em 0.6em rgba(0, 0, 0, 0.12);\nopacity: 0;\ntransform: scale(0.97);\ntransition: opacity 0.25s ease, transform 0.4s var(--fal-ease);\npointer-events: none;\n}\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-time]::before {\ncontent: attr(data-time) \"  ▶\";\nposition: absolute;\ntop: 50%;\nright: 0.1em;\npadding: 0.35em 0.75em;\nborder-radius: 99px;\nbackground: rgba(0, 0, 0, 0.28);\nfont-family: var(--fal-ui-font);\nfont-size: max(11px, 0.2em);\nfont-weight: 700;\nletter-spacing: 0.02em;\nwhite-space: pre;\ncolor: rgba(255, 255, 255, 0.85);\nopacity: 0;\ntransform: translate(0.4em, -50%);\ntransition: opacity 0.2s ease, transform 0.35s var(--fal-ease);\npointer-events: none;\n}\n.fal-root[data-align=\"right\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-time]::before { right: auto; left: 0.1em; transform: translate(-0.4em, -50%); }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-gap):hover::after { opacity: 1; transform: none; }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-time]:hover::before { opacity: 1; transform: translate(0, -50%); }\n.fal-root[data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-gap):active::after { transform: scale(0.985); }\n.fal-root[data-view=\"captions\"] .fal-line::before, .fal-root[data-view=\"captions\"] .fal-line::after { display: none; }\n.fal-root[data-layout=\"list\"] .fal-stage.is-browsing .fal-line {\n--fal-k: 0 !important;\nfilter: none !important;\ntransition:\nopacity 0.4s ease,\ntransform 0.45s var(--fal-ease),\nfilter 0.3s ease,\ncolor 0.4s ease,\ntext-shadow 0.4s ease;\n}\n.fal-root[data-layout=\"list\"] .fal-stage.is-browsing .fal-line:not(.is-active) { opacity: 0.42; }\n.fal-root[data-layout=\"list\"] .fal-stage.is-browsing .fal-line:not(.is-active):not(.is-gap):hover { opacity: 0.9; }\n.fal-root[data-layout=\"list\"] .fal-stage.is-entering[data-mode=\"synced\"] .fal-line {\nanimation: fal-line-in 1s var(--fal-ease) backwards;\nanimation-delay: calc(var(--i, 0) * 55ms);\n}\n@keyframes fal-line-in {\nfrom { opacity: 0; transform: translate3d(0, calc(var(--fal-y, 0px) + 64px), 0) scale(var(--fal-s)); filter: blur(12px); }\n}\n.fal-root[data-layout=\"stack\"] .fal-stage[data-mode=\"synced\"] .fal-lines { position: absolute; top: 0; bottom: 0; left: var(--fal-pad); right: var(--fal-pad); }\n.fal-root[data-layout=\"stack\"] .fal-stage[data-mode=\"synced\"] .fal-line {\nposition: absolute;\nleft: 0;\nright: 0;\ntop: 44%;\nopacity: 0;\npointer-events: none;\ntransform: translateY(-50%) scale(0.5);\n}\n.fal-root[data-layout=\"stack\"] .fal-stage[data-mode=\"synced\"] .fal-line.is-active { opacity: 1; pointer-events: auto; transform: translateY(-50%); }\n.fal-root[data-layout=\"stack\"] .fal-stage.is-entering[data-mode=\"synced\"] .fal-lines { animation: fal-fade-up 0.9s var(--fal-ease) backwards; }\n.fal-root[data-anim=\"fade\"] .fal-line { transition-duration: 0.55s, 0.8s, 0.6s, 0.5s, 0.6s; }\n.fal-root[data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-1\"] { opacity: 0.3; pointer-events: auto; transform: translateY(calc(var(--fal-ah) / -2 - 0.3em - 81%)) scale(0.62); }\n.fal-root[data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"1\"] { opacity: 0.3; pointer-events: auto; transform: translateY(calc(var(--fal-ah) / 2 + 0.3em - 19%)) scale(0.62); }\n.fal-root[data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-2\"] { transform: translateY(calc(var(--fal-ah) / -2 - 1.6em - 75%)) scale(0.5); }\n.fal-root[data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"2\"] { transform: translateY(calc(var(--fal-ah) / 2 + 1.6em - 25%)) scale(0.5); }\n.fal-root[data-depth=\"on\"][data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"-1\"],\n.fal-root[data-depth=\"on\"][data-anim=\"fade\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"1\"] { filter: blur(1px); }\n.fal-root[data-anim=\"cinematic\"] .fal-line { letter-spacing: -0.015em; transition-duration: 0.9s, 1.1s, 0.9s, 0.5s, 0.9s; }\n.fal-root[data-anim=\"cinematic\"] .fal-stage[data-mode=\"synced\"] .fal-line { transform: translateY(calc(-50% + 0.45em)) scale(0.97); }\n.fal-root[data-anim=\"cinematic\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d] { filter: blur(16px); }\n.fal-root[data-anim=\"cinematic\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d^=\"-\"] { transform: translateY(calc(-50% - 0.45em)) scale(1.03); }\n.fal-root[data-anim=\"cinematic\"] .fal-stage[data-mode=\"synced\"] .fal-line.is-active { filter: none; transform: translateY(-50%) scale(1.05); transition-delay: 0s, 0.14s, 0.14s, 0s, 0s; }\n.fal-root[data-context=\"off\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-active) { opacity: 0 !important; pointer-events: none; }\n.fal-stage[data-mode=\"unsynced\"] { overflow-y: auto; scrollbar-width: none; }\n.fal-stage[data-mode=\"unsynced\"]::-webkit-scrollbar { display: none; }\n.fal-stage[data-mode=\"unsynced\"] .fal-lines { padding: 24vh 0 42vh; }\n.fal-stage[data-mode=\"unsynced\"] .fal-line {\nfont-size: calc(var(--fal-size) * 0.66);\nline-height: 1.28;\npadding: calc(var(--fal-gap) / 3.5) 0;\nopacity: 0.9;\ntransform: none;\ncursor: text;\nuser-select: text;\n}\n.fal-stage[data-mode=\"unsynced\"] .fal-line.is-gap { height: 0.9em; }\n.fal-stage[data-mode=\"unsynced\"] .fal-dots { display: none; }\n.fal-stage.is-entering[data-mode=\"unsynced\"] .fal-lines { animation: fal-fade-up 0.9s var(--fal-ease) backwards; }\n@keyframes fal-fade-up {\nfrom { opacity: 0; transform: translateY(28px); filter: blur(8px); }\n}\n.fal-message {\nposition: absolute;\ninset: 0;\ndisplay: none;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 8px;\npadding: 60px 8vw 150px;\ntext-align: center;\n}\n.fal-stage[data-mode=\"message\"] .fal-message { display: flex; }\n.fal-message-art {\nwidth: clamp(120px, 30vh, 280px);\naspect-ratio: 1;\nmargin-bottom: 22px;\nborder-radius: 14px;\noverflow: hidden;\nbox-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);\n}\n.fal-message-art img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.fal-message[data-kind=\"loading\"] .fal-message-art { animation: fal-pulse 2.4s ease-in-out infinite; }\n.fal-message-icon { color: rgba(255, 255, 255, 0.55); margin-bottom: 6px; }\n.fal-message-icon:empty { display: none; }\n.fal-message-title { font-family: var(--fal-font); font-size: clamp(22px, calc(var(--fal-size) * 0.6), 40px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }\n.fal-message-detail { min-height: 1.5em; max-width: 520px; font-size: 15px; line-height: 1.5; color: rgba(255, 255, 255, 0.6); }\n.fal-message[data-kind=\"error\"] .fal-message-title { color: #ffb4a8; }\n.fal-message-action { margin-top: 14px; }\n.fal-spinner { display: flex; gap: 7px; margin-bottom: 6px; }\n.fal-spinner i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: fal-bounce 1.2s var(--fal-ease) infinite; }\n.fal-spinner i:nth-child(2) { animation-delay: 0.15s; }\n.fal-spinner i:nth-child(3) { animation-delay: 0.3s; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > * { animation: fal-fade-up 0.8s var(--fal-ease) backwards; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > :nth-child(2) { animation-delay: 0.06s; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > :nth-child(3) { animation-delay: 0.12s; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > :nth-child(4) { animation-delay: 0.18s; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > :nth-child(5) { animation-delay: 0.24s; }\n.fal-stage.is-entering[data-mode=\"message\"] .fal-message > .fal-message-art { animation: fal-art-in 1s var(--fal-ease) backwards; }\n@keyframes fal-bounce {\n0%, 100% { transform: translateY(0); opacity: 0.35; }\n40% { transform: translateY(-7px); opacity: 1; }\n}\n@keyframes fal-pulse {\n0%, 100% { transform: scale(1); }\n50% { transform: scale(0.975); }\n}\n@keyframes fal-art-in {\nfrom { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(10px); }\n}\n:where(.fal-root) button { appearance: none; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; -webkit-app-region: no-drag; }\n.fal-root button:focus-visible,\n.fal-root select:focus-visible,\n.fal-root input:focus-visible,\n.fal-root textarea:focus-visible,\n.fal-progress:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }\n.fal-icon-btn {\ndisplay: inline-grid;\nplace-items: center;\nflex: none;\nwidth: 36px;\nheight: 36px;\nborder-radius: 50%;\ncolor: rgba(255, 255, 255, 0.72);\ntransition: background 0.2s ease, color 0.2s ease, transform 0.25s var(--fal-spring);\n}\n.fal-icon-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }\n.fal-icon-btn:active { transform: scale(0.9); }\n.fal-icon-btn.is-on { color: var(--fal-green); }\n.fal-btn {\ndisplay: inline-flex;\nalign-items: center;\njustify-content: center;\ngap: 8px;\nheight: 36px;\npadding: 0 16px;\nborder-radius: 999px;\nbackground: rgba(255, 255, 255, 0.1);\nfont-size: 13px;\nfont-weight: 700;\ntransition: background 0.2s ease, transform 0.2s var(--fal-spring), box-shadow 0.2s ease;\n}\n.fal-btn svg { width: 16px; height: 16px; }\n.fal-btn:hover { background: rgba(255, 255, 255, 0.17); }\n.fal-btn:active { transform: scale(0.96); }\n.fal-btn:disabled { opacity: 0.4; pointer-events: none; }\n.fal-btn-ghost { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }\n.fal-btn-ghost:hover { background: rgba(255, 255, 255, 0.07); }\n.fal-btn-primary { background: #fff; color: #000; }\n.fal-btn-primary:hover { background: #fff; transform: scale(1.03); box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15); }\n.fal-btn-danger { background: transparent; color: #ff8a7a; box-shadow: inset 0 0 0 1px rgba(255, 138, 122, 0.35); }\n.fal-root {\n--fal-toggle-on: color-mix(in oklab, var(--fal-accent) 50%, #fff);\n--fal-ctl: rgba(255, 255, 255, 0.72);\n}\n.fal-player {\nposition: absolute;\nleft: 0;\nright: 0;\nbottom: 0;\nz-index: 3;\ndisplay: grid;\ngrid-template-columns: minmax(0, 1fr) minmax(300px, 640px) minmax(0, 1fr);\nalign-items: end;\ncolumn-gap: 28px;\npadding: 0 var(--fal-pad) 20px;\npointer-events: none;\ntransition: opacity 0.5s ease, transform 0.65s var(--fal-ease);\n}\n.fal-player > * { pointer-events: auto; }\n.fal-player-side { display: flex; align-items: center; gap: 4px; height: 58px; min-width: 0; }\n.fal-player-side.is-left { grid-column: 1; justify-content: flex-start; }\n.fal-player-center { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }\n.fal-player-side.is-right { grid-column: 3; justify-content: flex-end; }\n.fal-root[data-transport=\"off\"] .fal-player-center { display: none; }\n.fal-scrub { width: 100%; }\n.fal-progress { --p: 0; --hx: 0; position: relative; height: 18px; cursor: pointer; touch-action: none; border-radius: 4px; }\n.fal-progress-track {\nposition: absolute;\nleft: 0;\nright: 0;\ntop: 50%;\nheight: 4px;\nmargin-top: -2px;\noverflow: hidden;\nborder-radius: 99px;\nbackground: rgba(255, 255, 255, 0.16);\ntransition: height 0.25s var(--fal-ease), margin 0.25s var(--fal-ease), background 0.25s ease;\n}\n.fal-progress-fill {\nposition: absolute;\ninset: 0;\nborder-radius: inherit;\nbackground: linear-gradient(90deg, rgba(255, 255, 255, 0.75), #fff);\ntransform-origin: 0 50%;\ntransform: scaleX(var(--p));\n}\n.fal-progress-knob-rail { position: absolute; inset: 0; transform: translateX(calc(var(--p) * 100%)); pointer-events: none; }\n.fal-progress-knob {\nposition: absolute;\nleft: -7px;\ntop: 50%;\nwidth: 14px;\nheight: 14px;\nmargin-top: -7px;\nborder-radius: 50%;\nbackground: #fff;\nbox-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 0 4px color-mix(in oklab, var(--fal-glow-tint) 25%, transparent);\ntransform: scale(0);\ntransition: transform 0.3s var(--fal-spring);\n}\n.fal-progress:hover .fal-progress-track,\n.fal-progress.is-scrubbing .fal-progress-track { height: 7px; margin-top: -3.5px; background: rgba(255, 255, 255, 0.22); }\n.fal-progress:hover .fal-progress-knob,\n.fal-progress.is-scrubbing .fal-progress-knob,\n.fal-progress:focus-visible .fal-progress-knob { transform: scale(1); }\n.fal-progress.is-scrubbing .fal-progress-knob { transform: scale(1.15); }\n.fal-progress-tip {\nposition: absolute;\nbottom: 20px;\nleft: calc(var(--hx) * 100%);\npadding: 3px 8px;\nborder-radius: 7px;\nbackground: rgba(18, 18, 22, 0.88);\nborder: 1px solid rgba(255, 255, 255, 0.08);\nfont-size: 11.5px;\nfont-weight: 600;\nfont-variant-numeric: tabular-nums;\nwhite-space: nowrap;\npointer-events: none;\nopacity: 0;\ntransform: translate(-50%, 4px);\ntransition: opacity 0.18s ease, transform 0.25s var(--fal-ease);\n}\n.fal-progress:hover .fal-progress-tip,\n.fal-progress.is-scrubbing .fal-progress-tip { opacity: 1; transform: translate(-50%, 0); }\n.fal-times { display: flex; justify-content: space-between; margin-top: 1px; }\n.fal-time { font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.55); }\n.fal-transport { display: flex; align-items: center; gap: 20px; }\n.fal-skip { width: 42px; height: 42px; color: rgba(255, 255, 255, 0.92); }\n.fal-skip svg { width: 22px; height: 22px; }\n.fal-toggle { position: relative; color: rgba(255, 255, 255, 0.5); }\n.fal-toggle.is-on { color: var(--fal-toggle-on); }\n.fal-toggle::after {\ncontent: \"\";\nposition: absolute;\nleft: 50%;\nbottom: 3px;\nwidth: 4px;\nheight: 4px;\nmargin-left: -2px;\nborder-radius: 50%;\nbackground: currentColor;\nopacity: 0;\ntransform: scale(0);\ntransition: opacity 0.2s ease, transform 0.3s var(--fal-spring);\n}\n.fal-toggle.is-on::after { opacity: 1; transform: none; }\n.fal-play-btn {\nposition: relative;\ndisplay: grid;\nplace-items: center;\nwidth: 58px;\nheight: 58px;\nflex: none;\nborder-radius: 50%;\nbackground: #fff;\ncolor: #0b0b0e;\nbox-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 0 color-mix(in oklab, var(--fal-glow-tint) 30%, transparent);\ntransition: transform 0.35s var(--fal-spring), box-shadow 0.4s ease;\n}\n.fal-play-btn:hover { transform: scale(1.06); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32), 0 0 0 8px color-mix(in oklab, var(--fal-glow-tint) 16%, transparent); }\n.fal-play-btn:active { transform: scale(0.93); }\n.fal-pp { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity 0.22s ease, transform 0.4s var(--fal-spring); }\n.fal-pp svg { width: 26px; height: 26px; }\n.fal-pp.is-pause { opacity: 0; transform: scale(0.5) rotate(-90deg); }\n.fal-root[data-playing=\"true\"] .fal-pp.is-play { opacity: 0; transform: scale(0.5) rotate(90deg); }\n.fal-root[data-playing=\"true\"] .fal-pp.is-pause { opacity: 1; transform: none; }\n.fal-source {\ndisplay: inline-flex;\nalign-items: center;\ngap: 8px;\nmin-width: 0;\nmax-width: 230px;\nheight: 32px;\npadding: 0 12px 0 10px;\nborder-radius: 99px;\nbackground: rgba(255, 255, 255, 0.07);\nfont-size: 12px;\nfont-weight: 600;\nwhite-space: nowrap;\noverflow: hidden;\ntext-overflow: ellipsis;\ncolor: rgba(255, 255, 255, 0.78);\ntransition: background 0.2s ease, color 0.2s ease;\n}\n.fal-source:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }\n.fal-source::before { content: \"\"; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #777; }\n.fal-source[data-kind=\"synced\"]::before { background: var(--fal-green); }\n.fal-source[data-kind=\"word-synced\"]::before { background: #7cd4ff; box-shadow: 0 0 8px #7cd4ff; }\n.fal-source[data-kind=\"unsynced\"]::before { background: #f5c451; }\n.fal-offset-group { display: inline-flex; align-items: center; flex: none; height: 32px; margin-left: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.05); }\n.fal-mini-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: rgba(255, 255, 255, 0.6); transition: background 0.2s ease, color 0.2s ease; }\n.fal-mini-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }\n.fal-offset { min-width: 54px; height: 30px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: #fff; }\n.fal-offset.is-zero { color: rgba(255, 255, 255, 0.45); }\n.fal-player-side .fal-icon-btn { color: var(--fal-ctl); }\n.fal-heart { transition: color 0.2s ease, transform 0.35s var(--fal-spring); }\n.fal-heart.is-on { color: var(--fal-green); }\n.fal-heart.is-on svg { animation: fal-heart-pop 0.45s var(--fal-spring); }\n@keyframes fal-heart-pop { 40% { transform: scale(1.3); } }\n.fal-volume { display: flex; align-items: center; }\n.fal-vol {\n--v: 1;\n-webkit-appearance: none;\nappearance: none;\nwidth: 0;\nheight: 18px;\nmargin: 0;\nbackground: transparent;\nopacity: 0;\ncursor: pointer;\ntransition: width 0.35s var(--fal-ease), opacity 0.25s ease, margin 0.35s var(--fal-ease);\n}\n.fal-volume:hover .fal-vol,\n.fal-vol:focus-visible { width: 86px; margin: 0 6px 0 2px; opacity: 1; }\n.fal-vol::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, #fff calc(var(--v) * 100%), rgba(255, 255, 255, 0.18) calc(var(--v) * 100%)); }\n.fal-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); }\n.fal-vol::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); }\n.fal-vol::-moz-range-progress { height: 4px; border-radius: 99px; background: #fff; }\n.fal-vol::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }\n.fal-player-side .fal-sep { flex: none; width: 1px; height: 20px; margin: 0 6px; background: rgba(255, 255, 255, 0.14); }\n.fal-mini-progress { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 2px; background: rgba(255, 255, 255, 0.07); opacity: 0; transition: opacity 0.8s ease; pointer-events: none; }\n.fal-mini-fill { height: 100%; background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.75)); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }\n.fal-root[data-idle=\"true\"] .fal-mini-progress { opacity: 1; transition-delay: 0.3s; }\n.fal-root[data-idle=\"true\"] { cursor: none; }\n.fal-root[data-idle=\"true\"] .fal-chrome { opacity: 0; pointer-events: none; }\n.fal-root[data-idle=\"true\"] .fal-player { transform: translateY(18px); }\n.fal-root[data-idle=\"true\"] .fal-header { transform: translateY(-10px); }\n.fal-root.is-open .fal-player { animation: fal-rise 0.8s var(--fal-ease) 0.1s backwards; }\n.fal-root.is-open .fal-header { animation: fal-drop 0.8s var(--fal-ease) 0.05s backwards; }\n@keyframes fal-rise { from { opacity: 0; transform: translateY(28px); } }\n@keyframes fal-drop { from { opacity: 0; transform: translateY(-14px); } }\n.fal-toast {\nposition: absolute;\nleft: 50%;\nbottom: 150px;\nz-index: 5;\nmax-width: calc(100vw - 32px);\npadding: 9px 18px;\nborder-radius: 999px;\nbackground: rgba(24, 24, 28, 0.82);\nborder: 1px solid rgba(255, 255, 255, 0.1);\nbox-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);\nbackdrop-filter: blur(20px);\nfont-size: 13px;\nfont-weight: 600;\nwhite-space: nowrap;\noverflow: hidden;\ntext-overflow: ellipsis;\nopacity: 0;\npointer-events: none;\ntransform: translate(-50%, 10px) scale(0.96);\ntransition: opacity 0.25s ease, transform 0.4s var(--fal-spring);\n}\n.fal-root[data-transport=\"off\"] .fal-toast { bottom: 84px; }\n.fal-toast.is-on { opacity: 1; transform: translate(-50%, 0) scale(1); }\n.fal-root { --fal-safe-top: 52px; }\n.fal-root[data-fs=\"true\"] { --fal-safe-top: 12px; }\n.fal-panel {\nposition: absolute;\ntop: var(--fal-safe-top);\nright: 12px;\nbottom: 12px;\nz-index: 4;\nwidth: min(520px, calc(100vw - 24px));\ndisplay: grid;\ngrid-template-columns: 76px minmax(0, 1fr);\noverflow: hidden;\nborder-radius: 22px;\nbackground: linear-gradient(180deg, rgba(32, 32, 38, 0.86), rgba(18, 18, 22, 0.9));\nborder: 1px solid rgba(255, 255, 255, 0.08);\nbox-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);\nbackdrop-filter: blur(40px) saturate(1.5);\nfont-size: 14px;\n-webkit-app-region: no-drag;\nopacity: 0;\nvisibility: hidden;\ntransform: translateX(28px) scale(0.985);\ntransform-origin: right center;\ntransition: transform 0.5s var(--fal-ease), opacity 0.3s ease, visibility 0s linear 0.5s;\n}\n.fal-panel.is-open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }\n.fal-panel [hidden] { display: none !important; }\n.fal-rail {\nposition: relative;\ndisplay: flex;\nflex-direction: column;\ngap: 4px;\npadding: 14px 8px;\nbackground: rgba(0, 0, 0, 0.18);\nborder-right: 1px solid rgba(255, 255, 255, 0.05);\n}\n.fal-rail-btn {\nposition: relative;\nz-index: 1;\ndisplay: flex;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 5px;\nheight: 62px;\nborder-radius: 14px;\ncolor: rgba(255, 255, 255, 0.5);\ntransition: color 0.25s ease, background 0.25s ease;\n}\n.fal-rail-btn:hover { color: rgba(255, 255, 255, 0.88); background: rgba(255, 255, 255, 0.04); }\n.fal-rail-btn[aria-selected=\"true\"] { color: #fff; background: none; }\n.fal-rail-icon { display: grid; transition: transform 0.35s var(--fal-spring); }\n.fal-rail-btn[aria-selected=\"true\"] .fal-rail-icon { transform: translateY(-1px) scale(1.06); }\n.fal-rail-icon svg { width: 21px; height: 21px; }\n.fal-rail-label { font-size: 10.5px; font-weight: 650; letter-spacing: 0.01em; }\n.fal-rail-pill {\nposition: absolute;\ntop: 14px;\nleft: 8px;\nright: 8px;\nheight: 62px;\nborder-radius: 14px;\nbackground: rgba(255, 255, 255, 0.1);\nbox-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);\ntransform: translateY(calc(var(--i, 1) * 66px));\ntransition: transform 0.45s var(--fal-ease), opacity 0.2s ease;\n}\n.fal-rail-pill::before { content: \"\"; position: absolute; left: -8px; top: 20px; bottom: 20px; width: 3px; border-radius: 0 3px 3px 0; background: var(--fal-toggle-on); }\n.fal-panel[data-searching=\"true\"] .fal-rail-pill { opacity: 0; }\n.fal-panel-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }\n.fal-panel-head {\ndisplay: grid;\ngrid-template-columns: minmax(0, 1fr) auto;\nalign-items: start;\ngap: 14px 8px;\npadding: 18px 14px 14px 20px;\nborder-bottom: 1px solid rgba(255, 255, 255, 0.05);\n}\n.fal-panel-title { font-family: var(--fal-font); font-size: 21px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; }\n.fal-panel-sub { margin-top: 3px; font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }\n.fal-panel-close { margin: -4px -2px 0 0; background: rgba(255, 255, 255, 0.06); }\n.fal-panel-close:hover { background: rgba(255, 255, 255, 0.14); }\n.fal-search-wrap { grid-column: 1 / -1; position: relative; display: block; }\n.fal-search-icon { position: absolute; left: 11px; top: 50%; display: grid; transform: translateY(-50%); color: rgba(255, 255, 255, 0.45); pointer-events: none; }\n.fal-search {\nwidth: 100%;\nheight: 36px;\npadding: 0 12px 0 34px;\nborder: 1px solid rgba(255, 255, 255, 0.08);\nborder-radius: 11px;\nbackground: rgba(0, 0, 0, 0.25);\ncolor: #fff;\nfont: inherit;\nfont-size: 13px;\noutline: none;\ntransition: border-color 0.2s ease, background 0.2s ease;\n}\n.fal-search::placeholder { color: rgba(255, 255, 255, 0.4); }\n.fal-search:focus { border-color: rgba(255, 255, 255, 0.28); background: rgba(0, 0, 0, 0.35); }\n.fal-search::-webkit-search-cancel-button { filter: invert(1) opacity(0.5); cursor: pointer; }\n.fal-panel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 16px 24px 18px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }\n.fal-panel-scroll::-webkit-scrollbar { width: 8px; }\n.fal-panel-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: rgba(255, 255, 255, 0.15) padding-box; }\n.fal-panel.is-open .fal-tab-body:not([hidden]) > * { animation: fal-fade-up 0.5s var(--fal-ease) backwards; }\n.fal-panel.is-open .fal-tab-body:not([hidden]) > :nth-child(2) { animation-delay: 0.04s; }\n.fal-panel.is-open .fal-tab-body:not([hidden]) > :nth-child(3) { animation-delay: 0.08s; }\n.fal-panel.is-open .fal-tab-body:not([hidden]) > :nth-child(n + 4) { animation-delay: 0.12s; }\n.fal-no-results { padding: 48px 0; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.5); }\n.fal-tab-body[data-tab=\"track\"] > .fal-np { margin: 14px 0 4px; }\n@media (max-width: 600px) {\n.fal-panel { grid-template-columns: 58px minmax(0, 1fr); }\n.fal-rail-label { display: none; }\n.fal-rail-btn, .fal-rail-pill { height: 50px; }\n.fal-rail-pill { transform: translateY(calc(var(--i, 1) * 54px)); }\n}\n.fal-section h3 { margin: 22px 4px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }\n.fal-section-card { padding: 2px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05); }\n.fal-section-card > .fal-row + .fal-row { border-top: 1px solid rgba(255, 255, 255, 0.06); }\n.fal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 10px 0; cursor: pointer; transition: opacity 0.2s ease; }\n.fal-row > span, .fal-row-label > span { font-size: 13.5px; color: rgba(255, 255, 255, 0.9); }\n.fal-row.is-disabled { opacity: 0.35; pointer-events: none; }\n.fal-row-stack, .fal-row-range { flex-direction: column; align-items: stretch; gap: 10px; cursor: default; }\n.fal-row-range { gap: 6px; cursor: pointer; }\n.fal-row-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }\n.fal-range-value { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.55); }\n.fal-range { --p: 50%; -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }\n.fal-range::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, #fff var(--p), rgba(255, 255, 255, 0.16) var(--p)); }\n.fal-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45); transition: transform 0.2s var(--fal-spring); }\n.fal-range:hover::-webkit-slider-thumb { transform: scale(1.12); }\n.fal-range:active::-webkit-slider-thumb { transform: scale(1.25); }\n.fal-range::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); }\n.fal-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #fff; }\n.fal-range::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; }\n.fal-switch { appearance: none; position: relative; flex: none; width: 40px; height: 24px; margin: 0; border-radius: 99px; background: rgba(255, 255, 255, 0.2); cursor: pointer; transition: background 0.25s ease; }\n.fal-switch::before { content: \"\"; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.35s var(--fal-spring); }\n.fal-switch:checked { background: var(--fal-green); }\n.fal-switch:checked::before { transform: translateX(16px); }\n.fal-segmented { display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: rgba(0, 0, 0, 0.28); }\n.fal-seg { flex: 1; display: grid; place-items: center; height: 30px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, 0.6); transition: background 0.25s ease, color 0.2s ease, box-shadow 0.25s ease; }\n.fal-seg:hover { color: #fff; }\n.fal-seg[aria-checked=\"true\"] { background: rgba(255, 255, 255, 0.16); color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }\n.fal-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 8px; }\n.fal-card, .fal-font {\ndisplay: flex;\nflex-direction: column;\ngap: 2px;\npadding: 10px;\nborder-radius: 12px;\nbackground: rgba(255, 255, 255, 0.05);\nborder: 1px solid rgba(255, 255, 255, 0.06);\ntext-align: left;\ntransition: background 0.2s ease, border-color 0.2s ease, transform 0.25s var(--fal-spring);\n}\n.fal-card:hover, .fal-font:hover { background: rgba(255, 255, 255, 0.09); }\n.fal-card:active, .fal-font:active { transform: scale(0.97); }\n.fal-card[aria-checked=\"true\"], .fal-font[aria-checked=\"true\"] { background: rgba(30, 215, 96, 0.12); border-color: rgba(30, 215, 96, 0.75); }\n.fal-card-art { display: block; width: 100%; height: 38px; margin-bottom: 6px; color: rgba(255, 255, 255, 0.8); }\n.fal-card-art svg { width: 100%; height: 100%; fill: currentColor; }\n.fal-card[aria-checked=\"true\"] .fal-card-art { color: var(--fal-green); }\n.fal-card-name { font-size: 13px; font-weight: 700; }\n.fal-card-hint { font-size: 11px; color: rgba(255, 255, 255, 0.5); }\n.fal-fonts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }\n.fal-font { align-items: center; text-align: center; }\n.fal-font-sample { font-size: 26px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }\n.fal-font-name { font-size: 11px; color: rgba(255, 255, 255, 0.55); }\n.fal-select { max-width: 200px; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: #fff; font: inherit; font-size: 13px; }\n.fal-select option { background: #222; color: #fff; }\n.fal-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }\n.fal-hint { margin: 14px 2px 0; font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.45); }\n.fal-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 20px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.03); font-size: 12px; color: rgba(255, 255, 255, 0.6); }\n.fal-key { display: flex; align-items: center; gap: 8px; }\n.fal-key kbd { flex: none; min-width: 24px; padding: 2px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12); font: 600 11px/1.4 var(--fal-ui-font); color: #fff; text-align: center; }\n.fal-track-info { display: flex; align-items: center; gap: 14px; margin: 14px 0; }\n.fal-track-art { width: 60px; height: 60px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }\n.fal-track-text { min-width: 0; }\n.fal-track-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.fal-track-sub { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.fal-track-chip { display: inline-block; margin-top: 7px; padding: 3px 9px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.75); }\n.fal-textarea {\ndisplay: block;\nwidth: 100%;\nmin-height: 280px;\npadding: 12px 14px;\nresize: vertical;\nborder: 1px solid rgba(255, 255, 255, 0.1);\nborder-radius: 12px;\nbackground: rgba(0, 0, 0, 0.32);\ncolor: #fff;\nfont: 12px/1.6 ui-monospace, \"Cascadia Code\", Consolas, monospace;\nuser-select: text;\ntransition: border-color 0.2s ease, background 0.2s ease;\n}\n.fal-textarea:focus { border-color: rgba(255, 255, 255, 0.3); outline: none; }\n.fal-textarea.is-drop { border-color: var(--fal-green); background: rgba(30, 215, 96, 0.08); }\n.fal-root { --fal-split-w: clamp(320px, 40vw, 600px); }\n.fal-side {\nposition: absolute;\ntop: 0;\nbottom: 0;\nleft: 0;\nz-index: 1;\nwidth: var(--fal-split-w);\ndisplay: none;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 24px;\npadding: 64px 2vw 150px calc(var(--fal-pad) * 0.8);\n}\n.fal-art-wrap {\nposition: relative;\ndisplay: block;\nwidth: min(100%, 52vh, 460px);\naspect-ratio: 1;\nflex: none;\nborder-radius: 14px;\ncursor: pointer;\nbox-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);\ntransition: transform 0.8s var(--fal-spring), box-shadow 0.8s ease;\n}\n.fal-root[data-playing=\"false\"] .fal-art-wrap { transform: scale(0.86); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05); }\n.fal-art-wrap:active { transform: scale(0.97); }\n.fal-root[data-playing=\"false\"] .fal-art-wrap:active { transform: scale(0.84); }\n.fal-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; opacity: 0; transition: opacity 0.9s ease; }\n.fal-art.is-on { opacity: 1; }\n.fal-art-hint {\nposition: absolute;\nleft: 50%;\ntop: 50%;\ndisplay: grid;\nplace-items: center;\nwidth: 64px;\nheight: 64px;\nmargin: -32px 0 0 -32px;\nborder-radius: 50%;\nbackground: rgba(0, 0, 0, 0.45);\nbackdrop-filter: blur(10px);\ncolor: #fff;\nopacity: 0;\ntransform: scale(0.8);\ntransition: opacity 0.25s ease, transform 0.35s var(--fal-spring);\n}\n.fal-art-hint svg { width: 28px; height: 28px; }\n.fal-art-wrap:hover .fal-art-hint, .fal-art-wrap:focus-visible .fal-art-hint { opacity: 1; transform: none; }\n.fal-side-meta { width: min(100%, 52vh, 460px); min-width: 0; }\n.fal-side-title {\ndisplay: -webkit-box;\noverflow: hidden;\n-webkit-line-clamp: 2;\n-webkit-box-orient: vertical;\nfont-family: var(--fal-font);\nfont-size: clamp(20px, 2.1vw, 30px);\nfont-weight: 800;\nline-height: 1.15;\nletter-spacing: -0.02em;\n}\n.fal-side-artist, .fal-side-album { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.fal-side-artist { margin-top: 6px; font-size: 15px; color: rgba(255, 255, 255, 0.7); }\n.fal-side-album { margin-top: 2px; font-size: 13px; color: rgba(255, 255, 255, 0.45); }\n.fal-root.is-open .fal-side { animation: fal-art-in 0.9s var(--fal-ease) 0.05s backwards; }\n.fal-disc { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }\n.fal-disc-grooves, .fal-disc-shine { display: none; }\n@media (min-width: 900px) and (min-height: 540px) {\n.fal-root:is([data-view=\"split\"], [data-view=\"mirror\"], [data-view=\"poster\"], [data-view=\"vinyl\"]) .fal-side { display: flex; }\n.fal-root:is([data-view=\"split\"], [data-view=\"mirror\"], [data-view=\"poster\"], [data-view=\"vinyl\"]) :is(.fal-header, .fal-message-art) { display: none; }\n.fal-root:is([data-view=\"split\"], [data-view=\"vinyl\"]) .fal-stage { left: var(--fal-split-w); padding-left: 2.5vw; --fal-size: min(var(--fal-fs), 4.6vw, 10.5vh); }\n.fal-root[data-view=\"mirror\"] .fal-side { left: auto; right: 0; padding: 64px calc(var(--fal-pad) * 0.8) 150px 2vw; }\n.fal-root[data-view=\"mirror\"] .fal-stage { right: var(--fal-split-w); padding-right: 2.5vw; --fal-size: min(var(--fal-fs), 4.6vw, 10.5vh); }\n.fal-root[data-view=\"poster\"] { --fal-poster-w: clamp(360px, 46vw, 820px); }\n.fal-root[data-view=\"poster\"] .fal-side { width: var(--fal-poster-w); padding: 0; display: block; }\n.fal-root[data-view=\"poster\"] .fal-art-wrap {\nposition: absolute;\ninset: 0;\nwidth: 100%;\nheight: 100%;\naspect-ratio: auto;\nborder-radius: 0;\nbox-shadow: none;\n-webkit-mask-image: linear-gradient(to right, #000 45%, transparent 98%), linear-gradient(to top, transparent 0, #000 42%);\n-webkit-mask-composite: source-in;\nmask-image: linear-gradient(to right, #000 45%, transparent 98%), linear-gradient(to top, transparent 0, #000 42%);\nmask-composite: intersect;\ntransition: opacity 0.8s ease, filter 0.8s ease;\n}\n.fal-root[data-view=\"poster\"][data-playing=\"false\"] .fal-art-wrap { transform: none; box-shadow: none; filter: saturate(0.6) brightness(0.8); }\n.fal-root[data-view=\"poster\"] .fal-art-wrap:active { transform: none; }\n.fal-root[data-view=\"poster\"] .fal-art-hint { left: 40%; }\n.fal-root[data-view=\"poster\"] .fal-side-meta { position: absolute; left: var(--fal-pad); bottom: 150px; width: min(34vw, 560px); text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45); }\n.fal-root[data-view=\"poster\"] .fal-side-title { font-size: clamp(28px, 3.4vw, 54px); line-height: 1.05; }\n.fal-root[data-view=\"poster\"] .fal-side-artist { font-size: clamp(15px, 1.3vw, 19px); color: rgba(255, 255, 255, 0.82); }\n.fal-root[data-view=\"poster\"] .fal-stage { left: calc(var(--fal-poster-w) * 0.9); padding-left: 2vw; --fal-size: min(var(--fal-fs), 4.4vw, 10.5vh); }\n.fal-root[data-view=\"vinyl\"] .fal-art-wrap { border-radius: 50%; box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05); }\n.fal-root[data-view=\"vinyl\"] .fal-disc {\nborder-radius: 50%;\nbackground:\nradial-gradient(circle, transparent 0 21%, rgba(255, 255, 255, 0.07) 21.3%, transparent 22%),\nradial-gradient(circle, #1b1b1f 0 60%, #111114 100%);\nanimation: fal-spin-disc 7.5s linear infinite;\nanimation-play-state: paused;\n}\n.fal-root[data-view=\"vinyl\"][data-playing=\"true\"] .fal-disc { animation-play-state: running; }\n.fal-root[data-view=\"vinyl\"] .fal-disc-grooves {\ndisplay: block;\nposition: absolute;\ninset: 0;\nborder-radius: 50%;\nbackground: repeating-radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, rgba(255, 255, 255, 0.012) 1.6px, transparent 2.4px 4px);\n-webkit-mask-image: radial-gradient(circle, transparent 0 33%, #000 34% 96%, transparent 97%);\nmask-image: radial-gradient(circle, transparent 0 33%, #000 34% 96%, transparent 97%);\n}\n.fal-root[data-view=\"vinyl\"] .fal-art { inset: 31%; width: 38%; height: 38%; border-radius: 50%; }\n.fal-root[data-view=\"vinyl\"] .fal-disc::after { content: \"\"; position: absolute; left: 50%; top: 50%; width: 3.2%; height: 3.2%; margin: -1.6% 0 0 -1.6%; border-radius: 50%; background: #0b0b0e; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08); }\n.fal-root[data-view=\"vinyl\"] .fal-disc-shine {\ndisplay: block;\nposition: absolute;\ninset: 0;\nborder-radius: 50%;\npointer-events: none;\nbackground: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.1) 13%, transparent 20% 52%, rgba(255, 255, 255, 0.08) 60%, transparent 68%);\n-webkit-mask-image: radial-gradient(circle, transparent 0 32%, #000 36%);\nmask-image: radial-gradient(circle, transparent 0 32%, #000 36%);\n}\n.fal-root[data-view=\"vinyl\"] .fal-art-hint { z-index: 1; }\n.fal-root[data-view=\"vinyl\"] .fal-side-meta { text-align: center; }\n}\n@keyframes fal-spin-disc { to { rotate: 360deg; } }\n@media (min-height: 600px) {\n.fal-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .fal-side { display: flex; left: 0; right: 0; width: auto; }\n.fal-root:is([data-view=\"stage\"], [data-view=\"captions\"]) :is(.fal-header, .fal-message-art) { display: none; }\n.fal-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .fal-stage { --fal-origin: 50%; text-align: center; }\n.fal-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .fal-line { margin-inline: auto; }\n.fal-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .fal-side-meta { width: auto; min-width: 0; }\n.fal-root[data-view=\"stage\"] .fal-side { flex-direction: row; justify-content: center; bottom: auto; gap: 18px; padding: calc(var(--fal-safe-top) - 16px) var(--fal-pad) 0; }\n.fal-root[data-view=\"stage\"] .fal-art-wrap { width: clamp(84px, 14vh, 150px); border-radius: 10px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }\n.fal-root[data-view=\"stage\"][data-playing=\"false\"] .fal-art-wrap { transform: scale(0.9); }\n.fal-root[data-view=\"stage\"] .fal-art-hint { width: 44px; height: 44px; margin: -22px 0 0 -22px; }\n.fal-root[data-view=\"stage\"] .fal-side-meta { max-width: 42vw; }\n.fal-root[data-view=\"stage\"] .fal-side-title { font-size: clamp(18px, 2.4vh, 26px); }\n.fal-root[data-view=\"stage\"] .fal-stage { top: calc(var(--fal-safe-top) + clamp(84px, 14vh, 150px)); }\n.fal-root[data-view=\"captions\"] .fal-side { flex-direction: column; justify-content: center; top: 0; bottom: 40vh; gap: 14px; padding: calc(var(--fal-safe-top) - 8px) var(--fal-pad) 0; }\n.fal-root[data-view=\"captions\"] .fal-art-wrap { width: min(34vh, 380px); }\n.fal-root[data-view=\"captions\"] .fal-side-meta { text-align: center; }\n.fal-root[data-view=\"captions\"] .fal-side-title { font-size: clamp(18px, 2.4vh, 26px); }\n.fal-root[data-view=\"captions\"] .fal-stage {\ntop: 58vh;\nbottom: 104px;\n--fal-size: min(calc(var(--fal-fs) * 0.8), 4.4vw, 5.6vh);\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);\nmask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);\n}\n.fal-root[data-view=\"captions\"] .fal-stage[data-mode=\"synced\"] .fal-line:not(.is-active):not([data-d=\"1\"]) { opacity: 0 !important; pointer-events: none; }\n.fal-root[data-view=\"captions\"][data-layout=\"list\"] .fal-stage[data-mode=\"synced\"] .fal-line[data-d=\"1\"] { opacity: 0.4; }\n}\n.fal-root.fal-view-swap :is(.fal-side, .fal-stage) { animation: fal-fade-up 0.7s var(--fal-ease) both; }\n.fal-np {\ndisplay: flex;\nalign-items: center;\ngap: 12px;\nmargin: 2px 14px 8px;\npadding: 10px;\nborder-radius: 14px;\nbackground: linear-gradient(135deg, color-mix(in srgb, var(--fal-accent) 18%, transparent), rgba(255, 255, 255, 0.04));\nborder: 1px solid rgba(255, 255, 255, 0.07);\n}\n.fal-np img { width: 50px; height: 50px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }\n.fal-np-text { min-width: 0; flex: 1; }\n.fal-np-title, .fal-np-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.fal-np-title { font-size: 14px; font-weight: 700; }\n.fal-np-sub { margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }\n.fal-np-chip { flex: none; padding: 3px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.09); font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.8); }\n.fal-prov-list { display: flex; flex-direction: column; gap: 6px; }\n.fal-prov {\ndisplay: grid;\ngrid-template-columns: auto 1fr auto auto;\nalign-items: center;\ngap: 10px;\npadding: 10px 10px 10px 8px;\nborder-radius: 12px;\nbackground: rgba(0, 0, 0, 0.22);\ntransition: opacity 0.2s ease, background 0.2s ease;\n}\n.fal-prov.is-off { opacity: 0.45; }\n.fal-prov-rank { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); font-size: 11px; font-weight: 700; }\n.fal-prov-name { font-size: 13.5px; font-weight: 700; }\n.fal-prov-badge { margin-left: 6px; padding: 1px 6px; border-radius: 99px; background: rgba(124, 212, 255, 0.16); color: #7cd4ff; font-size: 10px; font-weight: 700; vertical-align: 1px; }\n.fal-prov-desc { margin-top: 2px; font-size: 11.5px; line-height: 1.35; color: rgba(255, 255, 255, 0.5); }\n.fal-prov-move { display: flex; flex-direction: column; }\n.fal-prov-move button { display: grid; place-items: center; width: 24px; height: 18px; border-radius: 6px; color: rgba(255, 255, 255, 0.6); }\n.fal-prov-move button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }\n.fal-prov-move button:disabled { opacity: 0.2; pointer-events: none; }\n.fal-prov-move svg { width: 14px; height: 14px; }\n.fal-src-title { margin: 16px 2px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }\n.fal-src-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }\n.fal-src-btn {\ndisplay: flex;\nalign-items: center;\njustify-content: space-between;\ngap: 6px;\nmin-height: 36px;\npadding: 6px 10px;\nborder-radius: 10px;\nbackground: rgba(255, 255, 255, 0.06);\nfont-size: 12.5px;\nfont-weight: 600;\ntext-align: left;\ntransition: background 0.2s ease, box-shadow 0.2s ease;\n}\n.fal-src-btn:hover { background: rgba(255, 255, 255, 0.11); }\n.fal-src-btn small { font-size: 10.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }\n.fal-src-btn.is-current { background: rgba(30, 215, 96, 0.13); box-shadow: inset 0 0 0 1px rgba(30, 215, 96, 0.6); }\n.fal-src-btn.is-loading small { animation: fal-blink 1s ease-in-out infinite; }\n.fal-test-btn { width: 100%; margin-top: 8px; }\n@keyframes fal-blink { 50% { opacity: 0.3; } }\n@media (max-width: 1100px) {\n.fal-offset-group { display: none; }\n.fal-source { max-width: 160px; }\n}\n@media (max-width: 780px) {\n.fal-root { --fal-pad: 22px; }\n.fal-header { top: 18px; max-width: calc(100vw - 44px); }\n.fal-cover { width: 44px; height: 44px; }\n.fal-player { column-gap: 10px; padding-bottom: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }\n.fal-source { width: 32px; padding: 0; justify-content: center; font-size: 0; }\n.fal-source::before { width: 9px; height: 9px; }\n.fal-transport { gap: 8px; }\n.fal-play-btn { width: 50px; height: 50px; }\n.fal-player-side { height: 50px; }\n}\n@media (max-width: 600px) {\n.fal-offset-group,\n.fal-volume,\n.fal-player-side .fal-sep,\n.fal-heart,\n.fal-toggle { display: none; }\n.fal-player-side .fal-icon-btn { width: 34px; height: 34px; }\n}\n@media (max-height: 540px) {\n.fal-header { display: none; }\n.fal-message-art { display: none; }\n}\n.fal-no-anim .fal-line,\n.fal-no-anim .fal-w,\n.fal-no-anim .fal-c { transition: none !important; }\n.fal-root[data-motion=\"reduced\"] { transform: none !important; transition: opacity 0.2s ease; }\n.fal-root[data-motion=\"reduced\"] .fal-line,\n.fal-root[data-motion=\"reduced\"] .fal-w,\n.fal-root[data-motion=\"reduced\"] .fal-player,\n.fal-root[data-motion=\"reduced\"] .fal-header,\n.fal-root[data-motion=\"reduced\"] .fal-panel,\n.fal-root[data-motion=\"reduced\"] .fal-rail-pill {\ntransition-property: opacity, color, visibility !important;\ntransition-duration: 0.2s !important;\ntransition-delay: 0s !important;\n}\n.fal-root[data-motion=\"reduced\"] *,\n.fal-root[data-motion=\"reduced\"] *::before { animation: none !important; }\n.fal-root[data-motion=\"reduced\"] .fal-line[data-d] { filter: none !important; }\n.fal-root[data-motion=\"reduced\"] .fal-w,\n.fal-root[data-motion=\"reduced\"] .fal-c { transform: none !important; }\n[data-testid=\"lyrics-npv-section\"][data-fal-hidden] { display: none !important; }\n.fal-npv {\n--npv-c: #3a3a46;\nposition: relative;\noverflow: hidden;\npadding: 16px 16px 10px;\nborder-radius: 8px;\ncolor: #fff;\nfont-family: var(--encore-body-font-stack, \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\nbackground:\nradial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--npv-c) 80%, #fff 6%) 0%, transparent 70%),\nlinear-gradient(165deg, color-mix(in oklab, var(--npv-c) 72%, #000) 0%, color-mix(in oklab, var(--npv-c) 38%, #0d0d10) 100%);\nbox-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);\ntransition: background 0.8s ease;\n}\n.fal-npv-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }\n.fal-npv-title { margin: 0; font-size: 16px; font-weight: 700; }\n.fal-npv-src { min-width: 0; overflow: hidden; padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); font-size: 11px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; color: rgba(255, 255, 255, 0.72); }\n.fal-npv-src:empty { display: none; }\n.fal-npv-open {\ndisplay: grid;\nflex: none;\nplace-items: center;\nwidth: 32px;\nheight: 32px;\nmargin-left: auto;\npadding: 0;\nborder: 0;\nborder-radius: 50%;\nbackground: rgba(255, 255, 255, 0.1);\ncolor: rgba(255, 255, 255, 0.8);\ncursor: pointer;\ntransition: background 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);\n}\n.fal-npv-open:hover { background: rgba(255, 255, 255, 0.2); color: #fff; transform: scale(1.08); }\n.fal-npv-open svg { width: 16px; height: 16px; }\n.fal-npv-body {\nposition: relative;\nheight: 204px;\noverflow: hidden;\ncursor: pointer;\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);\nmask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);\n}\n.fal-npv-lines { padding-top: 6px; will-change: transform; transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1); }\n.fal-npv-lines.no-anim { transition: none; }\n.fal-npv-line {\nmargin: 0 -8px;\npadding: 5px 8px;\nborder-radius: 8px;\nfont-size: 19px;\nfont-weight: 700;\nline-height: 1.32;\nletter-spacing: -0.01em;\ncolor: rgba(255, 255, 255, 0.42);\ntransition: color 0.45s ease, background 0.2s ease, text-shadow 0.6s ease;\n}\n.fal-npv-line.is-past { color: rgba(255, 255, 255, 0.7); }\n.fal-npv-line.is-active { color: #fff; text-shadow: 0 0 18px rgba(255, 255, 255, 0.25); }\n.fal-npv-line.is-gap { letter-spacing: 0.15em; }\n.fal-npv-line[title]:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.92); }\n.fal-npv-line.is-active:has(.fal-npv-w) { text-shadow: none; }\n.fal-npv-line.is-active .fal-npv-w { color: rgba(255, 255, 255, 0.42); }\n.fal-npv-line.is-active .fal-npv-w.sung { color: #fff; }\n.fal-npv-line.is-active .fal-npv-w.now {\ncolor: transparent;\nbackground: linear-gradient(90deg, #fff calc(var(--fal-wp, 0) * (100% + 0.6em) - 0.6em), rgba(255, 255, 255, 0.42) calc(var(--fal-wp, 0) * (100% + 0.6em)));\n-webkit-background-clip: text;\nbackground-clip: text;\n}\n.fal-npv.is-unsynced .fal-npv-line { color: rgba(255, 255, 255, 0.85); font-size: 16px; }\n.fal-npv-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 16px; font-size: 13px; text-align: center; color: rgba(255, 255, 255, 0.62); }\n.fal-npv-msg:empty { display: none; }\n.fal-npv-tr { margin-top: 2px; font-size: 13px; font-weight: 600; line-height: 1.3; color: rgba(255, 255, 255, 0.55); }\n.fal-npv-line.is-active .fal-npv-tr { color: rgba(255, 255, 255, 0.85); }";
+const CSS = ".aur-root {\n--aur-font: var(--encore-title-font-stack, \"SpotifyMixUITitle\", \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\n--aur-fs: 56px;\n--aur-gap: 0.55em;\n--aur-fw: 800;\n--aur-shade: 0.45;\n--aur-bg-scale: 12;\n--aur-bg-blur: 6px;\n--aur-c1: var(--aur-album-c1, #4b3b78);\n--aur-c2: var(--aur-album-c2, #14203a);\n--aur-accent: var(--aur-album-accent, #ffffff);\n--aur-ah: 1.2em;\n--aur-ui-font: var(--encore-body-font-stack, \"SpotifyMixUI\", \"CircularSp\", \"Segoe UI Variable Text\", system-ui, sans-serif);\n--aur-size: min(var(--aur-fs), 7.4vw, 10.5vh);\n--aur-hi: #fff;\n--aur-dim: color-mix(in srgb, var(--aur-hi) 30%, transparent);\n--aur-glow-tint: color-mix(in oklab, var(--aur-accent) 62%, #fff);\n--aur-glow-k: 1;\n--aur-glow-c: color-mix(in oklab, var(--aur-glow-tint) 45%, transparent);\n--aur-green: #1ed760;\n--aur-origin: 0%;\n--aur-pad: max(7vw, 20px);\n--aur-ease: cubic-bezier(0.22, 1, 0.36, 1);\n--aur-spring: cubic-bezier(0.34, 1.56, 0.64, 1);\n--aur-wave: cubic-bezier(0.3, 1.12, 0.44, 1);\n--aur-stagger: 0ms;\n--aur-move: 0.85s;\n--aur-move-ease: var(--aur-ease);\nposition: fixed;\ninset: 0;\nz-index: 99999;\noverflow: hidden;\noverflow: clip;\nisolation: isolate;\ncolor: #fff;\nbackground: #08080b;\nfont-family: var(--aur-ui-font);\n-webkit-font-smoothing: antialiased;\ntext-rendering: optimizeLegibility;\n-webkit-app-region: no-drag;\noutline: none;\nuser-select: none;\nopacity: 0;\ntransform: scale(1.035);\ntransition:\nopacity 0.42s var(--aur-ease),\ntransform 0.7s var(--aur-ease);\n}\n.aur-root[hidden] { display: none; }\n.aur-root.is-open { opacity: 1; transform: none; }\n.aur-root *, .aur-root *::before, .aur-root *::after { box-sizing: border-box; }\n.aur-root ::selection { background: rgba(255, 255, 255, 0.28); }\n.aur-root[data-align=\"center\"] { --aur-origin: 50%; }\n.aur-root[data-align=\"right\"] { --aur-origin: 100%; }\n.aur-root[data-glow=\"radiant\"] { --aur-glow-k: 1.7; }\n.aur-root[data-glow=\"off\"] { --aur-glow-k: 0; }\n.aur-root[data-color=\"accent\"] { --aur-hi: color-mix(in srgb, var(--aur-accent) 42%, #fff); }\n.aur-root[data-accent=\"custom\"] {\n--aur-accent: var(--aur-user-accent, #ffffff);\n--aur-c1: color-mix(in oklab, var(--aur-user-accent, #4b3b78) 62%, #000);\n--aur-c2: color-mix(in oklab, var(--aur-user-accent, #14203a) 22%, #07070c);\n}\n.aur-root[data-anim=\"flow\"] { --aur-stagger: 36ms; --aur-move: 1.05s; --aur-move-ease: var(--aur-wave); }\n.aur-root[data-anim=\"scale\"] { --aur-stagger: 14ms; --aur-move: 0.95s; --aur-move-ease: cubic-bezier(0.34, 1.3, 0.64, 1); }\n.aur-bg { position: absolute; inset: 0; z-index: -1; overflow: hidden; background: #0a0a0e; }\n.aur-bg-stack, .aur-bg-layer { position: absolute; inset: 0; }\n.aur-bg-layer { opacity: 0; transition: opacity 1.6s ease; }\n.aur-bg-layer.is-on { opacity: 1; }\n.aur-blob {\nposition: absolute;\nleft: 50%;\ntop: 50%;\nwidth: 256px;\nheight: 256px;\nmax-width: none;\nmargin: -128px 0 0 -128px;\nobject-fit: cover;\nfilter: blur(var(--aur-bg-blur)) saturate(1.7) brightness(0.92);\ntransform: translate(var(--bx, 0), var(--by, 0)) scale(calc(var(--aur-bg-scale) * var(--bs, 1)));\nanimation: aur-spin var(--bt, 120s) linear infinite;\nwill-change: transform;\n}\n.aur-blob.b3 { --bt: 150s; animation-direction: reverse; }\n.aur-blob.b1 { --bx: -20vw; --by: -14vh; --bs: 0.7; --bt: 70s; opacity: 0.85; border-radius: 42%; animation-delay: -20s; }\n.aur-blob.b2 { --bx: 22vw; --by: 16vh; --bs: 0.62; --bt: 95s; opacity: 0.7; border-radius: 46%; animation-direction: reverse; animation-delay: -45s; }\n.aur-root[data-bganim=\"off\"] .aur-blob,\n.aur-root[data-bganim=\"off\"] .aur-bg-gradient { animation-play-state: paused; }\n@keyframes aur-spin { to { rotate: 360deg; } }\n.aur-bg-gradient {\nposition: absolute;\ninset: -30%;\nopacity: 0;\nbackground:\nradial-gradient(42% 42% at 30% 35%, var(--aur-c1) 0%, transparent 70%),\nradial-gradient(48% 48% at 70% 65%, var(--aur-c2) 0%, transparent 72%),\nradial-gradient(35% 35% at 75% 20%, color-mix(in srgb, var(--aur-accent) 40%, transparent) 0%, transparent 70%),\n#0b0b10;\ntransition: opacity 1s ease;\nanimation: aur-drift 36s ease-in-out infinite alternate;\n}\n.aur-root[data-bg=\"gradient\"] .aur-bg-gradient { opacity: 1; }\n.aur-root:not([data-bg=\"gradient\"]) .aur-bg-gradient { animation: none; }\n.aur-root:not([data-bg=\"album\"]) .aur-bg-stack { display: none; }\n@keyframes aur-drift {\nfrom { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1); }\nto { transform: translate3d(3%, 2%, 0) rotate(10deg) scale(1.1); }\n}\n.aur-bg-shade {\nposition: absolute;\ninset: 0;\nbackground:\nlinear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.18) 16%, transparent 34%),\nradial-gradient(ellipse at 42% 40%, rgba(0, 0, 0, calc(var(--aur-shade) * 0.6)) 0%, rgba(0, 0, 0, var(--aur-shade)) 100%);\n}\n.aur-bg-grain {\nposition: absolute;\ninset: 0;\nopacity: 0.08;\nmix-blend-mode: overlay;\nbackground-size: 180px 180px;\nbackground-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\");\npointer-events: none;\n}\n.aur-drag { position: absolute; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; z-index: 1; }\n.aur-header {\nposition: absolute;\ntop: 30px;\nleft: var(--aur-pad);\nz-index: 2;\ndisplay: flex;\nalign-items: center;\ngap: 14px;\nmax-width: min(560px, 55vw);\npointer-events: none;\ntransition: opacity 0.5s ease, transform 0.6s var(--aur-ease);\n}\n.aur-root[data-info=\"off\"] .aur-header { display: none; }\n.aur-cover { width: 54px; height: 54px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }\n.aur-meta { min-width: 0; }\n.aur-title, .aur-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.aur-title { font-size: 15.5px; font-weight: 700; letter-spacing: -0.01em; }\n.aur-artist { margin-top: 3px; font-size: 13px; color: rgba(255, 255, 255, 0.62); }\n.aur-stage {\nposition: absolute;\ninset: 0;\npadding: 0 var(--aur-pad);\noverflow: hidden;\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 13%), #000 72%, transparent 93%);\nmask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 13%), #000 72%, transparent 93%);\n}\n.aur-lines { position: relative; }\n.aur-root:not([data-transport=\"off\"]) .aur-stage { bottom: 96px; }\n.aur-root[data-align=\"center\"] .aur-stage { text-align: center; }\n.aur-root[data-align=\"right\"] .aur-stage { text-align: right; }\n.aur-stage > .aur-lines,\n.aur-stage > .aur-message { transition: opacity 0.22s ease, filter 0.22s ease; }\n.aur-stage.is-leaving > .aur-lines,\n.aur-stage.is-leaving > .aur-message { opacity: 0; filter: blur(8px); }\n.aur-line {\n--aur-s: 0.95;\n--aur-k: 0;\nfont-family: var(--aur-font);\nfont-size: var(--aur-size);\nfont-weight: var(--aur-fw);\nline-height: 1.16;\nletter-spacing: -0.022em;\npadding: calc(var(--aur-gap) / 2) 0;\nmax-width: 1400px;\ncolor: var(--aur-hi);\nopacity: 0.1;\ntransform-origin: var(--aur-origin) 50%;\noverflow-wrap: anywhere;\ntext-wrap: balance;\nfont-kerning: normal;\ncursor: pointer;\ntransition:\nopacity 0.7s var(--aur-ease),\ntransform var(--aur-move) var(--aur-move-ease) calc(var(--aur-k) * var(--aur-stagger)),\nfilter 0.7s var(--aur-ease),\ncolor 0.5s ease,\ntext-shadow 0.7s ease;\n}\n.aur-root[data-align=\"center\"] .aur-line { margin-inline: auto; }\n.aur-root[data-align=\"right\"] .aur-line { margin-left: auto; }\n.aur-root .aur-line.is-active { --aur-s: 1; opacity: 1; cursor: default; }\n.aur-root:not([data-glow=\"off\"]) .aur-line.is-active:not(.has-words) .aur-main {\ntext-shadow:\n0 0 0.05em color-mix(in srgb, #fff calc(28% * var(--aur-glow-k)), transparent),\n0 0 0.26em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--aur-glow-k)), transparent),\n0 0 0.85em color-mix(in oklab, var(--aur-glow-tint) calc(16% * var(--aur-glow-k)), transparent);\n}\n.aur-main { transition: text-shadow 0.8s ease; }\n.aur-main { position: relative; }\n.aur-main::before {\n--a: calc(13% * var(--aur-glow-k));\ncontent: \"\";\nposition: absolute;\nz-index: -1;\nleft: calc(var(--hx, 0px) - 1.1em);\ntop: calc(var(--hy, 0px) - 0.7em);\nwidth: calc(var(--hw, 100%) + 2.2em);\nheight: calc(var(--hh, 100%) + 1.4em);\npointer-events: none;\nbackground: radial-gradient(closest-side, color-mix(in oklab, var(--aur-glow-tint) var(--a), transparent) 0%, color-mix(in oklab, var(--aur-glow-tint) calc(var(--a) * 0.45), transparent) 55%, transparent 100%);\nopacity: 0;\ntransform: scale(0.85);\ntransition: opacity 1.2s ease, transform 1.6s var(--aur-ease);\n}\n.aur-line.is-active .aur-main::before { opacity: 1; transform: none; }\n.aur-stage[data-mode=\"unsynced\"] .aur-main::before { display: none; }\n@property --aur-wp { syntax: \"<number>\"; inherits: true; initial-value: 0; }\n.aur-wg { display: inline-block; white-space: nowrap; }\n.aur-w, .aur-c { display: inline-block; }\n.aur-root[data-words=\"on\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--p: var(--aur-wp);\n--e: calc(var(--p) * var(--p) * (3 - 2 * var(--p)));\n--hop: sin(calc(var(--e) * 3.14159));\n--edge: 0.75em;\ntransform-origin: 50% 90%;\nwill-change: transform;\n}\n.aur-root[data-words=\"on\"] .is-active.has-words .aur-w .aur-c {\n--wave: 2.6;\n--p: clamp(0, (var(--aur-wp) * (var(--n) + var(--wave)) - var(--i)) / var(--wave), 1);\n--edge: 0.4em;\n}\n.aur-root[data-words=\"on\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\ncolor: color-mix(in srgb, var(--aur-hi) calc(var(--e) * 100%), var(--aur-dim));\ntransform: translateY(calc(0.03em - var(--e) * 0.075em));\n}\n.aur-root:not([data-glow=\"off\"])[data-words=\"on\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--g: calc(var(--e) * var(--aur-glow-k));\nfilter:\ndrop-shadow(0 0 0.04em color-mix(in srgb, #fff calc(32% * var(--g)), transparent))\ndrop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(34% * var(--g)), transparent));\n}\n.aur-root[data-words=\"on\"]:is([data-wordanim=\"fill\"], [data-wordanim=\"rise\"], [data-wordanim=\"karaoke\"], [data-wordanim=\"letters\"]) .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\ncolor: transparent;\nbackground-image: linear-gradient(90deg, var(--aur-ink, var(--aur-hi)) calc(var(--p) * (100% + var(--edge)) - var(--edge)), var(--aur-dim) calc(var(--p) * (100% + var(--edge))));\n-webkit-background-clip: text;\nbackground-clip: text;\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--lit: clamp(0, var(--e) * 3, 1);\ncolor: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));\ntransform: translateY(calc(0.03em - var(--lit) * 0.07em)) scale(calc(1 + 0.04 * var(--hop)));\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active .aur-w.now:not(.has-chars),\n.aur-root[data-words=\"on\"][data-wordanim=\"glow\"] .is-active .aur-w.now .aur-c {\n--gk: max(var(--aur-glow-k), 0.6);\nfilter:\ndrop-shadow(0 0 0.05em color-mix(in srgb, #fff calc((30% + 25% * var(--hop)) * var(--gk)), transparent))\ndrop-shadow(0 0 calc(0.25em + 0.3em * var(--hop)) color-mix(in oklab, var(--aur-glow-tint) calc((32% + 30% * var(--hop)) * var(--gk)), transparent));\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"pop\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--lit: clamp(0, var(--e) * 4, 1);\ncolor: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));\ntransform: translateY(calc(0.03em - var(--lit) * 0.06em - 0.06em * var(--hop))) scale(calc(1 + 0.12 * var(--hop)));\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"rise\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--up: clamp(0, var(--e) * 2.2, 1);\n--up-e: calc(1 - (1 - var(--up)) * (1 - var(--up)));\nopacity: calc(0.45 + 0.55 * var(--up-e));\ntransform: translateY(calc((1 - var(--up-e)) * 0.2em - 0.04em));\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"karaoke\"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {\n--aur-ink: var(--aur-kink, color-mix(in srgb, var(--aur-accent) 70%, #fff));\n--edge: 0.18em;\ntransform: none;\n}\n.aur-root[data-words=\"on\"][data-wordanim=\"letters\"] .is-active.has-words .aur-w .aur-c {\ntransform: translateY(calc(0.03em - var(--e) * 0.06em - 0.13em * var(--hop))) scale(calc(1 + 0.09 * var(--hop)));\n}\n.aur-root[data-words=\"on\"]:not([data-wordanim=\"karaoke\"]):not([data-wordanim=\"letters\"]) .is-active .aur-w.is-long .aur-c {\ntransform: translateY(calc(0.03em - var(--e) * 0.075em - 0.08em * var(--hop))) scale(calc(1 + 0.05 * var(--hop)));\n}\n.aur-root[data-words=\"on\"] .is-active .aur-w.is-long.now .aur-c {\nfilter:\ndrop-shadow(0 0 0.05em color-mix(in srgb, #fff calc((20% + 30% * var(--hop)) * var(--aur-glow-k)), transparent))\ndrop-shadow(0 0 calc(0.22em + 0.25em * var(--hop)) color-mix(in oklab, var(--aur-glow-tint) calc((30% + 35% * var(--hop)) * var(--aur-glow-k)), transparent));\n}\n.aur-tr {\nmargin-top: 0.22em;\nfont-family: var(--aur-ui-font);\nfont-size: 0.44em;\nfont-weight: 600;\nline-height: 1.3;\nletter-spacing: 0;\ncolor: rgba(255, 255, 255, 0.62);\ntext-wrap: balance;\ntransition: color 0.5s ease;\n}\n.aur-line.is-active .aur-tr { color: rgba(255, 255, 255, 0.9); }\n.aur-stage[data-mode=\"unsynced\"] .aur-tr { font-size: 0.6em; }\n.aur-root[data-view=\"captions\"] .aur-tr { font-size: 0.5em; }\n.aur-tr-btn.is-on { background: rgba(255, 255, 255, 0.08); }\n.aur-root { --aur-duet: oklch(from var(--aur-accent) 0.86 clamp(0.09, c, 0.16) h); }\n.aur-root:is([data-color=\"accent\"], [data-wordanim=\"karaoke\"]) { --aur-duet: oklch(from var(--aur-accent) 0.86 clamp(0.09, c, 0.16) calc(h + 150)); }\n.aur-root[data-duet=\"on\"] .aur-line[data-singer=\"1\"] { --aur-hi: var(--aur-duet); --aur-kink: var(--aur-duet); }\n.aur-root[data-duet=\"on\"] .aur-line[data-singer=\"2\"] { --aur-hi: color-mix(in oklab, var(--aur-duet) 50%, #fff); --aur-kink: color-mix(in oklab, var(--aur-duet) 50%, #fff); }\n.aur-root[data-duet=\"on\"] .aur-line:is([data-singer=\"1\"], [data-singer=\"2\"]) {\n--aur-dim: color-mix(in srgb, var(--aur-hi) 30%, transparent);\n--aur-glow-tint: color-mix(in oklab, var(--aur-hi) 70%, #fff);\n--aur-glow-c: color-mix(in oklab, var(--aur-glow-tint) 45%, transparent);\n}\n.aur-root[data-align=\"left\"] .aur-line.is-opposite { --aur-origin: 100%; text-align: right; margin-left: auto; }\n.aur-root[data-align=\"right\"] .aur-line.is-opposite { --aur-origin: 0%; text-align: left; margin-left: 0; margin-right: auto; }\n.aur-bgv {\nmargin-top: 0.12em;\nfont-size: 0.56em;\nfont-weight: calc(var(--aur-fw) - 100);\nletter-spacing: -0.01em;\nopacity: 0.55;\ntransition: opacity 0.6s ease;\n}\n.aur-line.is-active .aur-bgv { opacity: 0.85; }\n.aur-line.is-gap { cursor: default; }\n.aur-dots { display: inline-flex; align-items: center; gap: 0.32em; height: 1.16em; transform-origin: var(--aur-origin) 50%; }\n.aur-dots i { width: 0.28em; height: 0.28em; border-radius: 50%; background: var(--aur-hi); opacity: 0.3; transform: scale(0.8); transition: opacity 0.4s ease, transform 0.5s var(--aur-spring); }\n.is-active .aur-dots { animation: aur-breathe 3s ease-in-out infinite; }\n.is-active .aur-dots i:nth-child(1) { opacity: calc(0.3 + 0.7 * clamp(0, var(--aur-gp, 0) * 3, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--aur-gp, 0) * 3, 1))); }\n.is-active .aur-dots i:nth-child(2) { opacity: calc(0.3 + 0.7 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1))); }\n.is-active .aur-dots i:nth-child(3) { opacity: calc(0.3 + 0.7 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1)); transform: scale(calc(0.8 + 0.35 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1))); }\n@keyframes aur-breathe {\n0%, 100% { transform: scale(1); }\n50% { transform: scale(1.14); }\n}\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line {\ntransform: translate3d(0, var(--aur-y, 0px), 0) scale(var(--aur-s));\n}\n.aur-root[data-anim=\"flow\"] .aur-line { --aur-s: 0.96; }\n.aur-root[data-anim=\"scale\"] .aur-line { --aur-s: 0.8; }\n.aur-root[data-anim=\"scale\"] .aur-line[data-d=\"-1\"],\n.aur-root[data-anim=\"scale\"] .aur-line[data-d=\"1\"] { --aur-s: 0.86; }\n.aur-root .aur-line.is-active { --aur-s: 1; }\n.aur-root[data-anim=\"scale\"] .aur-line.is-active { --aur-s: 1.04; }\n.aur-root[data-layout=\"list\"] .aur-line[data-d=\"-1\"], .aur-root[data-layout=\"list\"] .aur-line[data-d=\"1\"] { opacity: 0.36; }\n.aur-root[data-layout=\"list\"] .aur-line[data-d=\"-2\"], .aur-root[data-layout=\"list\"] .aur-line[data-d=\"2\"] { opacity: 0.24; }\n.aur-root[data-layout=\"list\"] .aur-line[data-d=\"-3\"], .aur-root[data-layout=\"list\"] .aur-line[data-d=\"3\"] { opacity: 0.17; }\n.aur-root[data-layout=\"list\"] .aur-line[data-d=\"-4\"], .aur-root[data-layout=\"list\"] .aur-line[data-d=\"4\"] { opacity: 0.13; }\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-1\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"1\"] { filter: blur(0.8px); }\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-2\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"2\"] { filter: blur(1.5px); }\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-3\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"3\"] { filter: blur(2.2px); }\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-4\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"4\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-5\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"5\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-6\"],\n.aur-root[data-depth=\"on\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"6\"] { filter: blur(2.8px); }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"-1\"] { --aur-k: 1; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"0\"] { --aur-k: 2; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"1\"] { --aur-k: 3; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"2\"] { --aur-k: 4; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"3\"] { --aur-k: 5; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"4\"] { --aur-k: 6; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"5\"] { --aur-k: 7; }\n.aur-lines[data-dir=\"up\"] .aur-line[data-d=\"6\"],\n.aur-lines[data-dir=\"up\"] .aur-line.is-active ~ .aur-line:not([data-d]) { --aur-k: 8; }\n.aur-lines[data-dir=\"down\"] .aur-line:not([data-d]) { --aur-k: 8; }\n.aur-lines[data-dir=\"down\"] .aur-line.is-active ~ .aur-line:not([data-d]) { --aur-k: 0; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"1\"] { --aur-k: 1; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"0\"] { --aur-k: 2; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-1\"] { --aur-k: 3; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-2\"] { --aur-k: 4; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-3\"] { --aur-k: 5; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-4\"] { --aur-k: 6; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-5\"] { --aur-k: 7; }\n.aur-lines[data-dir=\"down\"] .aur-line[data-d=\"-6\"] { --aur-k: 8; }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-gap) { position: relative; }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-active):not(.is-gap):hover { opacity: 0.82; filter: none; transition-duration: 0.25s, var(--aur-move), 0.25s, 0.3s, 0.3s; }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-gap)::after {\ncontent: \"\";\nposition: absolute;\nz-index: -1;\ninset: 0 -0.32em;\nborder-radius: 0.28em;\nbackground: linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));\nbox-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 0.2em 0.6em rgba(0, 0, 0, 0.12);\nopacity: 0;\ntransform: scale(0.97);\ntransition: opacity 0.25s ease, transform 0.4s var(--aur-ease);\npointer-events: none;\n}\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-time]::before {\ncontent: attr(data-time) \"  ▶\";\nposition: absolute;\ntop: 50%;\nright: 0.1em;\npadding: 0.35em 0.75em;\nborder-radius: 99px;\nbackground: rgba(0, 0, 0, 0.28);\nfont-family: var(--aur-ui-font);\nfont-size: max(11px, 0.2em);\nfont-weight: 700;\nletter-spacing: 0.02em;\nwhite-space: pre;\ncolor: rgba(255, 255, 255, 0.85);\nopacity: 0;\ntransform: translate(0.4em, -50%);\ntransition: opacity 0.2s ease, transform 0.35s var(--aur-ease);\npointer-events: none;\n}\n.aur-root[data-align=\"right\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-time]::before { right: auto; left: 0.1em; transform: translate(-0.4em, -50%); }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-gap):hover::after { opacity: 1; transform: none; }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-time]:hover::before { opacity: 1; transform: translate(0, -50%); }\n.aur-root[data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-gap):active::after { transform: scale(0.985); }\n.aur-root[data-view=\"captions\"] .aur-line::before, .aur-root[data-view=\"captions\"] .aur-line::after { display: none; }\n.aur-root[data-layout=\"list\"] .aur-stage.is-browsing .aur-line {\n--aur-k: 0 !important;\nfilter: none !important;\ntransition:\nopacity 0.4s ease,\ntransform 0.45s var(--aur-ease),\nfilter 0.3s ease,\ncolor 0.4s ease,\ntext-shadow 0.4s ease;\n}\n.aur-root[data-layout=\"list\"] .aur-stage.is-browsing .aur-line:not(.is-active) { opacity: 0.42; }\n.aur-root[data-layout=\"list\"] .aur-stage.is-browsing .aur-line:not(.is-active):not(.is-gap):hover { opacity: 0.9; }\n.aur-root[data-layout=\"list\"] .aur-stage.is-entering[data-mode=\"synced\"] .aur-line {\nanimation: aur-line-in 1s var(--aur-ease) backwards;\nanimation-delay: calc(var(--i, 0) * 55ms);\n}\n@keyframes aur-line-in {\nfrom { opacity: 0; transform: translate3d(0, calc(var(--aur-y, 0px) + 64px), 0) scale(var(--aur-s)); filter: blur(12px); }\n}\n.aur-root[data-layout=\"stack\"] .aur-stage[data-mode=\"synced\"] .aur-lines { position: absolute; top: 0; bottom: 0; left: var(--aur-pad); right: var(--aur-pad); }\n.aur-root[data-layout=\"stack\"] .aur-stage[data-mode=\"synced\"] .aur-line {\nposition: absolute;\nleft: 0;\nright: 0;\ntop: 44%;\nopacity: 0;\npointer-events: none;\ntransform: translateY(-50%) scale(0.5);\n}\n.aur-root[data-layout=\"stack\"] .aur-stage[data-mode=\"synced\"] .aur-line.is-active { opacity: 1; pointer-events: auto; transform: translateY(-50%); }\n.aur-root[data-layout=\"stack\"] .aur-stage.is-entering[data-mode=\"synced\"] .aur-lines { animation: aur-fade-up 0.9s var(--aur-ease) backwards; }\n.aur-root[data-anim=\"fade\"] .aur-line { transition-duration: 0.55s, 0.8s, 0.6s, 0.5s, 0.6s; }\n.aur-root[data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-1\"] { opacity: 0.3; pointer-events: auto; transform: translateY(calc(var(--aur-ah) / -2 - 0.3em - 81%)) scale(0.62); }\n.aur-root[data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"1\"] { opacity: 0.3; pointer-events: auto; transform: translateY(calc(var(--aur-ah) / 2 + 0.3em - 19%)) scale(0.62); }\n.aur-root[data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-2\"] { transform: translateY(calc(var(--aur-ah) / -2 - 1.6em - 75%)) scale(0.5); }\n.aur-root[data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"2\"] { transform: translateY(calc(var(--aur-ah) / 2 + 1.6em - 25%)) scale(0.5); }\n.aur-root[data-depth=\"on\"][data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"-1\"],\n.aur-root[data-depth=\"on\"][data-anim=\"fade\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"1\"] { filter: blur(1px); }\n.aur-root[data-anim=\"cinematic\"] .aur-line { letter-spacing: -0.015em; transition-duration: 0.9s, 1.1s, 0.9s, 0.5s, 0.9s; }\n.aur-root[data-anim=\"cinematic\"] .aur-stage[data-mode=\"synced\"] .aur-line { transform: translateY(calc(-50% + 0.45em)) scale(0.97); }\n.aur-root[data-anim=\"cinematic\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d] { filter: blur(16px); }\n.aur-root[data-anim=\"cinematic\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d^=\"-\"] { transform: translateY(calc(-50% - 0.45em)) scale(1.03); }\n.aur-root[data-anim=\"cinematic\"] .aur-stage[data-mode=\"synced\"] .aur-line.is-active { filter: none; transform: translateY(-50%) scale(1.05); transition-delay: 0s, 0.14s, 0.14s, 0s, 0s; }\n.aur-root[data-context=\"off\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-active) { opacity: 0 !important; pointer-events: none; }\n.aur-stage[data-mode=\"unsynced\"] { overflow-y: auto; scrollbar-width: none; }\n.aur-stage[data-mode=\"unsynced\"]::-webkit-scrollbar { display: none; }\n.aur-stage[data-mode=\"unsynced\"] .aur-lines { padding: 24vh 0 42vh; }\n.aur-stage[data-mode=\"unsynced\"] .aur-line {\nfont-size: calc(var(--aur-size) * 0.66);\nline-height: 1.28;\npadding: calc(var(--aur-gap) / 3.5) 0;\nopacity: 0.9;\ntransform: none;\ncursor: text;\nuser-select: text;\n}\n.aur-stage[data-mode=\"unsynced\"] .aur-line.is-gap { height: 0.9em; }\n.aur-stage[data-mode=\"unsynced\"] .aur-dots { display: none; }\n.aur-stage.is-entering[data-mode=\"unsynced\"] .aur-lines { animation: aur-fade-up 0.9s var(--aur-ease) backwards; }\n@keyframes aur-fade-up {\nfrom { opacity: 0; transform: translateY(28px); filter: blur(8px); }\n}\n.aur-message {\nposition: absolute;\ninset: 0;\ndisplay: none;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 8px;\npadding: 60px 8vw 150px;\ntext-align: center;\n}\n.aur-stage[data-mode=\"message\"] .aur-message { display: flex; }\n.aur-message-art {\nwidth: clamp(120px, 30vh, 280px);\naspect-ratio: 1;\nmargin-bottom: 22px;\nborder-radius: 14px;\noverflow: hidden;\nbox-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);\n}\n.aur-message-art img { display: block; width: 100%; height: 100%; object-fit: cover; }\n.aur-message[data-kind=\"loading\"] .aur-message-art { animation: aur-pulse 2.4s ease-in-out infinite; }\n.aur-message-icon { color: rgba(255, 255, 255, 0.55); margin-bottom: 6px; }\n.aur-message-icon:empty { display: none; }\n.aur-message-title { font-family: var(--aur-font); font-size: clamp(22px, calc(var(--aur-size) * 0.6), 40px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }\n.aur-message-detail { min-height: 1.5em; max-width: 520px; font-size: 15px; line-height: 1.5; color: rgba(255, 255, 255, 0.6); }\n.aur-message[data-kind=\"error\"] .aur-message-title { color: #ffb4a8; }\n.aur-message-action { margin-top: 14px; }\n.aur-spinner { display: flex; gap: 7px; margin-bottom: 6px; }\n.aur-spinner i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: aur-bounce 1.2s var(--aur-ease) infinite; }\n.aur-spinner i:nth-child(2) { animation-delay: 0.15s; }\n.aur-spinner i:nth-child(3) { animation-delay: 0.3s; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > * { animation: aur-fade-up 0.8s var(--aur-ease) backwards; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > :nth-child(2) { animation-delay: 0.06s; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > :nth-child(3) { animation-delay: 0.12s; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > :nth-child(4) { animation-delay: 0.18s; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > :nth-child(5) { animation-delay: 0.24s; }\n.aur-stage.is-entering[data-mode=\"message\"] .aur-message > .aur-message-art { animation: aur-art-in 1s var(--aur-ease) backwards; }\n@keyframes aur-bounce {\n0%, 100% { transform: translateY(0); opacity: 0.35; }\n40% { transform: translateY(-7px); opacity: 1; }\n}\n@keyframes aur-pulse {\n0%, 100% { transform: scale(1); }\n50% { transform: scale(0.975); }\n}\n@keyframes aur-art-in {\nfrom { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(10px); }\n}\n:where(.aur-root) button { appearance: none; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; -webkit-app-region: no-drag; }\n.aur-root button:focus-visible,\n.aur-root select:focus-visible,\n.aur-root input:focus-visible,\n.aur-root textarea:focus-visible,\n.aur-progress:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }\n.aur-icon-btn {\ndisplay: inline-grid;\nplace-items: center;\nflex: none;\nwidth: 36px;\nheight: 36px;\nborder-radius: 50%;\ncolor: rgba(255, 255, 255, 0.72);\ntransition: background 0.2s ease, color 0.2s ease, transform 0.25s var(--aur-spring);\n}\n.aur-icon-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }\n.aur-icon-btn:active { transform: scale(0.9); }\n.aur-icon-btn.is-on { color: var(--aur-green); }\n.aur-btn {\ndisplay: inline-flex;\nalign-items: center;\njustify-content: center;\ngap: 8px;\nheight: 36px;\npadding: 0 16px;\nborder-radius: 999px;\nbackground: rgba(255, 255, 255, 0.1);\nfont-size: 13px;\nfont-weight: 700;\ntransition: background 0.2s ease, transform 0.2s var(--aur-spring), box-shadow 0.2s ease;\n}\n.aur-btn svg { width: 16px; height: 16px; }\n.aur-btn:hover { background: rgba(255, 255, 255, 0.17); }\n.aur-btn:active { transform: scale(0.96); }\n.aur-btn:disabled { opacity: 0.4; pointer-events: none; }\n.aur-btn-ghost { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }\n.aur-btn-ghost:hover { background: rgba(255, 255, 255, 0.07); }\n.aur-btn-primary { background: #fff; color: #000; }\n.aur-btn-primary:hover { background: #fff; transform: scale(1.03); box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15); }\n.aur-btn-danger { background: transparent; color: #ff8a7a; box-shadow: inset 0 0 0 1px rgba(255, 138, 122, 0.35); }\n.aur-root {\n--aur-toggle-on: color-mix(in oklab, var(--aur-accent) 50%, #fff);\n--aur-ctl: rgba(255, 255, 255, 0.72);\n}\n.aur-player {\nposition: absolute;\nleft: 0;\nright: 0;\nbottom: 0;\nz-index: 3;\ndisplay: grid;\ngrid-template-columns: minmax(0, 1fr) minmax(300px, 640px) minmax(0, 1fr);\nalign-items: end;\ncolumn-gap: 28px;\npadding: 0 var(--aur-pad) 20px;\npointer-events: none;\ntransition: opacity 0.5s ease, transform 0.65s var(--aur-ease);\n}\n.aur-player > * { pointer-events: auto; }\n.aur-player-side { display: flex; align-items: center; gap: 4px; height: 58px; min-width: 0; }\n.aur-player-side.is-left { grid-column: 1; justify-content: flex-start; }\n.aur-player-center { grid-column: 2; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }\n.aur-player-side.is-right { grid-column: 3; justify-content: flex-end; }\n.aur-root[data-transport=\"off\"] .aur-player-center { display: none; }\n.aur-scrub { width: 100%; }\n.aur-progress { --p: 0; --hx: 0; position: relative; height: 18px; cursor: pointer; touch-action: none; border-radius: 4px; }\n.aur-progress-track {\nposition: absolute;\nleft: 0;\nright: 0;\ntop: 50%;\nheight: 4px;\nmargin-top: -2px;\noverflow: hidden;\nborder-radius: 99px;\nbackground: rgba(255, 255, 255, 0.16);\ntransition: height 0.25s var(--aur-ease), margin 0.25s var(--aur-ease), background 0.25s ease;\n}\n.aur-progress-fill {\nposition: absolute;\ninset: 0;\nborder-radius: inherit;\nbackground: linear-gradient(90deg, rgba(255, 255, 255, 0.75), #fff);\ntransform-origin: 0 50%;\ntransform: scaleX(var(--p));\n}\n.aur-progress-knob-rail { position: absolute; inset: 0; transform: translateX(calc(var(--p) * 100%)); pointer-events: none; }\n.aur-progress-knob {\nposition: absolute;\nleft: -7px;\ntop: 50%;\nwidth: 14px;\nheight: 14px;\nmargin-top: -7px;\nborder-radius: 50%;\nbackground: #fff;\nbox-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 0 4px color-mix(in oklab, var(--aur-glow-tint) 25%, transparent);\ntransform: scale(0);\ntransition: transform 0.3s var(--aur-spring);\n}\n.aur-progress:hover .aur-progress-track,\n.aur-progress.is-scrubbing .aur-progress-track { height: 7px; margin-top: -3.5px; background: rgba(255, 255, 255, 0.22); }\n.aur-progress:hover .aur-progress-knob,\n.aur-progress.is-scrubbing .aur-progress-knob,\n.aur-progress:focus-visible .aur-progress-knob { transform: scale(1); }\n.aur-progress.is-scrubbing .aur-progress-knob { transform: scale(1.15); }\n.aur-progress-tip {\nposition: absolute;\nbottom: 20px;\nleft: calc(var(--hx) * 100%);\npadding: 3px 8px;\nborder-radius: 7px;\nbackground: rgba(18, 18, 22, 0.88);\nborder: 1px solid rgba(255, 255, 255, 0.08);\nfont-size: 11.5px;\nfont-weight: 600;\nfont-variant-numeric: tabular-nums;\nwhite-space: nowrap;\npointer-events: none;\nopacity: 0;\ntransform: translate(-50%, 4px);\ntransition: opacity 0.18s ease, transform 0.25s var(--aur-ease);\n}\n.aur-progress:hover .aur-progress-tip,\n.aur-progress.is-scrubbing .aur-progress-tip { opacity: 1; transform: translate(-50%, 0); }\n.aur-times { display: flex; justify-content: space-between; margin-top: 1px; }\n.aur-time { font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.55); }\n.aur-transport { display: flex; align-items: center; gap: 20px; }\n.aur-skip { width: 42px; height: 42px; color: rgba(255, 255, 255, 0.92); }\n.aur-skip svg { width: 22px; height: 22px; }\n.aur-toggle { position: relative; color: rgba(255, 255, 255, 0.5); }\n.aur-toggle.is-on { color: var(--aur-toggle-on); }\n.aur-toggle::after {\ncontent: \"\";\nposition: absolute;\nleft: 50%;\nbottom: 3px;\nwidth: 4px;\nheight: 4px;\nmargin-left: -2px;\nborder-radius: 50%;\nbackground: currentColor;\nopacity: 0;\ntransform: scale(0);\ntransition: opacity 0.2s ease, transform 0.3s var(--aur-spring);\n}\n.aur-toggle.is-on::after { opacity: 1; transform: none; }\n.aur-play-btn {\nposition: relative;\ndisplay: grid;\nplace-items: center;\nwidth: 58px;\nheight: 58px;\nflex: none;\nborder-radius: 50%;\nbackground: #fff;\ncolor: #0b0b0e;\nbox-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 0 color-mix(in oklab, var(--aur-glow-tint) 30%, transparent);\ntransition: transform 0.35s var(--aur-spring), box-shadow 0.4s ease;\n}\n.aur-play-btn:hover { transform: scale(1.06); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32), 0 0 0 8px color-mix(in oklab, var(--aur-glow-tint) 16%, transparent); }\n.aur-play-btn:active { transform: scale(0.93); }\n.aur-pp { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity 0.22s ease, transform 0.4s var(--aur-spring); }\n.aur-pp svg { width: 26px; height: 26px; }\n.aur-pp.is-pause { opacity: 0; transform: scale(0.5) rotate(-90deg); }\n.aur-root[data-playing=\"true\"] .aur-pp.is-play { opacity: 0; transform: scale(0.5) rotate(90deg); }\n.aur-root[data-playing=\"true\"] .aur-pp.is-pause { opacity: 1; transform: none; }\n.aur-source {\ndisplay: inline-flex;\nalign-items: center;\ngap: 8px;\nmin-width: 0;\nmax-width: 230px;\nheight: 32px;\npadding: 0 12px 0 10px;\nborder-radius: 99px;\nbackground: rgba(255, 255, 255, 0.07);\nfont-size: 12px;\nfont-weight: 600;\nwhite-space: nowrap;\noverflow: hidden;\ntext-overflow: ellipsis;\ncolor: rgba(255, 255, 255, 0.78);\ntransition: background 0.2s ease, color 0.2s ease;\n}\n.aur-source:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }\n.aur-source::before { content: \"\"; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #777; }\n.aur-source[data-kind=\"synced\"]::before { background: var(--aur-green); }\n.aur-source[data-kind=\"word-synced\"]::before { background: #7cd4ff; box-shadow: 0 0 8px #7cd4ff; }\n.aur-source[data-kind=\"unsynced\"]::before { background: #f5c451; }\n.aur-offset-group { display: inline-flex; align-items: center; flex: none; height: 32px; margin-left: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.05); }\n.aur-mini-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: rgba(255, 255, 255, 0.6); transition: background 0.2s ease, color 0.2s ease; }\n.aur-mini-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }\n.aur-offset { min-width: 54px; height: 30px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; color: #fff; }\n.aur-offset.is-zero { color: rgba(255, 255, 255, 0.45); }\n.aur-player-side .aur-icon-btn { color: var(--aur-ctl); }\n.aur-heart { transition: color 0.2s ease, transform 0.35s var(--aur-spring); }\n.aur-heart.is-on { color: var(--aur-green); }\n.aur-heart.is-on svg { animation: aur-heart-pop 0.45s var(--aur-spring); }\n@keyframes aur-heart-pop { 40% { transform: scale(1.3); } }\n.aur-volume { display: flex; align-items: center; }\n.aur-vol {\n--v: 1;\n-webkit-appearance: none;\nappearance: none;\nwidth: 0;\nheight: 18px;\nmargin: 0;\nbackground: transparent;\nopacity: 0;\ncursor: pointer;\ntransition: width 0.35s var(--aur-ease), opacity 0.25s ease, margin 0.35s var(--aur-ease);\n}\n.aur-volume:hover .aur-vol,\n.aur-vol:focus-visible { width: 86px; margin: 0 6px 0 2px; opacity: 1; }\n.aur-vol::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, #fff calc(var(--v) * 100%), rgba(255, 255, 255, 0.18) calc(var(--v) * 100%)); }\n.aur-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); }\n.aur-vol::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.18); }\n.aur-vol::-moz-range-progress { height: 4px; border-radius: 99px; background: #fff; }\n.aur-vol::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: #fff; }\n.aur-player-side .aur-sep { flex: none; width: 1px; height: 20px; margin: 0 6px; background: rgba(255, 255, 255, 0.14); }\n.aur-mini-progress { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: 2px; background: rgba(255, 255, 255, 0.07); opacity: 0; transition: opacity 0.8s ease; pointer-events: none; }\n.aur-mini-fill { height: 100%; background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.75)); transform-origin: 0 50%; transform: scaleX(var(--p, 0)); }\n.aur-root[data-idle=\"true\"] .aur-mini-progress { opacity: 1; transition-delay: 0.3s; }\n.aur-root[data-idle=\"true\"] { cursor: none; }\n.aur-root[data-idle=\"true\"] .aur-chrome { opacity: 0; pointer-events: none; }\n.aur-root[data-idle=\"true\"] .aur-player { transform: translateY(18px); }\n.aur-root[data-idle=\"true\"] .aur-header { transform: translateY(-10px); }\n.aur-root.is-open .aur-player { animation: aur-rise 0.8s var(--aur-ease) 0.1s backwards; }\n.aur-root.is-open .aur-header { animation: aur-drop 0.8s var(--aur-ease) 0.05s backwards; }\n@keyframes aur-rise { from { opacity: 0; transform: translateY(28px); } }\n@keyframes aur-drop { from { opacity: 0; transform: translateY(-14px); } }\n.aur-toast {\nposition: absolute;\nleft: 50%;\nbottom: 150px;\nz-index: 5;\nmax-width: calc(100vw - 32px);\npadding: 9px 18px;\nborder-radius: 999px;\nbackground: rgba(24, 24, 28, 0.82);\nborder: 1px solid rgba(255, 255, 255, 0.1);\nbox-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);\nbackdrop-filter: blur(20px);\nfont-size: 13px;\nfont-weight: 600;\nwhite-space: nowrap;\noverflow: hidden;\ntext-overflow: ellipsis;\nopacity: 0;\npointer-events: none;\ntransform: translate(-50%, 10px) scale(0.96);\ntransition: opacity 0.25s ease, transform 0.4s var(--aur-spring);\n}\n.aur-root[data-transport=\"off\"] .aur-toast { bottom: 84px; }\n.aur-toast.is-on { opacity: 1; transform: translate(-50%, 0) scale(1); }\n.aur-root { --aur-safe-top: 52px; }\n.aur-root[data-fs=\"true\"] { --aur-safe-top: 12px; }\n.aur-panel {\nposition: absolute;\ntop: var(--aur-safe-top);\nright: 12px;\nbottom: 12px;\nz-index: 4;\nwidth: min(520px, calc(100vw - 24px));\ndisplay: grid;\ngrid-template-columns: 76px minmax(0, 1fr);\noverflow: hidden;\nborder-radius: 22px;\nbackground: linear-gradient(180deg, rgba(32, 32, 38, 0.86), rgba(18, 18, 22, 0.9));\nborder: 1px solid rgba(255, 255, 255, 0.08);\nbox-shadow: 0 40px 100px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);\nbackdrop-filter: blur(40px) saturate(1.5);\nfont-size: 14px;\n-webkit-app-region: no-drag;\nopacity: 0;\nvisibility: hidden;\ntransform: translateX(28px) scale(0.985);\ntransform-origin: right center;\ntransition: transform 0.5s var(--aur-ease), opacity 0.3s ease, visibility 0s linear 0.5s;\n}\n.aur-panel.is-open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }\n.aur-panel [hidden] { display: none !important; }\n.aur-rail {\nposition: relative;\ndisplay: flex;\nflex-direction: column;\ngap: 4px;\npadding: 14px 8px;\nbackground: rgba(0, 0, 0, 0.18);\nborder-right: 1px solid rgba(255, 255, 255, 0.05);\n}\n.aur-rail-btn {\nposition: relative;\nz-index: 1;\ndisplay: flex;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 5px;\nheight: 62px;\nborder-radius: 14px;\ncolor: rgba(255, 255, 255, 0.5);\ntransition: color 0.25s ease, background 0.25s ease;\n}\n.aur-rail-btn:hover { color: rgba(255, 255, 255, 0.88); background: rgba(255, 255, 255, 0.04); }\n.aur-rail-btn[aria-selected=\"true\"] { color: #fff; background: none; }\n.aur-rail-icon { display: grid; transition: transform 0.35s var(--aur-spring); }\n.aur-rail-btn[aria-selected=\"true\"] .aur-rail-icon { transform: translateY(-1px) scale(1.06); }\n.aur-rail-icon svg { width: 21px; height: 21px; }\n.aur-rail-label { font-size: 10.5px; font-weight: 650; letter-spacing: 0.01em; }\n.aur-rail-pill {\nposition: absolute;\ntop: 14px;\nleft: 8px;\nright: 8px;\nheight: 62px;\nborder-radius: 14px;\nbackground: rgba(255, 255, 255, 0.1);\nbox-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);\ntransform: translateY(calc(var(--i, 1) * 66px));\ntransition: transform 0.45s var(--aur-ease), opacity 0.2s ease;\n}\n.aur-rail-pill::before { content: \"\"; position: absolute; left: -8px; top: 20px; bottom: 20px; width: 3px; border-radius: 0 3px 3px 0; background: var(--aur-toggle-on); }\n.aur-panel[data-searching=\"true\"] .aur-rail-pill { opacity: 0; }\n.aur-panel-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }\n.aur-panel-head {\ndisplay: grid;\ngrid-template-columns: minmax(0, 1fr) auto;\nalign-items: start;\ngap: 14px 8px;\npadding: 18px 14px 14px 20px;\nborder-bottom: 1px solid rgba(255, 255, 255, 0.05);\n}\n.aur-panel-title { font-family: var(--aur-font); font-size: 21px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; }\n.aur-panel-sub { margin-top: 3px; font-size: 12.5px; color: rgba(255, 255, 255, 0.5); }\n.aur-panel-close { margin: -4px -2px 0 0; background: rgba(255, 255, 255, 0.06); }\n.aur-panel-close:hover { background: rgba(255, 255, 255, 0.14); }\n.aur-search-wrap { grid-column: 1 / -1; position: relative; display: block; }\n.aur-search-icon { position: absolute; left: 11px; top: 50%; display: grid; transform: translateY(-50%); color: rgba(255, 255, 255, 0.45); pointer-events: none; }\n.aur-search {\nwidth: 100%;\nheight: 36px;\npadding: 0 12px 0 34px;\nborder: 1px solid rgba(255, 255, 255, 0.08);\nborder-radius: 11px;\nbackground: rgba(0, 0, 0, 0.25);\ncolor: #fff;\nfont: inherit;\nfont-size: 13px;\noutline: none;\ntransition: border-color 0.2s ease, background 0.2s ease;\n}\n.aur-search::placeholder { color: rgba(255, 255, 255, 0.4); }\n.aur-search:focus { border-color: rgba(255, 255, 255, 0.28); background: rgba(0, 0, 0, 0.35); }\n.aur-search::-webkit-search-cancel-button { filter: invert(1) opacity(0.5); cursor: pointer; }\n.aur-panel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 16px 24px 18px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }\n.aur-panel-scroll::-webkit-scrollbar { width: 8px; }\n.aur-panel-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 99px; background: rgba(255, 255, 255, 0.15) padding-box; }\n.aur-panel.is-open .aur-tab-body:not([hidden]) > * { animation: aur-fade-up 0.5s var(--aur-ease) backwards; }\n.aur-panel.is-open .aur-tab-body:not([hidden]) > :nth-child(2) { animation-delay: 0.04s; }\n.aur-panel.is-open .aur-tab-body:not([hidden]) > :nth-child(3) { animation-delay: 0.08s; }\n.aur-panel.is-open .aur-tab-body:not([hidden]) > :nth-child(n + 4) { animation-delay: 0.12s; }\n.aur-no-results { padding: 48px 0; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.5); }\n.aur-tab-body[data-tab=\"track\"] > .aur-np { margin: 14px 0 4px; }\n@media (max-width: 600px) {\n.aur-panel { grid-template-columns: 58px minmax(0, 1fr); }\n.aur-rail-label { display: none; }\n.aur-rail-btn, .aur-rail-pill { height: 50px; }\n.aur-rail-pill { transform: translateY(calc(var(--i, 1) * 54px)); }\n}\n.aur-section h3 { margin: 22px 4px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }\n.aur-section-card { padding: 2px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05); }\n.aur-section-card > .aur-row + .aur-row { border-top: 1px solid rgba(255, 255, 255, 0.06); }\n.aur-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px; padding: 10px 0; cursor: pointer; transition: opacity 0.2s ease; }\n.aur-row > span, .aur-row-label > span { font-size: 13.5px; color: rgba(255, 255, 255, 0.9); }\n.aur-row.is-disabled { opacity: 0.35; pointer-events: none; }\n.aur-row-stack, .aur-row-range { flex-direction: column; align-items: stretch; gap: 10px; cursor: default; }\n.aur-row-range { gap: 6px; cursor: pointer; }\n.aur-row-label { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }\n.aur-range-value { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.55); }\n.aur-range { --p: 50%; -webkit-appearance: none; appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }\n.aur-range::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, #fff var(--p), rgba(255, 255, 255, 0.16) var(--p)); }\n.aur-range::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45); transition: transform 0.2s var(--aur-spring); }\n.aur-range:hover::-webkit-slider-thumb { transform: scale(1.12); }\n.aur-range:active::-webkit-slider-thumb { transform: scale(1.25); }\n.aur-range::-moz-range-track { height: 4px; border-radius: 99px; background: rgba(255, 255, 255, 0.16); }\n.aur-range::-moz-range-progress { height: 4px; border-radius: 99px; background: #fff; }\n.aur-range::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; }\n.aur-switch { appearance: none; position: relative; flex: none; width: 40px; height: 24px; margin: 0; border-radius: 99px; background: rgba(255, 255, 255, 0.2); cursor: pointer; transition: background 0.25s ease; }\n.aur-switch::before { content: \"\"; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); transition: transform 0.35s var(--aur-spring); }\n.aur-switch:checked { background: var(--aur-green); }\n.aur-switch:checked::before { transform: translateX(16px); }\n.aur-segmented { display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: rgba(0, 0, 0, 0.28); }\n.aur-seg { flex: 1; display: grid; place-items: center; height: 30px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, 0.6); transition: background 0.25s ease, color 0.2s ease, box-shadow 0.25s ease; }\n.aur-seg:hover { color: #fff; }\n.aur-seg[aria-checked=\"true\"] { background: rgba(255, 255, 255, 0.16); color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }\n.aur-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); gap: 8px; }\n.aur-card, .aur-font {\ndisplay: flex;\nflex-direction: column;\ngap: 2px;\npadding: 10px;\nborder-radius: 12px;\nbackground: rgba(255, 255, 255, 0.05);\nborder: 1px solid rgba(255, 255, 255, 0.06);\ntext-align: left;\ntransition: background 0.2s ease, border-color 0.2s ease, transform 0.25s var(--aur-spring);\n}\n.aur-card:hover, .aur-font:hover { background: rgba(255, 255, 255, 0.09); }\n.aur-card:active, .aur-font:active { transform: scale(0.97); }\n.aur-card[aria-checked=\"true\"], .aur-font[aria-checked=\"true\"] { background: rgba(30, 215, 96, 0.12); border-color: rgba(30, 215, 96, 0.75); }\n.aur-card-art { display: block; width: 100%; height: 38px; margin-bottom: 6px; color: rgba(255, 255, 255, 0.8); }\n.aur-card-art svg { width: 100%; height: 100%; fill: currentColor; }\n.aur-card[aria-checked=\"true\"] .aur-card-art { color: var(--aur-green); }\n.aur-card-name { font-size: 13px; font-weight: 700; }\n.aur-card-hint { font-size: 11px; color: rgba(255, 255, 255, 0.5); }\n.aur-themes { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }\n.aur-theme-art {\nposition: relative;\ndisplay: grid;\nplace-items: center;\nheight: 52px;\nmargin-bottom: 6px;\nborder-radius: 8px;\noverflow: hidden;\nbackground: radial-gradient(120% 140% at 20% 10%, var(--t1) 0%, transparent 70%), var(--t2);\nbox-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);\n}\n.aur-theme-art span { font-size: 24px; font-weight: 800; line-height: 1; color: #fff; text-shadow: 0 0 14px color-mix(in oklab, var(--t1) 70%, transparent); }\n.aur-theme[aria-checked=\"true\"] .aur-theme-art { box-shadow: inset 0 0 0 1px rgba(30, 215, 96, 0.6); }\n.aur-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }\n.aur-swatch {\nposition: relative;\nwidth: 30px;\nheight: 30px;\nflex: none;\nborder-radius: 50%;\nbackground: var(--sw);\nbox-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);\ncursor: pointer;\ntransition: transform 0.25s var(--aur-spring), box-shadow 0.2s ease;\n}\n.aur-swatch:hover { transform: scale(1.08); }\n.aur-swatch[aria-checked=\"true\"] { box-shadow: 0 0 0 2px #121216, 0 0 0 4px #fff; }\n.aur-swatch.is-album {\nwidth: auto;\npadding: 0 12px;\nborder-radius: 99px;\nfont-size: 12px;\nfont-weight: 700;\ncolor: #fff;\nbackground: linear-gradient(135deg, color-mix(in srgb, var(--aur-album-accent, #fff) 55%, #222), color-mix(in srgb, var(--aur-album-c1, #4b3b78) 70%, #111));\n}\n.aur-swatch.is-custom { background: conic-gradient(var(--sw) 0 0), conic-gradient(#ff5f5f, #ffd23f, #3ddc84, #2ec5ff, #b388ff, #ff5fa2, #ff5f5f); overflow: hidden; }\n.aur-swatch-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }\n.aur-fonts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }\n.aur-font { align-items: center; text-align: center; }\n.aur-font-sample { font-size: 26px; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }\n.aur-font-name { font-size: 11px; color: rgba(255, 255, 255, 0.55); }\n.aur-select { max-width: 200px; padding: 6px 8px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: rgba(255, 255, 255, 0.07); color: #fff; font: inherit; font-size: 13px; }\n.aur-select option { background: #222; color: #fff; }\n.aur-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }\n.aur-hint { margin: 14px 2px 0; font-size: 12px; line-height: 1.55; color: rgba(255, 255, 255, 0.45); }\n.aur-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 20px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.03); font-size: 12px; color: rgba(255, 255, 255, 0.6); }\n.aur-key { display: flex; align-items: center; gap: 8px; }\n.aur-key kbd { flex: none; min-width: 24px; padding: 2px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12); font: 600 11px/1.4 var(--aur-ui-font); color: #fff; text-align: center; }\n.aur-track-info { display: flex; align-items: center; gap: 14px; margin: 14px 0; }\n.aur-track-art { width: 60px; height: 60px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }\n.aur-track-text { min-width: 0; }\n.aur-track-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.aur-track-sub { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.aur-track-chip { display: inline-block; margin-top: 7px; padding: 3px 9px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, 0.75); }\n.aur-textarea {\ndisplay: block;\nwidth: 100%;\nmin-height: 280px;\npadding: 12px 14px;\nresize: vertical;\nborder: 1px solid rgba(255, 255, 255, 0.1);\nborder-radius: 12px;\nbackground: rgba(0, 0, 0, 0.32);\ncolor: #fff;\nfont: 12px/1.6 ui-monospace, \"Cascadia Code\", Consolas, monospace;\nuser-select: text;\ntransition: border-color 0.2s ease, background 0.2s ease;\n}\n.aur-textarea:focus { border-color: rgba(255, 255, 255, 0.3); outline: none; }\n.aur-textarea.is-drop { border-color: var(--aur-green); background: rgba(30, 215, 96, 0.08); }\n.aur-root { --aur-split-w: clamp(320px, 40vw, 600px); }\n.aur-side {\nposition: absolute;\ntop: 0;\nbottom: 0;\nleft: 0;\nz-index: 1;\nwidth: var(--aur-split-w);\ndisplay: none;\nflex-direction: column;\nalign-items: center;\njustify-content: center;\ngap: 24px;\npadding: 64px 2vw 150px calc(var(--aur-pad) * 0.8);\n}\n.aur-art-wrap {\nposition: relative;\ndisplay: block;\nwidth: min(100%, 52vh, 460px);\naspect-ratio: 1;\nflex: none;\nborder-radius: 14px;\ncursor: pointer;\nbox-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);\ntransition: transform 0.8s var(--aur-spring), box-shadow 0.8s ease;\n}\n.aur-root[data-playing=\"false\"] .aur-art-wrap { transform: scale(0.86); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05); }\n.aur-art-wrap:active { transform: scale(0.97); }\n.aur-root[data-playing=\"false\"] .aur-art-wrap:active { transform: scale(0.84); }\n.aur-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; opacity: 0; transition: opacity 0.9s ease; }\n.aur-art.is-on { opacity: 1; }\n.aur-art-hint {\nposition: absolute;\nleft: 50%;\ntop: 50%;\ndisplay: grid;\nplace-items: center;\nwidth: 64px;\nheight: 64px;\nmargin: -32px 0 0 -32px;\nborder-radius: 50%;\nbackground: rgba(0, 0, 0, 0.45);\nbackdrop-filter: blur(10px);\ncolor: #fff;\nopacity: 0;\ntransform: scale(0.8);\ntransition: opacity 0.25s ease, transform 0.35s var(--aur-spring);\n}\n.aur-art-hint svg { width: 28px; height: 28px; }\n.aur-art-wrap:hover .aur-art-hint, .aur-art-wrap:focus-visible .aur-art-hint { opacity: 1; transform: none; }\n.aur-side-meta { width: min(100%, 52vh, 460px); min-width: 0; }\n.aur-side-title {\ndisplay: -webkit-box;\noverflow: hidden;\n-webkit-line-clamp: 2;\n-webkit-box-orient: vertical;\nfont-family: var(--aur-font);\nfont-size: clamp(20px, 2.1vw, 30px);\nfont-weight: 800;\nline-height: 1.15;\nletter-spacing: -0.02em;\n}\n.aur-side-artist, .aur-side-album { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.aur-side-artist { margin-top: 6px; font-size: 15px; color: rgba(255, 255, 255, 0.7); }\n.aur-side-album { margin-top: 2px; font-size: 13px; color: rgba(255, 255, 255, 0.45); }\n.aur-root.is-open .aur-side { animation: aur-art-in 0.9s var(--aur-ease) 0.05s backwards; }\n.aur-disc { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; }\n.aur-disc-grooves, .aur-disc-shine { display: none; }\n@media (min-width: 900px) and (min-height: 540px) {\n.aur-root:is([data-view=\"split\"], [data-view=\"mirror\"], [data-view=\"poster\"], [data-view=\"vinyl\"]) .aur-side { display: flex; }\n.aur-root:is([data-view=\"split\"], [data-view=\"mirror\"], [data-view=\"poster\"], [data-view=\"vinyl\"]) :is(.aur-header, .aur-message-art) { display: none; }\n.aur-root:is([data-view=\"split\"], [data-view=\"vinyl\"]) .aur-stage { left: var(--aur-split-w); padding-left: 2.5vw; --aur-size: min(var(--aur-fs), 4.6vw, 10.5vh); }\n.aur-root[data-view=\"mirror\"] .aur-side { left: auto; right: 0; padding: 64px calc(var(--aur-pad) * 0.8) 150px 2vw; }\n.aur-root[data-view=\"mirror\"] .aur-stage { right: var(--aur-split-w); padding-right: 2.5vw; --aur-size: min(var(--aur-fs), 4.6vw, 10.5vh); }\n.aur-root[data-view=\"poster\"] { --aur-poster-w: clamp(360px, 46vw, 820px); }\n.aur-root[data-view=\"poster\"] .aur-side { width: var(--aur-poster-w); padding: 0; display: block; }\n.aur-root[data-view=\"poster\"] .aur-art-wrap {\nposition: absolute;\ninset: 0;\nwidth: 100%;\nheight: 100%;\naspect-ratio: auto;\nborder-radius: 0;\nbox-shadow: none;\n-webkit-mask-image: linear-gradient(to right, #000 45%, transparent 98%), linear-gradient(to top, transparent 0, #000 42%);\n-webkit-mask-composite: source-in;\nmask-image: linear-gradient(to right, #000 45%, transparent 98%), linear-gradient(to top, transparent 0, #000 42%);\nmask-composite: intersect;\ntransition: opacity 0.8s ease, filter 0.8s ease;\n}\n.aur-root[data-view=\"poster\"][data-playing=\"false\"] .aur-art-wrap { transform: none; box-shadow: none; filter: saturate(0.6) brightness(0.8); }\n.aur-root[data-view=\"poster\"] .aur-art-wrap:active { transform: none; }\n.aur-root[data-view=\"poster\"] .aur-art-hint { left: 40%; }\n.aur-root[data-view=\"poster\"] .aur-side-meta { position: absolute; left: var(--aur-pad); bottom: 150px; width: min(34vw, 560px); text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45); }\n.aur-root[data-view=\"poster\"] .aur-side-title { font-size: clamp(28px, 3.4vw, 54px); line-height: 1.05; }\n.aur-root[data-view=\"poster\"] .aur-side-artist { font-size: clamp(15px, 1.3vw, 19px); color: rgba(255, 255, 255, 0.82); }\n.aur-root[data-view=\"poster\"] .aur-stage { left: calc(var(--aur-poster-w) * 0.9); padding-left: 2vw; --aur-size: min(var(--aur-fs), 4.4vw, 10.5vh); }\n.aur-root[data-view=\"vinyl\"] .aur-art-wrap { border-radius: 50%; box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05); }\n.aur-root[data-view=\"vinyl\"] .aur-disc {\nborder-radius: 50%;\nbackground:\nradial-gradient(circle, transparent 0 21%, rgba(255, 255, 255, 0.07) 21.3%, transparent 22%),\nradial-gradient(circle, #1b1b1f 0 60%, #111114 100%);\nanimation: aur-spin-disc 7.5s linear infinite;\nanimation-play-state: paused;\n}\n.aur-root[data-view=\"vinyl\"][data-playing=\"true\"] .aur-disc { animation-play-state: running; }\n.aur-root[data-view=\"vinyl\"] .aur-disc-grooves {\ndisplay: block;\nposition: absolute;\ninset: 0;\nborder-radius: 50%;\nbackground: repeating-radial-gradient(circle, rgba(255, 255, 255, 0.035) 0 1px, rgba(255, 255, 255, 0.012) 1.6px, transparent 2.4px 4px);\n-webkit-mask-image: radial-gradient(circle, transparent 0 33%, #000 34% 96%, transparent 97%);\nmask-image: radial-gradient(circle, transparent 0 33%, #000 34% 96%, transparent 97%);\n}\n.aur-root[data-view=\"vinyl\"] .aur-art { inset: 31%; width: 38%; height: 38%; border-radius: 50%; }\n.aur-root[data-view=\"vinyl\"] .aur-disc::after { content: \"\"; position: absolute; left: 50%; top: 50%; width: 3.2%; height: 3.2%; margin: -1.6% 0 0 -1.6%; border-radius: 50%; background: #0b0b0e; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08); }\n.aur-root[data-view=\"vinyl\"] .aur-disc-shine {\ndisplay: block;\nposition: absolute;\ninset: 0;\nborder-radius: 50%;\npointer-events: none;\nbackground: conic-gradient(from 20deg, transparent 0 8%, rgba(255, 255, 255, 0.1) 13%, transparent 20% 52%, rgba(255, 255, 255, 0.08) 60%, transparent 68%);\n-webkit-mask-image: radial-gradient(circle, transparent 0 32%, #000 36%);\nmask-image: radial-gradient(circle, transparent 0 32%, #000 36%);\n}\n.aur-root[data-view=\"vinyl\"] .aur-art-hint { z-index: 1; }\n.aur-root[data-view=\"vinyl\"] .aur-side-meta { text-align: center; }\n}\n@keyframes aur-spin-disc { to { rotate: 360deg; } }\n@media (min-height: 600px) {\n.aur-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .aur-side { display: flex; left: 0; right: 0; width: auto; }\n.aur-root:is([data-view=\"stage\"], [data-view=\"captions\"]) :is(.aur-header, .aur-message-art) { display: none; }\n.aur-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .aur-stage { --aur-origin: 50%; text-align: center; }\n.aur-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .aur-line { margin-inline: auto; }\n.aur-root:is([data-view=\"stage\"], [data-view=\"captions\"]) .aur-side-meta { width: auto; min-width: 0; }\n.aur-root[data-view=\"stage\"] .aur-side { flex-direction: row; justify-content: center; bottom: auto; gap: 18px; padding: calc(var(--aur-safe-top) - 16px) var(--aur-pad) 0; }\n.aur-root[data-view=\"stage\"] .aur-art-wrap { width: clamp(84px, 14vh, 150px); border-radius: 10px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }\n.aur-root[data-view=\"stage\"][data-playing=\"false\"] .aur-art-wrap { transform: scale(0.9); }\n.aur-root[data-view=\"stage\"] .aur-art-hint { width: 44px; height: 44px; margin: -22px 0 0 -22px; }\n.aur-root[data-view=\"stage\"] .aur-side-meta { max-width: 42vw; }\n.aur-root[data-view=\"stage\"] .aur-side-title { font-size: clamp(18px, 2.4vh, 26px); }\n.aur-root[data-view=\"stage\"] .aur-stage { top: calc(var(--aur-safe-top) + clamp(84px, 14vh, 150px)); }\n.aur-root[data-view=\"captions\"] .aur-side { flex-direction: column; justify-content: center; top: 0; bottom: 40vh; gap: 14px; padding: calc(var(--aur-safe-top) - 8px) var(--aur-pad) 0; }\n.aur-root[data-view=\"captions\"] .aur-art-wrap { width: min(34vh, 380px); }\n.aur-root[data-view=\"captions\"] .aur-side-meta { text-align: center; }\n.aur-root[data-view=\"captions\"] .aur-side-title { font-size: clamp(18px, 2.4vh, 26px); }\n.aur-root[data-view=\"captions\"] .aur-stage {\ntop: 58vh;\nbottom: 104px;\n--aur-size: min(calc(var(--aur-fs) * 0.8), 4.4vw, 5.6vh);\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);\nmask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 86%, transparent 100%);\n}\n.aur-root[data-view=\"captions\"] .aur-stage[data-mode=\"synced\"] .aur-line:not(.is-active):not([data-d=\"1\"]) { opacity: 0 !important; pointer-events: none; }\n.aur-root[data-view=\"captions\"][data-layout=\"list\"] .aur-stage[data-mode=\"synced\"] .aur-line[data-d=\"1\"] { opacity: 0.4; }\n}\n.aur-root.aur-view-swap :is(.aur-side, .aur-stage) { animation: aur-fade-up 0.7s var(--aur-ease) both; }\n.aur-np {\ndisplay: flex;\nalign-items: center;\ngap: 12px;\nmargin: 2px 14px 8px;\npadding: 10px;\nborder-radius: 14px;\nbackground: linear-gradient(135deg, color-mix(in srgb, var(--aur-accent) 18%, transparent), rgba(255, 255, 255, 0.04));\nborder: 1px solid rgba(255, 255, 255, 0.07);\n}\n.aur-np img { width: 50px; height: 50px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }\n.aur-np-text { min-width: 0; flex: 1; }\n.aur-np-title, .aur-np-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.aur-np-title { font-size: 14px; font-weight: 700; }\n.aur-np-sub { margin-top: 2px; font-size: 12px; color: rgba(255, 255, 255, 0.6); }\n.aur-np-chip { flex: none; padding: 3px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.09); font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.8); }\n.aur-prov-list { display: flex; flex-direction: column; gap: 6px; }\n.aur-prov {\ndisplay: grid;\ngrid-template-columns: auto 1fr auto auto;\nalign-items: center;\ngap: 10px;\npadding: 10px 10px 10px 8px;\nborder-radius: 12px;\nbackground: rgba(0, 0, 0, 0.22);\ntransition: opacity 0.2s ease, background 0.2s ease;\n}\n.aur-prov.is-off { opacity: 0.45; }\n.aur-prov-rank { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); font-size: 11px; font-weight: 700; }\n.aur-prov-name { font-size: 13.5px; font-weight: 700; }\n.aur-prov-badge { margin-left: 6px; padding: 1px 6px; border-radius: 99px; background: rgba(124, 212, 255, 0.16); color: #7cd4ff; font-size: 10px; font-weight: 700; vertical-align: 1px; }\n.aur-prov-desc { margin-top: 2px; font-size: 11.5px; line-height: 1.35; color: rgba(255, 255, 255, 0.5); }\n.aur-prov-move { display: flex; flex-direction: column; }\n.aur-prov-move button { display: grid; place-items: center; width: 24px; height: 18px; border-radius: 6px; color: rgba(255, 255, 255, 0.6); }\n.aur-prov-move button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }\n.aur-prov-move button:disabled { opacity: 0.2; pointer-events: none; }\n.aur-prov-move svg { width: 14px; height: 14px; }\n.aur-src-title { margin: 16px 2px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }\n.aur-src-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }\n.aur-src-btn {\ndisplay: flex;\nalign-items: center;\njustify-content: space-between;\ngap: 6px;\nmin-height: 36px;\npadding: 6px 10px;\nborder-radius: 10px;\nbackground: rgba(255, 255, 255, 0.06);\nfont-size: 12.5px;\nfont-weight: 600;\ntext-align: left;\ntransition: background 0.2s ease, box-shadow 0.2s ease;\n}\n.aur-src-btn:hover { background: rgba(255, 255, 255, 0.11); }\n.aur-src-btn small { font-size: 10.5px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }\n.aur-src-btn.is-current { background: rgba(30, 215, 96, 0.13); box-shadow: inset 0 0 0 1px rgba(30, 215, 96, 0.6); }\n.aur-src-btn.is-loading small { animation: aur-blink 1s ease-in-out infinite; }\n.aur-test-btn { width: 100%; margin-top: 8px; }\n@keyframes aur-blink { 50% { opacity: 0.3; } }\n@media (max-width: 1100px) {\n.aur-offset-group { display: none; }\n.aur-source { max-width: 160px; }\n}\n@media (max-width: 780px) {\n.aur-root { --aur-pad: 22px; }\n.aur-header { top: 18px; max-width: calc(100vw - 44px); }\n.aur-cover { width: 44px; height: 44px; }\n.aur-player { column-gap: 10px; padding-bottom: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }\n.aur-source { width: 32px; padding: 0; justify-content: center; font-size: 0; }\n.aur-source::before { width: 9px; height: 9px; }\n.aur-transport { gap: 8px; }\n.aur-play-btn { width: 50px; height: 50px; }\n.aur-player-side { height: 50px; }\n}\n@media (max-width: 600px) {\n.aur-offset-group,\n.aur-volume,\n.aur-player-side .aur-sep,\n.aur-heart,\n.aur-toggle { display: none; }\n.aur-player-side .aur-icon-btn { width: 34px; height: 34px; }\n}\n@media (max-height: 540px) {\n.aur-header { display: none; }\n.aur-message-art { display: none; }\n}\n.aur-no-anim .aur-line,\n.aur-no-anim .aur-w,\n.aur-no-anim .aur-c { transition: none !important; }\n.aur-root[data-motion=\"reduced\"] { transform: none !important; transition: opacity 0.2s ease; }\n.aur-root[data-motion=\"reduced\"] .aur-line,\n.aur-root[data-motion=\"reduced\"] .aur-w,\n.aur-root[data-motion=\"reduced\"] .aur-player,\n.aur-root[data-motion=\"reduced\"] .aur-header,\n.aur-root[data-motion=\"reduced\"] .aur-panel,\n.aur-root[data-motion=\"reduced\"] .aur-rail-pill {\ntransition-property: opacity, color, visibility !important;\ntransition-duration: 0.2s !important;\ntransition-delay: 0s !important;\n}\n.aur-root[data-motion=\"reduced\"] *,\n.aur-root[data-motion=\"reduced\"] *::before { animation: none !important; }\n.aur-root[data-motion=\"reduced\"] .aur-line[data-d] { filter: none !important; }\n.aur-root[data-motion=\"reduced\"] .aur-w,\n.aur-root[data-motion=\"reduced\"] .aur-c { transform: none !important; }\n[data-testid=\"lyrics-npv-section\"][data-aur-hidden] { display: none !important; }\n.aur-npv {\n--npv-c: #3a3a46;\nposition: relative;\noverflow: hidden;\npadding: 16px 16px 10px;\nborder-radius: 8px;\ncolor: #fff;\nfont-family: var(--encore-body-font-stack, \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\nbackground:\nradial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--npv-c) 80%, #fff 6%) 0%, transparent 70%),\nlinear-gradient(165deg, color-mix(in oklab, var(--npv-c) 72%, #000) 0%, color-mix(in oklab, var(--npv-c) 38%, #0d0d10) 100%);\nbox-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);\ntransition: background 0.8s ease;\n}\n.aur-npv-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }\n.aur-npv-title { margin: 0; font-size: 16px; font-weight: 700; }\n.aur-npv-src { min-width: 0; overflow: hidden; padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); font-size: 11px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; color: rgba(255, 255, 255, 0.72); }\n.aur-npv-src:empty { display: none; }\n.aur-npv-open {\ndisplay: grid;\nflex: none;\nplace-items: center;\nwidth: 32px;\nheight: 32px;\nmargin-left: auto;\npadding: 0;\nborder: 0;\nborder-radius: 50%;\nbackground: rgba(255, 255, 255, 0.1);\ncolor: rgba(255, 255, 255, 0.8);\ncursor: pointer;\ntransition: background 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);\n}\n.aur-npv-open:hover { background: rgba(255, 255, 255, 0.2); color: #fff; transform: scale(1.08); }\n.aur-npv-open svg { width: 16px; height: 16px; }\n.aur-npv-body {\nposition: relative;\nheight: 204px;\noverflow: hidden;\ncursor: pointer;\n-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);\nmask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);\n}\n.aur-npv-lines { padding-top: 6px; will-change: transform; transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1); }\n.aur-npv-lines.no-anim { transition: none; }\n.aur-npv-line {\nmargin: 0 -8px;\npadding: 5px 8px;\nborder-radius: 8px;\nfont-size: 19px;\nfont-weight: 700;\nline-height: 1.32;\nletter-spacing: -0.01em;\ncolor: rgba(255, 255, 255, 0.42);\ntransition: color 0.45s ease, background 0.2s ease, text-shadow 0.6s ease;\n}\n.aur-npv-line.is-past { color: rgba(255, 255, 255, 0.7); }\n.aur-npv-line.is-active { color: #fff; text-shadow: 0 0 18px rgba(255, 255, 255, 0.25); }\n.aur-npv-line.is-gap { letter-spacing: 0.15em; }\n.aur-npv-line[title]:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.92); }\n.aur-npv-line.is-active:has(.aur-npv-w) { text-shadow: none; }\n.aur-npv-line.is-active .aur-npv-w { color: rgba(255, 255, 255, 0.42); }\n.aur-npv-line.is-active .aur-npv-w.sung { color: #fff; }\n.aur-npv-line.is-active .aur-npv-w.now {\ncolor: transparent;\nbackground: linear-gradient(90deg, #fff calc(var(--aur-wp, 0) * (100% + 0.6em) - 0.6em), rgba(255, 255, 255, 0.42) calc(var(--aur-wp, 0) * (100% + 0.6em)));\n-webkit-background-clip: text;\nbackground-clip: text;\n}\n.aur-npv.is-unsynced .aur-npv-line { color: rgba(255, 255, 255, 0.85); font-size: 16px; }\n.aur-npv[data-duet=\"on\"] .aur-npv-line[data-singer=\"1\"] { text-align: right; }\n.aur-npv[data-duet=\"on\"] .aur-npv-line[data-singer=\"2\"] { text-align: center; }\n.aur-npv[data-duet=\"on\"] .aur-npv-line.is-active[data-singer=\"1\"],\n.aur-npv[data-duet=\"on\"] .aur-npv-line.is-active[data-singer=\"1\"] .aur-npv-w.sung { color: #ffd3e6; }\n.aur-npv[data-duet=\"on\"] .aur-npv-line.is-active[data-singer=\"2\"],\n.aur-npv[data-duet=\"on\"] .aur-npv-line.is-active[data-singer=\"2\"] .aur-npv-w.sung { color: #ffe9f2; }\n.aur-npv-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 16px; font-size: 13px; text-align: center; color: rgba(255, 255, 255, 0.62); }\n.aur-npv-msg:empty { display: none; }\n.aur-npv-tr { margin-top: 2px; font-size: 13px; font-weight: 600; line-height: 1.3; color: rgba(255, 255, 255, 0.55); }\n.aur-npv-line.is-active .aur-npv-tr { color: rgba(255, 255, 255, 0.85); }\n.aur-share {\nposition: absolute;\ninset: 0;\nz-index: 6;\ndisplay: grid;\nplace-items: center;\npadding: var(--aur-safe-top, 48px) 16px 16px;\nbackground: rgba(0, 0, 0, 0.45);\nbackdrop-filter: blur(6px);\nopacity: 0;\ntransition: opacity 0.25s ease;\n}\n.aur-share[hidden] { display: none; }\n.aur-share.is-open { opacity: 1; }\n.aur-share-card {\ndisplay: grid;\ngrid-template-columns: auto minmax(260px, 340px);\ngap: 22px;\nmax-width: min(980px, 100%);\nmax-height: 100%;\npadding: 20px;\nborder-radius: 24px;\nbackground: linear-gradient(180deg, rgba(34, 34, 40, 0.92), rgba(18, 18, 22, 0.95));\nborder: 1px solid rgba(255, 255, 255, 0.08);\nbox-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);\ntransform: translateY(12px) scale(0.98);\ntransition: transform 0.35s var(--aur-ease);\nuser-select: none;\n}\n.aur-share.is-open .aur-share-card { transform: none; }\n.aur-share-preview { display: grid; place-items: center; min-height: 0; }\n.aur-share-canvas {\ndisplay: block;\nwidth: auto;\nmax-width: min(46vw, 440px);\nmax-height: min(72vh, 640px);\nborder-radius: 14px;\nbox-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);\n}\n.aur-share-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }\n.aur-share-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }\n.aur-share-label { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }\n.aur-share-count { font-variant-numeric: tabular-nums; letter-spacing: 0; }\n.aur-share-lines {\ndisplay: flex;\nflex-direction: column;\ngap: 2px;\nflex: 1 1 auto;\nmin-height: 120px;\nmax-height: 38vh;\noverflow-y: auto;\npadding: 4px;\nborder-radius: 12px;\nbackground: rgba(0, 0, 0, 0.22);\nscrollbar-width: thin;\n}\n.aur-share-line {\npadding: 7px 10px;\nborder-radius: 8px;\nfont-size: 13.5px;\nfont-weight: 600;\nline-height: 1.35;\ntext-align: left;\ncolor: rgba(255, 255, 255, 0.62);\ntransition: background 0.15s ease, color 0.15s ease;\n}\n.aur-share-line:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }\n.aur-share-line[aria-pressed=\"true\"] { background: rgba(30, 215, 96, 0.14); color: #fff; box-shadow: inset 3px 0 0 var(--aur-green); }\n.aur-share .aur-panel-actions { margin-top: 12px; }\n@media (max-width: 760px) {\n.aur-share-card { grid-template-columns: 1fr; overflow-y: auto; }\n.aur-share-canvas { max-width: 100%; max-height: 40vh; }\n}\n.aur-float {\n--float-c: #2a2a33;\nposition: fixed;\nz-index: 9990;\ndisplay: flex;\nalign-items: center;\ngap: 12px;\nbox-sizing: border-box;\nwidth: min(560px, calc(100vw - 16px));\nmin-height: 68px;\npadding: 10px 16px 10px 10px;\nborder-radius: 18px;\ncolor: #fff;\nfont-family: var(--encore-body-font-stack, \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\nbackground: linear-gradient(135deg, color-mix(in srgb, var(--float-c) 72%, rgba(14, 14, 18, 0.9)), rgba(14, 14, 18, 0.88));\nborder: 1px solid rgba(255, 255, 255, 0.1);\nbox-shadow: 0 18px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);\nbackdrop-filter: blur(22px) saturate(1.4);\ncursor: grab;\nuser-select: none;\n-webkit-app-region: no-drag;\ntransition: background 0.8s ease, box-shadow 0.25s ease;\n}\n.aur-float[hidden] { display: none; }\n.aur-float *, .aur-float *::before { box-sizing: border-box; }\n.aur-float.is-in { animation: aur-float-in 0.45s cubic-bezier(0.22, 1, 0.36, 1); }\n@keyframes aur-float-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }\n.aur-float.is-dragging { cursor: grabbing; box-shadow: 0 26px 60px rgba(0, 0, 0, 0.6); transition: none; }\n.aur-float-art { flex: none; width: 48px; height: 48px; border-radius: 10px; object-fit: cover; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); pointer-events: none; }\n.aur-float-art[hidden] { display: none; }\n.aur-float-text { flex: 1; min-width: 0; cursor: pointer; }\n.aur-float-cur {\nfont-family: var(--encore-title-font-stack, \"SpotifyMixUITitle\", \"SpotifyMixUI\", \"CircularSp\", system-ui, sans-serif);\nfont-size: 18px;\nfont-weight: 800;\nline-height: 1.25;\nletter-spacing: -0.01em;\noverflow-wrap: anywhere;\ndisplay: -webkit-box;\n-webkit-line-clamp: 2;\n-webkit-box-orient: vertical;\noverflow: hidden;\n}\n.aur-float-next { margin-top: 2px; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.aur-float-next:empty { display: none; }\n.aur-float .is-enter { animation: aur-float-line 0.4s cubic-bezier(0.22, 1, 0.36, 1); }\n@keyframes aur-float-line { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } }\n.aur-float-w { color: rgba(255, 255, 255, 0.4); }\n.aur-float-w.sung { color: #fff; }\n.aur-float-w[style*=\"--aur-wp\"] {\ncolor: transparent;\nbackground: linear-gradient(90deg, #fff calc(var(--aur-wp, 0) * (100% + 0.6em) - 0.6em), rgba(255, 255, 255, 0.4) calc(var(--aur-wp, 0) * (100% + 0.6em)));\n-webkit-background-clip: text;\nbackground-clip: text;\n}\n.aur-float[data-duet=\"on\"] .aur-float-cur[data-singer=\"1\"] .aur-float-w.sung,\n.aur-float[data-duet=\"on\"] .aur-float-cur[data-singer=\"1\"]:not(:has(.aur-float-w)) { color: #ffd3e6; }\n.aur-float-dots { display: inline-flex; gap: 6px; padding: 6px 0; }\n.aur-float-dots i { width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: 0.35; animation: aur-float-dot 1.4s ease-in-out infinite; }\n.aur-float-dots i:nth-child(2) { animation-delay: 0.18s; }\n.aur-float-dots i:nth-child(3) { animation-delay: 0.36s; }\n@keyframes aur-float-dot { 50% { opacity: 0.9; transform: translateY(-2px); } }\n.aur-float-actions {\nposition: absolute;\ntop: -12px;\nright: 10px;\ndisplay: flex;\ngap: 4px;\npadding: 3px;\nborder-radius: 99px;\nbackground: rgba(24, 24, 28, 0.95);\nborder: 1px solid rgba(255, 255, 255, 0.1);\nbox-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);\nopacity: 0;\ntransform: translateY(4px);\ntransition: opacity 0.2s ease, transform 0.25s ease;\npointer-events: none;\n}\n.aur-float:hover .aur-float-actions, .aur-float:focus-within .aur-float-actions { opacity: 1; transform: none; pointer-events: auto; }\n.aur-float-btn {\ndisplay: grid;\nplace-items: center;\nwidth: 28px;\nheight: 28px;\npadding: 0;\nborder: 0;\nborder-radius: 50%;\nbackground: transparent;\ncolor: rgba(255, 255, 255, 0.75);\ncursor: pointer;\n}\n.aur-float-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }\n.aur-float-btn[hidden] { display: none; }\n.aur-float-btn svg { width: 16px; height: 16px; }\n.aur-float-pip-body { margin: 0; overflow: hidden; background: #0e0e12; }\n.aur-float.is-pip { position: static; width: 100vw; height: 100vh; min-height: 0; border: 0; border-radius: 0; padding: 12px 18px 12px 12px; box-shadow: none; cursor: default; }\n.aur-float.is-pip .aur-float-art { width: min(64px, calc(100vh - 24px)); height: min(64px, calc(100vh - 24px)); }\n.aur-float.is-pip .aur-float-cur { font-size: clamp(16px, 6.5vw, 30px); }\n.aur-float.is-pip .aur-float-actions { top: 6px; right: 6px; }\n.aur-float.is-pip .is-pip-btn { display: none; }\n.aur-upnext {\nposition: absolute;\nright: var(--aur-pad);\nbottom: 116px;\nz-index: 3;\ndisplay: flex;\nalign-items: center;\ngap: 12px;\nmax-width: min(340px, calc(100vw - 32px));\npadding: 8px 12px 8px 8px;\nborder-radius: 16px;\nbackground: rgba(20, 20, 26, 0.55);\nborder: 1px solid rgba(255, 255, 255, 0.1);\nbox-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);\nbackdrop-filter: blur(20px) saturate(1.4);\ncolor: #fff;\ntext-align: left;\nopacity: 0;\ntransform: translateY(14px) scale(0.97);\npointer-events: none;\ntransition: opacity 0.5s var(--aur-ease), transform 0.6s var(--aur-ease), bottom 0.65s var(--aur-ease), background 0.2s ease;\n}\n.aur-upnext.is-on { opacity: 1; transform: none; pointer-events: auto; }\n.aur-upnext:hover { background: rgba(38, 38, 46, 0.7); }\n.aur-root[data-transport=\"off\"] .aur-upnext,\n.aur-root[data-idle=\"true\"] .aur-upnext { bottom: 24px; }\n.aur-upnext-art { flex: none; width: 46px; height: 46px; border-radius: 9px; object-fit: cover; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }\n.aur-upnext-art[hidden] { display: none; }\n.aur-upnext-text { min-width: 0; flex: 1; }\n.aur-upnext-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }\n.aur-upnext-when { letter-spacing: 0.02em; text-transform: none; font-variant-numeric: tabular-nums; }\n.aur-upnext-title, .aur-upnext-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.aur-upnext-title { margin-top: 1px; font-size: 14px; font-weight: 700; }\n.aur-upnext-artist { font-size: 12.5px; color: rgba(255, 255, 255, 0.62); }\n.aur-upnext-skip { flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); opacity: 0.7; transition: opacity 0.2s ease, background 0.2s ease; }\n.aur-upnext-skip svg { width: 14px; height: 14px; }\n.aur-upnext:hover .aur-upnext-skip { opacity: 1; background: rgba(255, 255, 255, 0.2); }\n.aur-root[data-motion=\"reduced\"] .aur-upnext { transition: opacity 0.3s ease; transform: none; }";
 
 // ---- view.js ---------------------------------------------------------------
 // LyricsView: renders a Lyrics object into the stage and keeps it in sync with playback.
@@ -2207,11 +2402,11 @@ const CSS = ".fal-root {\n--fal-font: var(--encore-title-font-stack, \"SpotifyMi
 //  - All motion is CSS transitions on transform / opacity / filter.
 //
 // Layouts:
-//  - "list"  (flow, slide, scale): lines in a column. The list publishes --fal-y (the
+//  - "list"  (flow, slide, scale): lines in a column. The list publishes --aur-y (the
 //            scroll offset); every line applies it in its own transform, so each line can
 //            transition with its own delay — that's the staggered "wave" in Flow.
 //  - "stack" (fade, cinematic): lines absolutely stacked at the centre; the active line's
-//            height is published as --fal-ah so neighbours sit above/below it.
+//            height is published as --aur-ah so neighbours sit above/below it.
 
 
 const ANCHOR = 0.4; // active line position, fraction of stage height
@@ -2227,13 +2422,14 @@ const WORD_LEAD_MS = 40; // highlight words slightly early to cover render laten
 class LyricsView {
 	/**
 	 * @param {HTMLElement} stage
-	 * @param {{ onSeek?: (ms:number)=>void }} opts
+	 * @param {{ onSeek?: (ms:number)=>void, onShare?: (lineIndex:number)=>void }} opts
 	 */
 	constructor(stage, opts = {}) {
 		this.stage = stage;
 		this.onSeek = opts.onSeek;
-		this.list = h("div", { class: "fal-lines" });
-		this.message = h("div", { class: "fal-message", role: "status" });
+		this.onShare = opts.onShare;
+		this.list = h("div", { class: "aur-lines" });
+		this.message = h("div", { class: "aur-message", role: "status" });
 		stage.append(this.list, this.message);
 		stage.dataset.mode = "none";
 
@@ -2330,19 +2526,19 @@ class LyricsView {
 			this.message.dataset.kind = kind;
 			const parts = [
 				opts.image
-					? h("div", { class: "fal-message-art" }, h("img", { src: opts.image, alt: "", decoding: "async" }))
-					: h("div", { class: "fal-message-icon", html: opts.icon || "" }),
-				kind === "loading" && h("div", { class: "fal-spinner", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
-				h("div", { class: "fal-message-title" }, title),
-				h("div", { class: "fal-message-detail" }, detail || ""),
-				opts.action && h("button", { class: "fal-btn fal-btn-primary fal-message-action", onclick: opts.action.onClick }, opts.action.label),
+					? h("div", { class: "aur-message-art" }, h("img", { src: opts.image, alt: "", decoding: "async" }))
+					: h("div", { class: "aur-message-icon", html: opts.icon || "" }),
+				kind === "loading" && h("div", { class: "aur-spinner", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
+				h("div", { class: "aur-message-title" }, title),
+				h("div", { class: "aur-message-detail" }, detail || ""),
+				opts.action && h("button", { class: "aur-btn aur-btn-primary aur-message-action", onclick: opts.action.onClick }, opts.action.label),
 			];
 			this.message.replaceChildren(...parts.filter(Boolean)); // replaceChildren would stringify null
 		});
 	}
 
 	setStatus(text) {
-		const el = this.message.querySelector(".fal-message-detail");
+		const el = this.message.querySelector(".aur-message-detail");
 		if (el) el.textContent = text || "";
 	}
 
@@ -2378,10 +2574,10 @@ class LyricsView {
 				const long = w.end - w.time >= LONG_WORD_MS;
 				const chars = Array.from(m[2]);
 				const split = (letters || long) && chars.length > 1 && chars.length <= 16;
-				const content = split ? chars.map((ch, ci) => h("span", { class: "fal-c", style: `--i:${ci};--n:${chars.length}` }, ch)) : m[2];
-				const span = h("span", { class: `fal-w${long ? " is-long" : ""}${split ? " has-chars" : ""}` }, content);
+				const content = split ? chars.map((ch, ci) => h("span", { class: "aur-c", style: `--i:${ci};--n:${chars.length}` }, ch)) : m[2];
+				const span = h("span", { class: `aur-w${long ? " is-long" : ""}${split ? " has-chars" : ""}` }, content);
 				if (!group) {
-					group = h("span", { class: "fal-wg" });
+					group = h("span", { class: "aur-wg" });
 					container.append(group);
 				}
 				group.append(span);
@@ -2399,10 +2595,13 @@ class LyricsView {
 			let words = null;
 			if (line.gap) {
 				// Instrumental break: three dots that fill up over the gap's duration.
-				el = h("div", { class: "fal-line is-gap", "aria-hidden": "true" }, h("span", { class: "fal-dots" }, h("i"), h("i"), h("i")));
+				el = h("div", { class: "aur-line is-gap", "aria-hidden": "true" }, h("span", { class: "aur-dots" }, h("i"), h("i"), h("i")));
 			} else {
-				const main = h("div", { class: "fal-main" });
-				el = h("div", { class: line.opposite ? "fal-line is-opposite" : "fal-line" }, main);
+				const main = h("div", { class: "aur-main" });
+				el = h("div", { class: line.opposite ? "aur-line is-opposite" : "aur-line" }, main);
+				// Duets: who sings it (colours per singer; older cached lyrics only have `opposite`).
+				const singer = line.singer ?? (line.opposite ? 1 : null);
+				if (singer) el.dataset.singer = String(singer);
 				let pairs = [];
 				if (line.words) {
 					el.classList.add("has-words");
@@ -2412,7 +2611,7 @@ class LyricsView {
 				}
 				// Background vocals: a smaller line under the main one, filled in time with it.
 				if (line.bg && this.showBg) {
-					const bgEl = h("div", { class: "fal-bgv" });
+					const bgEl = h("div", { class: "aur-bgv" });
 					if (line.bg.words) {
 						el.classList.add("has-words");
 						pairs = pairs.concat(addWords(bgEl, line.bg.words));
@@ -2433,6 +2632,12 @@ class LyricsView {
 				el.addEventListener("click", () => {
 					this.stopBrowsing(true);
 					this.onSeek(line.time);
+				});
+			}
+			if (!line.gap && this.onShare) {
+				el.addEventListener("contextmenu", (e) => {
+					e.preventDefault();
+					this.onShare(i);
 				});
 			}
 			this.lineEls.push(el);
@@ -2458,13 +2663,13 @@ class LyricsView {
 	}
 
 	applyTranslations() {
-		for (const el of this.list.querySelectorAll(".fal-tr")) el.remove();
+		for (const el of this.list.querySelectorAll(".aur-tr")) el.remove();
 		const tr = this.tr;
 		if (!tr || !this.lyrics || tr.length !== this.lyrics.lines.length) return;
 		this.lineEls.forEach((el, i) => {
 			if (!tr[i] || el.classList.contains("is-gap")) return;
-			const node = h("div", { class: "fal-tr", lang: "" }, tr[i]);
-			const bg = el.querySelector(".fal-bgv");
+			const node = h("div", { class: "aur-tr", lang: "" }, tr[i]);
+			const bg = el.querySelector(".aur-bgv");
 			bg ? el.insertBefore(node, bg) : el.append(node);
 		});
 	}
@@ -2506,7 +2711,7 @@ class LyricsView {
 		const line = lyrics.lines[idx];
 		if (line.gap) {
 			const p = clamp((pos - line.time) / Math.max(1, line.end - line.time), 0, 1);
-			this.lineEls[idx].style.setProperty("--fal-gp", p.toFixed(3));
+			this.lineEls[idx].style.setProperty("--aur-gp", p.toFixed(3));
 		} else if (this.wordEls[idx] && this.wordSync) {
 			this.updateWords(idx, pos);
 		}
@@ -2548,18 +2753,18 @@ class LyricsView {
 	position(instant = false) {
 		if (!this.lyrics?.synced || !this.lineEls.length) return;
 		const focus = this.lineEls[Math.max(this.active, 0)];
-		if (instant) this.stage.classList.add("fal-no-anim");
+		if (instant) this.stage.classList.add("aur-no-anim");
 
 		if (this.layout === "stack") {
-			this.stage.style.setProperty("--fal-ah", `${focus.offsetHeight}px`);
+			this.stage.style.setProperty("--aur-ah", `${focus.offsetHeight}px`);
 		} else {
 			this.y = Math.round(this.stage.clientHeight * ANCHOR - (focus.offsetTop + focus.offsetHeight / 2));
-			if (!this.browsing) this.list.style.setProperty("--fal-y", `${this.y}px`);
+			if (!this.browsing) this.list.style.setProperty("--aur-y", `${this.y}px`);
 		}
 
 		if (instant) {
 			void this.list.offsetHeight; // flush so no-anim applies to this change only
-			nextFrame(() => this.stage.classList.remove("fal-no-anim"));
+			nextFrame(() => this.stage.classList.remove("aur-no-anim"));
 		}
 	}
 
@@ -2569,7 +2774,7 @@ class LyricsView {
 	 * element's own (untransformed) coordinates.
 	 */
 	measureHalo(el) {
-		const main = el.querySelector(".fal-main");
+		const main = el.querySelector(".aur-main");
 		if (!main || !main.firstChild) return;
 		const range = document.createRange();
 		range.selectNodeContents(main);
@@ -2607,7 +2812,7 @@ class LyricsView {
 			this.browsing = true;
 			this.stage.classList.add("is-browsing");
 		}
-		this.list.style.setProperty("--fal-y", `${Math.round(this.browseY)}px`);
+		this.list.style.setProperty("--aur-y", `${Math.round(this.browseY)}px`);
 		clearTimeout(this.browseTimer);
 		this.browseTimer = setTimeout(() => this.stopBrowsing(), BROWSE_RESUME);
 	}
@@ -2620,7 +2825,7 @@ class LyricsView {
 		this.stage.classList.remove("is-browsing");
 		if (instant) return;
 		this.list.dataset.dir = this.browseY > this.y ? "up" : "down";
-		this.list.style.setProperty("--fal-y", `${this.y}px`);
+		this.list.style.setProperty("--aur-y", `${this.y}px`);
 	}
 
 	// -------------------------------------------------------------------------
@@ -2632,13 +2837,13 @@ class LyricsView {
 		if (!data) return;
 		for (const s of data.spans) {
 			s.classList.remove("sung", "now");
-			s.style.removeProperty("--fal-wp");
+			s.style.removeProperty("--aur-wp");
 		}
 	}
 
 	/**
 	 * Word-level progress for the active line (main + background words, time-ordered).
-	 * Every word carries one continuous value, --fal-wp: 0 = upcoming, 0..1 = being sung,
+	 * Every word carries one continuous value, --aur-wp: 0 = upcoming, 0..1 = being sung,
 	 * 1 = sung. All word styling (sweep, colour, lift, glow, scale, letter wave) is derived
 	 * from it in CSS, so nothing ever snaps between states. Only the current word is
 	 * written every frame; others change once when the current word moves on.
@@ -2654,15 +2859,15 @@ class LyricsView {
 				const span = spans[i];
 				span.classList.toggle("sung", i < k);
 				span.classList.toggle("now", i === k);
-				if (i < k) span.style.setProperty("--fal-wp", "1");
-				else if (i > k) span.style.removeProperty("--fal-wp");
+				if (i < k) span.style.setProperty("--aur-wp", "1");
+				else if (i > k) span.style.removeProperty("--aur-wp");
 			}
 			this.wordIdx = k;
 		}
 		if (k >= 0 && k < spans.length) {
 			const w = words[k];
 			const p = w.end > w.time ? Math.min(1, Math.max(0, (pos - w.time) / (w.end - w.time))) : 1;
-			spans[k].style.setProperty("--fal-wp", p.toFixed(4));
+			spans[k].style.setProperty("--aur-wp", p.toFixed(4));
 		}
 	}
 
@@ -2691,6 +2896,7 @@ class LyricsView {
 
 const MAX_IMPORT_BYTES = 512 * 1024;
 const SEGMENT_ICONS = { left: ICONS.alignLeft, center: ICONS.alignCenter, right: ICONS.alignRight };
+const ACCENT_SWATCHES = ["#ff5fa2", "#ff7a45", "#ffc93d", "#3ddc84", "#2ec5ff", "#7aa2ff", "#b388ff", "#ffffff"];
 
 const loadedFonts = new Set();
 /** Load a Google web font the first time it is needed (no-op for local stacks). */
@@ -2698,7 +2904,7 @@ function ensureFont(key) {
 	const f = FONTS[key];
 	if (!f?.web || loadedFonts.has(key)) return;
 	loadedFonts.add(key);
-	document.head.append(h("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${f.web}&display=swap`, "data-fal-font": key }));
+	document.head.append(h("link", { rel: "stylesheet", href: `https://fonts.googleapis.com/css2?family=${f.web}&display=swap`, "data-aur-font": key }));
 }
 
 function fmtValue(entry, v) {
@@ -2731,13 +2937,13 @@ function choiceGroup(entry, className, renderOption) {
 }
 
 function buildControl(entry) {
-	const id = `fal-set-${entry.key}`;
+	const id = `aur-set-${entry.key}`;
 	const value = settings.get(entry.key);
-	const labelEl = (extra) => h("div", { class: "fal-row-label" }, h("span", null, entry.label), extra);
+	const labelEl = (extra) => h("div", { class: "aur-row-label" }, h("span", null, entry.label), extra);
 
 	if (entry.type === "providers") {
 		// Ordered provider list: rank, name (+ WORD badge), description, move up/down, on/off.
-		const list = h("div", { class: "fal-prov-list" });
+		const list = h("div", { class: "aur-prov-list" });
 		const render = (providers) => {
 			const set = (next) => settings.set(entry.key, next);
 			list.replaceChildren(
@@ -2750,18 +2956,18 @@ function buildControl(entry) {
 					};
 					return h(
 						"div",
-						{ class: p.on ? "fal-prov" : "fal-prov is-off" },
-						h("span", { class: "fal-prov-rank" }, String(i + 1)),
-						h("div", null, h("div", { class: "fal-prov-name" }, info.label, info.words ? h("span", { class: "fal-prov-badge", title: "Can provide word-by-word timing" }, "WORD") : null), h("div", { class: "fal-prov-desc" }, info.desc)),
+						{ class: p.on ? "aur-prov" : "aur-prov is-off" },
+						h("span", { class: "aur-prov-rank" }, String(i + 1)),
+						h("div", null, h("div", { class: "aur-prov-name" }, info.label, info.words ? h("span", { class: "aur-prov-badge", title: "Can provide word-by-word timing" }, "WORD") : null), h("div", { class: "aur-prov-desc" }, info.desc)),
 						h(
 							"div",
-							{ class: "fal-prov-move" },
+							{ class: "aur-prov-move" },
 							h("button", { title: "Move up", "aria-label": `Move ${info.label} up`, html: ARROWS.up(), disabled: i === 0, onclick: () => move(-1) }),
 							h("button", { title: "Move down", "aria-label": `Move ${info.label} down`, html: ARROWS.down(), disabled: i === providers.length - 1, onclick: () => move(1) }),
 						),
 						h("input", {
 							type: "checkbox",
-							class: "fal-switch",
+							class: "aur-switch",
 							checked: p.on,
 							"aria-label": `Use ${info.label}`,
 							onchange: (e) => set(providers.map((q) => (q.id === p.id ? { ...q, on: e.target.checked } : q))),
@@ -2771,53 +2977,75 @@ function buildControl(entry) {
 			);
 		};
 		render(value);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), list), sync: render };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), list), sync: render };
+	}
+
+	if (entry.type === "color") {
+		// "Album" (colour from the cover art), a few presets, and a custom picker.
+		const picker = h("input", { type: "color", class: "aur-swatch-input", "aria-label": "Pick a custom colour", oninput: (e) => settings.set(entry.key, e.target.value) });
+		const customBtn = h("label", { class: "aur-swatch is-custom", title: "Custom colour", role: "radio" }, picker);
+		const albumBtn = h("button", { class: "aur-swatch is-album", title: "From the album cover", role: "radio", onclick: () => settings.set(entry.key, "album") }, "Album");
+		const presetBtns = ACCENT_SWATCHES.map((c) =>
+			h("button", { class: "aur-swatch", title: c, role: "radio", "aria-label": `Accent ${c}`, style: `--sw:${c}`, "data-color": c, onclick: () => settings.set(entry.key, c) }),
+		);
+		const sync = (v) => {
+			const preset = ACCENT_SWATCHES.includes(v);
+			albumBtn.setAttribute("aria-checked", String(v === "album"));
+			for (const b of presetBtns) b.setAttribute("aria-checked", String(b.dataset.color === v));
+			const custom = v !== "album" && !preset;
+			customBtn.setAttribute("aria-checked", String(custom));
+			customBtn.style.setProperty("--sw", custom ? v : "transparent");
+			if (v !== "album") picker.value = v;
+		};
+		sync(value);
+		const el = h("div", { class: "aur-swatches", role: "radiogroup", "aria-label": entry.label }, albumBtn, presetBtns, customBtn);
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "toggle") {
-		const input = h("input", { type: "checkbox", id, class: "fal-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
-		return { row: h("label", { class: "fal-row fal-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
+		const input = h("input", { type: "checkbox", id, class: "aur-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
+		return { row: h("label", { class: "aur-row aur-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
 	}
 
 	if (entry.type === "select" && entry.ui === "segmented") {
-		const { el, sync } = choiceGroup(entry, "fal-segmented", (v, label) =>
-			h("button", { class: "fal-seg", title: label, html: SEGMENT_ICONS[v] && entry.key === "textAlign" ? SEGMENT_ICONS[v]() : null }, SEGMENT_ICONS[v] && entry.key === "textAlign" ? null : label),
+		const { el, sync } = choiceGroup(entry, "aur-segmented", (v, label) =>
+			h("button", { class: "aur-seg", title: label, html: SEGMENT_ICONS[v] && entry.key === "textAlign" ? SEGMENT_ICONS[v]() : null }, SEGMENT_ICONS[v] && entry.key === "textAlign" ? null : label),
 		);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select" && entry.ui === "cards") {
-		const { el, sync } = choiceGroup(entry, "fal-cards", (v, label) =>
-			h("button", { class: "fal-card" }, h("span", { class: "fal-card-art", html: STYLE_ART[v] || "" }), h("span", { class: "fal-card-name" }, label), h("span", { class: "fal-card-hint" }, entry.hints?.[v] || "")),
+		const { el, sync } = choiceGroup(entry, "aur-cards", (v, label) =>
+			h("button", { class: "aur-card" }, h("span", { class: "aur-card-art", html: STYLE_ART[v] || "" }), h("span", { class: "aur-card-name" }, label), h("span", { class: "aur-card-hint" }, entry.hints?.[v] || "")),
 		);
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select" && entry.ui === "fonts") {
-		const { el, sync } = choiceGroup(entry, "fal-fonts", (v, label) => {
+		const { el, sync } = choiceGroup(entry, "aur-fonts", (v, label) => {
 			const f = FONTS[v];
 			return h(
 				"button",
-				{ class: "fal-font", title: f.web ? `${label} (web font, loaded from Google Fonts)` : label, onpointerenter: () => ensureFont(v), onfocus: () => ensureFont(v) },
-				h("span", { class: "fal-font-sample", style: { fontFamily: f.stack } }, "Aa"),
-				h("span", { class: "fal-font-name" }, label),
+				{ class: "aur-font", title: f.web ? `${label} (web font, loaded from Google Fonts)` : label, onpointerenter: () => ensureFont(v), onfocus: () => ensureFont(v) },
+				h("span", { class: "aur-font-sample", style: { fontFamily: f.stack } }, "Aa"),
+				h("span", { class: "aur-font-name" }, label),
 			);
 		});
-		return { row: h("div", { class: "fal-row fal-row-stack" }, labelEl(), el), sync };
+		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
 	if (entry.type === "select") {
 		const select = h(
 			"select",
-			{ id, class: "fal-select", onchange: (e) => settings.set(entry.key, e.target.value) },
+			{ id, class: "aur-select", onchange: (e) => settings.set(entry.key, e.target.value) },
 			entry.options.map(([v, label]) => h("option", { value: v, selected: v === value }, label)),
 		);
-		return { row: h("label", { class: "fal-row", for: id }, h("span", null, entry.label), select), sync: (v) => (select.value = v) };
+		return { row: h("label", { class: "aur-row", for: id }, h("span", null, entry.label), select), sync: (v) => (select.value = v) };
 	}
 
 	// range — the filled part of the track is drawn from --p (0..100%)
-	const out = h("output", { class: "fal-range-value" }, fmtValue(entry, value));
-	const input = h("input", { type: "range", id, min: String(entry.min), max: String(entry.max), step: String(entry.step), class: "fal-range" });
+	const out = h("output", { class: "aur-range-value" }, fmtValue(entry, value));
+	const input = h("input", { type: "range", id, min: String(entry.min), max: String(entry.max), step: String(entry.step), class: "aur-range" });
 	const paint = (v) => {
 		input.style.setProperty("--p", `${((v - entry.min) / (entry.max - entry.min)) * 100}%`);
 		out.textContent = fmtValue(entry, v);
@@ -2830,7 +3058,7 @@ function buildControl(entry) {
 	input.value = String(value);
 	paint(value);
 	return {
-		row: h("label", { class: "fal-row fal-row-range", for: id }, labelEl(out), input),
+		row: h("label", { class: "aur-row aur-row-range", for: id }, labelEl(out), input),
 		sync: (v) => {
 			input.value = String(v);
 			paint(v);
@@ -2858,7 +3086,7 @@ function createPanel(ctx) {
 	// Rail order. "track" = this song's lyrics; the others group SCHEMA sections.
 	const PAGES = [
 		{ id: "track", label: "Lyrics", icon: ICONS.navLyrics, title: "This track", sub: "Source, reload, import" },
-		{ id: "look", label: "Look", icon: ICONS.navLook, title: "Look", sub: "Layout, text and background", sections: ["Layout", "Text", "Background"] },
+		{ id: "look", label: "Look", icon: ICONS.navLook, title: "Look", sub: "Layout, text and background", sections: ["Theme", "Layout", "Text", "Background"] },
 		{ id: "motion", label: "Motion", icon: ICONS.navMotion, title: "Motion", sub: "Line and word animation", sections: ["Motion", "Words"] },
 		{ id: "sources", label: "Sources", icon: ICONS.navSources, title: "Sources", sub: "Where lyrics come from, translation", sections: ["Sources", "Translation"] },
 		{ id: "general", label: "General", icon: ICONS.navGeneral, title: "General", sub: "Sync, controls and shortcuts", sections: ["Sync", "Interface"] },
@@ -2874,41 +3102,84 @@ function createPanel(ctx) {
 		syncers.set(entry.key, sync);
 		sections.get(entry.section).push(row);
 	}
+	// Theme cards: one-click looks. "Custom" appears once the user has a look of their own
+	// (it restores what a theme replaced).
+	const themeCards = new Map();
+	const themeCard = (id, label, hint, swatch, font) => {
+		const btn = h(
+			"button",
+			{
+				class: "aur-card aur-theme",
+				role: "radio",
+				title: hint,
+				onpointerenter: () => ensureFont(font),
+				onclick: () => {
+					if (btn.getAttribute("aria-checked") === "true") return;
+					settings.applyTheme(id);
+					ctx.toast(id === "custom" ? "Your custom look is back" : `Theme: ${label}`);
+				},
+			},
+			h("span", { class: "aur-theme-art", style: `--t1:${swatch[0]};--t2:${swatch[1]}` }, h("span", { style: { fontFamily: FONTS[font]?.stack } }, "Aa")),
+			h("span", { class: "aur-card-name" }, label),
+			h("span", { class: "aur-card-hint" }, hint),
+		);
+		themeCards.set(id, btn);
+		return btn;
+	};
+	const themeGrid = h(
+		"div",
+		{ class: "aur-cards aur-themes", role: "radiogroup", "aria-label": "Theme" },
+		THEMES.map((t) => themeCard(t.id, t.label, t.hint, t.swatch, t.values.font || DEFAULTS.font)),
+		themeCard("custom", "Custom", "Your own look", ["#3a3a44", "#16161c"], DEFAULTS.font),
+	);
+	const syncThemes = (all) => {
+		const active = settings.currentTheme() || "custom";
+		for (const [id, btn] of themeCards) btn.setAttribute("aria-checked", String(id === active));
+		themeCards.get("custom").hidden = active !== "custom" && !all.customLook;
+	};
+	const themeRow = h("div", { class: "aur-row aur-row-stack" }, h("div", { class: "aur-row-label" }, h("span", null, "Theme")), themeGrid);
+	themeRow.dataset.search = ["theme preset look style", ...THEMES.map((t) => `${t.label} ${t.hint}`)].join(" ").toLowerCase();
+	sections.get("Theme").unshift(themeRow);
+	syncThemes(settings.all());
+
 	const bodies = {};
 	for (const page of PAGES.filter((pg) => pg.sections)) {
 		bodies[page.id] = h(
 			"div",
-			{ class: "fal-tab-body", "data-tab": page.id, hidden: true },
-			page.sections.map((name) => h("div", { class: "fal-section", "data-section": name }, h("h3", null, name), h("div", { class: "fal-section-card" }, sections.get(name) || []))),
+			{ class: "aur-tab-body", "data-tab": page.id, hidden: true },
+			page.sections.map((name) => h("div", { class: "aur-section", "data-section": name }, h("h3", null, name), h("div", { class: "aur-section-card" }, sections.get(name) || []))),
 		);
 	}
 	bodies.general.append(
-		h("div", { class: "fal-section" }, h("h3", null, "Shortcuts"), h(
+		h("div", { class: "aur-section" }, h("h3", null, "Shortcuts"), h(
 			"div",
-			{ class: "fal-keys" },
+			{ class: "aur-keys" },
 			[
 				["Alt L", "Open / close"],
 				["Esc", "Close"],
 				["[ ]", "Offset ∓100 ms"],
 				["F", "Fullscreen"],
+				["S", "Share lyrics"],
+				["Alt M", "Mini lyrics"],
+				["Right-click line", "Share that line"],
 				["Wheel", "Browse lyrics"],
 				["Click line", "Jump there"],
-			].map(([k, d]) => h("div", { class: "fal-key" }, h("kbd", null, k), h("span", null, d))),
+			].map(([k, d]) => h("div", { class: "aur-key" }, h("kbd", null, k), h("span", null, d))),
 		)),
 		h(
 			"div",
-			{ class: "fal-section" },
+			{ class: "aur-section" },
 			h("h3", null, "Maintenance"),
 			h(
 				"div",
-				{ class: "fal-panel-actions" },
-				h("button", { class: "fal-btn", onclick: () => ctx.toast(`Cleared ${ctx.clearCache()} cached lyrics`) }, "Clear lyrics cache"),
-				h("button", { class: "fal-btn fal-btn-ghost", onclick: () => (settings.reset(), ctx.toast("Settings reset")) }, "Reset to defaults"),
+				{ class: "aur-panel-actions" },
+				h("button", { class: "aur-btn", onclick: () => ctx.toast(`Cleared ${ctx.clearCache()} cached lyrics`) }, "Clear lyrics cache"),
+				h("button", { class: "aur-btn aur-btn-ghost", onclick: () => (settings.reset(), ctx.toast("Settings reset")) }, "Reset to defaults"),
 			),
 		),
 	);
 	const settingsBodies = Object.values(bodies);
-	const noResults = h("div", { class: "fal-no-results", hidden: true }, "No settings match your search.");
+	const noResults = h("div", { class: "aur-no-results", hidden: true }, "No settings match your search.");
 
 	const syncDisabled = (all) => {
 		for (const b of settingsBodies) b.querySelector('[data-key="autoHideDelay"]')?.classList.toggle("is-disabled", !all.autoHideControls);
@@ -2917,16 +3188,17 @@ function createPanel(ctx) {
 		if (key === "*") for (const [k, fn] of syncers) fn(all[k]);
 		else syncers.get(key)?.(v);
 		syncDisabled(all);
+		syncThemes(all);
 	});
 	syncDisabled(settings.all());
 
 	// --- This track tab ------------------------------------------------------
 	// "Load lyrics from": Auto + one button per provider. Picking one pins it to this track.
-	const sourceGrid = h("div", { class: "fal-src-grid" });
+	const sourceGrid = h("div", { class: "aur-src-grid" });
 	const testBtn = h(
 		"button",
 		{
-			class: "fal-btn fal-btn-ghost fal-test-btn",
+			class: "aur-btn aur-btn-ghost aur-test-btn",
 			title: "Ask every source for this song and show what each one returns (doesn't change your settings)",
 			onclick: async () => {
 				testBtn.disabled = true;
@@ -2939,9 +3211,9 @@ function createPanel(ctx) {
 		},
 		"Test all sources",
 	);
-	const trackInfo = h("div", null, h("div", { class: "fal-src-title" }, "Load lyrics from"), sourceGrid, testBtn, h("div", { class: "fal-src-title" }, "Edit or import"));
+	const trackInfo = h("div", null, h("div", { class: "aur-src-title" }, "Load lyrics from"), sourceGrid, testBtn, h("div", { class: "aur-src-title" }, "Edit or import"));
 	const textarea = h("textarea", {
-		class: "fal-textarea",
+		class: "aur-textarea",
 		spellcheck: "false",
 		placeholder: "Paste lyrics here.\n\nSynced (LRC):\n[00:12.30]First line\n[00:15.80]Second line\n\nEnhanced LRC (word timing):\n[00:12.30]<00:12.30>First <00:12.70>line<00:13.40>\n\nOr plain text for unsynced lyrics.",
 	});
@@ -2959,7 +3231,7 @@ function createPanel(ctx) {
 			ctx.toast(`Loaded ${file.name} — press Save to use it`);
 		},
 	});
-	const removeBtn = h("button", { class: "fal-btn fal-btn-danger", onclick: () => (ctx.removeLocal(), refreshTrack()) }, "Remove imported");
+	const removeBtn = h("button", { class: "aur-btn aur-btn-danger", onclick: () => (ctx.removeLocal(), refreshTrack()) }, "Remove imported");
 
 	// Dropping a file anywhere on the editor imports it.
 	textarea.addEventListener("dragover", (e) => (e.preventDefault(), textarea.classList.add("is-drop")));
@@ -2977,17 +3249,17 @@ function createPanel(ctx) {
 
 	const trackBody = h(
 		"div",
-		{ class: "fal-tab-body", "data-tab": "track", hidden: true },
+		{ class: "aur-tab-body", "data-tab": "track", hidden: true },
 		trackInfo,
 		textarea,
 		h(
 			"div",
-			{ class: "fal-panel-actions" },
-			h("button", { class: "fal-btn", onclick: () => fileInput.click(), html: `${ICONS.upload()}<span>Import file</span>` }),
+			{ class: "aur-panel-actions" },
+			h("button", { class: "aur-btn", onclick: () => fileInput.click(), html: `${ICONS.upload()}<span>Import file</span>` }),
 			h(
 				"button",
 				{
-					class: "fal-btn fal-btn-ghost",
+					class: "aur-btn aur-btn-ghost",
 					title: "Copy the currently shown lyrics into the editor (e.g. to fix timings)",
 					onclick: () => {
 						const { lrc } = ctx.getLyricsInfo();
@@ -3000,11 +3272,11 @@ function createPanel(ctx) {
 		),
 		h(
 			"div",
-			{ class: "fal-panel-actions" },
+			{ class: "aur-panel-actions" },
 			h(
 				"button",
 				{
-					class: "fal-btn fal-btn-primary",
+					class: "aur-btn aur-btn-primary",
 					onclick: () => {
 						const text = textarea.value.trim();
 						if (!text) return ctx.toast("Nothing to save");
@@ -3016,7 +3288,7 @@ function createPanel(ctx) {
 			),
 			removeBtn,
 		),
-		h("p", { class: "fal-hint" }, "Drop an .lrc or .txt file on the editor, or paste text. Imported lyrics are stored locally, always take priority over online sources, and also apply to the same song on other albums."),
+		h("p", { class: "aur-hint" }, "Drop an .lrc or .txt file on the editor, or paste text. Imported lyrics are stored locally, always take priority over online sources, and also apply to the same song on other albums."),
 		fileInput,
 	);
 
@@ -3044,7 +3316,7 @@ function createPanel(ctx) {
 				const btn = h(
 					"button",
 					{
-						class: `fal-src-btn${id === current ? " is-current" : ""}`,
+						class: `aur-src-btn${id === current ? " is-current" : ""}`,
 						title: id === "auto" ? "Search all enabled sources in order" : `Use ${label} for this track`,
 						onclick: async () => {
 							btn.classList.add("is-loading");
@@ -3070,14 +3342,14 @@ function createPanel(ctx) {
 	}
 
 	// --- Shell: rail + header (title, search, close) + pages --------------------
-	const nowPlaying = h("div", { class: "fal-np" });
+	const nowPlaying = h("div", { class: "aur-np" });
 	function setNowPlaying(track, sourceLabel) {
 		nowPlaying.hidden = !track;
 		if (!track) return;
 		nowPlaying.replaceChildren(
 			track.image ? h("img", { src: track.image, alt: "" }) : null,
-			h("div", { class: "fal-np-text" }, h("div", { class: "fal-np-title" }, track.title), h("div", { class: "fal-np-sub" }, [track.artist, track.album].filter(Boolean).join(" • "))),
-			h("span", { class: "fal-np-chip", title: "Lyrics source" }, sourceLabel || "No lyrics"),
+			h("div", { class: "aur-np-text" }, h("div", { class: "aur-np-title" }, track.title), h("div", { class: "aur-np-sub" }, [track.artist, track.album].filter(Boolean).join(" • "))),
+			h("span", { class: "aur-np-chip", title: "Lyrics source" }, sourceLabel || "No lyrics"),
 		);
 	}
 	trackBody.prepend(nowPlaying);
@@ -3085,33 +3357,33 @@ function createPanel(ctx) {
 	const railButtons = new Map();
 	const rail = h(
 		"nav",
-		{ class: "fal-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "Settings pages" },
-		h("span", { class: "fal-rail-pill", "aria-hidden": "true" }),
+		{ class: "aur-rail", role: "tablist", "aria-orientation": "vertical", "aria-label": "Settings pages" },
+		h("span", { class: "aur-rail-pill", "aria-hidden": "true" }),
 		PAGES.map((pg) => {
-			const btn = h("button", { class: "fal-rail-btn", role: "tab", title: pg.title, onclick: () => ((search.value = ""), show(pg.id)) }, h("span", { class: "fal-rail-icon", html: pg.icon() }), h("span", { class: "fal-rail-label" }, pg.label));
+			const btn = h("button", { class: "aur-rail-btn", role: "tab", title: pg.title, onclick: () => ((search.value = ""), show(pg.id)) }, h("span", { class: "aur-rail-icon", html: pg.icon() }), h("span", { class: "aur-rail-label" }, pg.label));
 			railButtons.set(pg.id, btn);
 			return btn;
 		}),
 	);
-	const titleEl = h("div", { class: "fal-panel-title" });
-	const subEl = h("div", { class: "fal-panel-sub" });
-	const search = h("input", { type: "search", class: "fal-search", placeholder: "Search settings", "aria-label": "Search settings", spellcheck: "false" });
+	const titleEl = h("div", { class: "aur-panel-title" });
+	const subEl = h("div", { class: "aur-panel-sub" });
+	const search = h("input", { type: "search", class: "aur-search", placeholder: "Search settings", "aria-label": "Search settings", spellcheck: "false" });
 	search.addEventListener("input", () => applySearch());
 	const el = h(
 		"div",
-		{ class: "fal-panel", role: "dialog", "aria-label": "Lyrics settings" },
+		{ class: "aur-panel", role: "dialog", "aria-label": "Lyrics settings" },
 		rail,
 		h(
 			"div",
-			{ class: "fal-panel-main" },
+			{ class: "aur-panel-main" },
 			h(
 				"div",
-				{ class: "fal-panel-head" },
-				h("div", { class: "fal-panel-heading" }, titleEl, subEl),
-				h("button", { class: "fal-icon-btn fal-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
-				h("label", { class: "fal-search-wrap" }, h("span", { class: "fal-search-icon", html: ICONS.search() }), search),
+				{ class: "aur-panel-head" },
+				h("div", { class: "aur-panel-heading" }, titleEl, subEl),
+				h("button", { class: "aur-icon-btn aur-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
+				h("label", { class: "aur-search-wrap" }, h("span", { class: "aur-search-icon", html: ICONS.search() }), search),
 			),
-			h("div", { class: "fal-panel-scroll" }, trackBody, settingsBodies, noResults),
+			h("div", { class: "aur-panel-scroll" }, trackBody, settingsBodies, noResults),
 		),
 	);
 	// Keep typing in the panel from triggering Spotify / overlay shortcuts.
@@ -3144,7 +3416,7 @@ function createPanel(ctx) {
 		trackBody.hidden = tab !== "track";
 		for (const [id, body] of Object.entries(bodies)) body.hidden = id !== tab;
 		noResults.hidden = true;
-		el.querySelector(".fal-panel-scroll").scrollTop = 0;
+		el.querySelector(".aur-panel-scroll").scrollTop = 0;
 		if (tab === "track") refreshTrack();
 	}
 
@@ -3154,7 +3426,7 @@ function createPanel(ctx) {
 		el.dataset.searching = q ? "true" : "false";
 		if (!q) {
 			for (const b of settingsBodies) for (const r of b.querySelectorAll("[data-search]")) r.hidden = false;
-			for (const sec of el.querySelectorAll(".fal-section")) sec.hidden = false;
+			for (const sec of el.querySelectorAll(".aur-section")) sec.hidden = false;
 			return show(current);
 		}
 		titleEl.textContent = "Search";
@@ -3164,7 +3436,7 @@ function createPanel(ctx) {
 		let any = false;
 		for (const body of settingsBodies) {
 			body.hidden = false;
-			for (const sec of body.querySelectorAll(".fal-section")) {
+			for (const sec of body.querySelectorAll(".aur-section")) {
 				const rows = [...sec.querySelectorAll("[data-search]")];
 				let visible = 0;
 				for (const r of rows) {
@@ -3213,6 +3485,411 @@ function createPanel(ctx) {
 	};
 }
 
+// ---- share.js --------------------------------------------------------------
+// Share card: render a few lyric lines + cover art + track info into an image (canvas), with a
+// live preview. Copy it to the clipboard or save it as a PNG.
+//
+// Opened from the overlay (share button, S, or right-click on a line). Everything is drawn
+// locally; the only network use is loading the cover image (CORS-enabled Spotify CDN). If the
+// cover can't be used on a canvas, the card falls back to the gradient background.
+
+
+const SHARE_FORMATS = {
+	square: { label: "Square", w: 1080, h: 1080 },
+	portrait: { label: "Portrait", w: 1080, h: 1350 },
+	story: { label: "Story", w: 1080, h: 1920 },
+};
+const BACKGROUNDS = [
+	["album", "Album art"],
+	["gradient", "Gradient"],
+	["dark", "Dark"],
+];
+const MAX_LINES = 6;
+
+const images = new Map();
+/** Load an image for canvas use (CORS), cached; resolves null if it can't be used. */
+function loadImage(url) {
+	if (!url) return Promise.resolve(null);
+	if (!images.has(url)) {
+		images.set(
+			url,
+			new Promise((resolve) => {
+				const img = new Image();
+				img.crossOrigin = "anonymous";
+				img.decoding = "async";
+				img.onload = () => resolve(img);
+				img.onerror = () => resolve(null);
+				img.src = url;
+			}),
+		);
+	}
+	return images.get(url);
+}
+
+/** Any CSS colour (incl. color-mix / oklch) → something canvas understands. */
+function canvasColor(css, fallback) {
+	if (!css) return fallback;
+	const probe = document.createElement("canvas").getContext("2d");
+	probe.fillStyle = fallback;
+	const el = h("span", { style: { color: css, display: "none" } });
+	document.body.append(el);
+	const resolved = getComputedStyle(el).color;
+	el.remove();
+	probe.fillStyle = resolved || fallback;
+	return probe.fillStyle;
+}
+
+/** Word-wrap `text` to `maxW`; text without spaces (CJK) wraps per character. */
+function wrapText(ctx, text, maxW) {
+	const tokens = /\s/.test(text.trim()) ? text.trim().split(/(?<=\s)/) : Array.from(text.trim());
+	const out = [];
+	let line = "";
+	for (const tok of tokens) {
+		const tryLine = line + tok;
+		if (line && ctx.measureText(tryLine.trimEnd()).width > maxW) {
+			out.push(line.trimEnd());
+			line = tok.trimStart();
+		} else line = tryLine;
+		// A single token wider than the line: break it by characters.
+		while (ctx.measureText(line.trimEnd()).width > maxW && Array.from(line).length > 1) {
+			const chars = Array.from(line);
+			let n = chars.length - 1;
+			while (n > 1 && ctx.measureText(chars.slice(0, n).join("")).width > maxW) n--;
+			out.push(chars.slice(0, n).join(""));
+			line = chars.slice(n).join("");
+		}
+	}
+	if (line.trim()) out.push(line.trimEnd());
+	return out;
+}
+
+function ellipsize(ctx, text, maxW) {
+	if (ctx.measureText(text).width <= maxW) return text;
+	const chars = Array.from(text);
+	while (chars.length && ctx.measureText(`${chars.join("")}…`).width > maxW) chars.pop();
+	return `${chars.join("").trimEnd()}…`;
+}
+
+function roundRect(ctx, x, y, w, hgt, r) {
+	ctx.beginPath();
+	ctx.roundRect ? ctx.roundRect(x, y, w, hgt, r) : ctx.rect(x, y, w, hgt);
+}
+
+/** Draw `img` covering the box (like object-fit: cover). */
+function drawCover(ctx, img, x, y, w, hgt) {
+	const s = Math.max(w / img.naturalWidth, hgt / img.naturalHeight);
+	const iw = img.naturalWidth * s;
+	const ih = img.naturalHeight * s;
+	ctx.drawImage(img, x + (w - iw) / 2, y + (hgt - ih) / 2, iw, ih);
+}
+
+/**
+ * Render the share image.
+ * @param {HTMLCanvasElement} canvas
+ * @param {{ lines: string[], title: string, artist: string, cover: HTMLImageElement|null,
+ *   format: string, bg: string, font: string, uiFont: string, weight: string|number,
+ *   accent: string, c1: string, c2: string }} o
+ */
+function drawShareCard(canvas, o) {
+	const { w: W, h: H } = SHARE_FORMATS[o.format] || SHARE_FORMATS.portrait;
+	canvas.width = W;
+	canvas.height = H;
+	const ctx = canvas.getContext("2d");
+	const radial = (x, y, r, color, alpha) => {
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		ctx.globalAlpha = alpha;
+		g.addColorStop(0, color);
+		g.addColorStop(1, "rgba(0,0,0,0)");
+		ctx.fillStyle = g;
+		ctx.fillRect(0, 0, W, H);
+		ctx.globalAlpha = 1;
+	};
+
+	// ---- background
+	const bg = o.bg === "album" && !o.cover ? "gradient" : o.bg;
+	if (bg === "album") {
+		ctx.fillStyle = o.c2;
+		ctx.fillRect(0, 0, W, H);
+		ctx.save();
+		ctx.filter = `blur(${Math.round(W * 0.07)}px) saturate(1.5) brightness(0.85)`;
+		drawCover(ctx, o.cover, -W * 0.2, -H * 0.2, W * 1.4, H * 1.4);
+		ctx.restore();
+		ctx.fillStyle = "rgba(0,0,0,0.3)";
+		ctx.fillRect(0, 0, W, H);
+	} else if (bg === "gradient") {
+		ctx.fillStyle = o.c2;
+		ctx.fillRect(0, 0, W, H);
+		radial(W * 0.2, H * 0.18, W * 1.05, o.c1, 0.95);
+		radial(W * 0.9, H * 0.92, W * 0.8, o.accent, 0.38);
+		ctx.fillStyle = "rgba(0,0,0,0.22)";
+		ctx.fillRect(0, 0, W, H);
+	} else {
+		ctx.fillStyle = "#0b0b0f";
+		ctx.fillRect(0, 0, W, H);
+		radial(W * 0.12, H * 0.08, W * 0.9, o.accent, 0.2);
+	}
+	// Darker towards the footer so the track info always reads.
+	const fade = ctx.createLinearGradient(0, H * 0.55, 0, H);
+	fade.addColorStop(0, "rgba(0,0,0,0)");
+	fade.addColorStop(1, "rgba(0,0,0,0.45)");
+	ctx.fillStyle = fade;
+	ctx.fillRect(0, 0, W, H);
+
+	// ---- footer: cover + title / artist
+	const pad = Math.round(W * 0.08);
+	const cs = Math.round(W * 0.13);
+	const fy = H - pad - cs;
+	let tx = pad;
+	if (o.cover) {
+		ctx.save();
+		ctx.shadowColor = "rgba(0,0,0,0.45)";
+		ctx.shadowBlur = W * 0.03;
+		ctx.shadowOffsetY = W * 0.008;
+		roundRect(ctx, pad, fy, cs, cs, W * 0.016);
+		ctx.fillStyle = "#000";
+		ctx.fill();
+		ctx.restore();
+		ctx.save();
+		roundRect(ctx, pad, fy, cs, cs, W * 0.016);
+		ctx.clip();
+		drawCover(ctx, o.cover, pad, fy, cs, cs);
+		ctx.restore();
+		tx = pad + cs + W * 0.035;
+	}
+	const maxT = W - pad - tx;
+	ctx.textBaseline = "alphabetic";
+	ctx.fillStyle = "#fff";
+	ctx.font = `700 ${Math.round(W * 0.038)}px ${o.uiFont}`;
+	ctx.fillText(ellipsize(ctx, o.title || "", maxT), tx, fy + cs * 0.46);
+	ctx.fillStyle = "rgba(255,255,255,0.7)";
+	ctx.font = `500 ${Math.round(W * 0.03)}px ${o.uiFont}`;
+	ctx.fillText(ellipsize(ctx, o.artist || "", maxT), tx, fy + cs * 0.82);
+
+	// ---- lyrics: largest size that fits the space above the footer
+	const top = pad;
+	const bottom = fy - pad * 0.9;
+	const maxW = W - pad * 2;
+	let size = W * 0.088;
+	let layout;
+	for (;;) {
+		ctx.font = `${o.weight} ${Math.round(size)}px ${o.font}`;
+		const blocks = o.lines.map((l) => wrapText(ctx, l, maxW));
+		const lh = size * 1.16;
+		const gapH = size * 0.42;
+		const height = blocks.reduce((sum, b) => sum + b.length * lh, 0) + gapH * Math.max(0, blocks.length - 1);
+		layout = { blocks, lh, gapH, height };
+		if (height <= bottom - top || size <= W * 0.036) break;
+		size *= 0.94;
+	}
+	// Centred in portrait / story; nearer the top in square (reads like a quote).
+	let y = top + Math.max(0, (bottom - top - layout.height) * (o.format === "square" ? 0.35 : 0.5)) + layout.lh * 0.8;
+	ctx.fillStyle = "#fff";
+	// Soft light in the accent colour (canvasColor gives "#rrggbb" or "rgba(…)").
+	ctx.shadowColor = /^#[0-9a-f]{6}$/i.test(o.accent) ? `${o.accent}8c` : o.accent;
+	ctx.shadowBlur = size * 0.38;
+	for (const [bi, block] of layout.blocks.entries()) {
+		ctx.globalAlpha = 0.97;
+		for (const line of block) {
+			ctx.fillText(line, pad, y);
+			y += layout.lh;
+		}
+		if (bi < layout.blocks.length - 1) y += layout.gapH;
+	}
+	ctx.globalAlpha = 1;
+	ctx.shadowBlur = 0;
+	return canvas;
+}
+
+/**
+ * The share sheet (lives inside the overlay).
+ * @param {{ getContext: () => { track: object|null, lyrics: object|null, active: number, root: HTMLElement }, toast: (m: string) => void, onClose?: () => void }} ctx
+ */
+function createShareSheet(ctx) {
+	const opts = { format: "portrait", bg: "album" };
+	let selected = new Set();
+	let info = null; // snapshot of the context when opened
+	let renderToken = 0;
+
+	const canvas = h("canvas", { class: "aur-share-canvas", "aria-label": "Share image preview" });
+	const lineList = h("div", { class: "aur-share-lines", role: "group", "aria-label": "Lines to include" });
+	const count = h("span", { class: "aur-share-count" });
+
+	const segmented = (options, key) => {
+		const buttons = options.map(([v, label]) =>
+			h("button", { class: "aur-seg", role: "radio", "aria-checked": String(opts[key] === v), onclick: () => ((opts[key] = v), sync(), render()) }, label),
+		);
+		const sync = () => buttons.forEach((b, i) => b.setAttribute("aria-checked", String(options[i][0] === opts[key])));
+		return h("div", { class: "aur-segmented", role: "radiogroup" }, buttons);
+	};
+
+	const copyBtn = h("button", { class: "aur-btn aur-btn-primary", html: `${ICONS.copy()}<span>Copy image</span>`, onclick: () => copy() });
+	const saveBtn = h("button", { class: "aur-btn", html: `${ICONS.download()}<span>Save PNG</span>`, onclick: () => save() });
+	const card = h(
+		"div",
+		{ class: "aur-share-card", role: "dialog", "aria-label": "Share lyrics" },
+		h("div", { class: "aur-share-preview" }, canvas),
+		h(
+			"div",
+			{ class: "aur-share-side" },
+			h(
+				"div",
+				{ class: "aur-share-head" },
+				h("div", null, h("div", { class: "aur-panel-title" }, "Share lyrics"), h("div", { class: "aur-panel-sub" }, "Pick lines, then copy or save the image")),
+				h("button", { class: "aur-icon-btn", title: "Close (Esc)", "aria-label": "Close", html: ICONS.close(), onclick: () => close() }),
+			),
+			h("div", { class: "aur-share-label" }, h("span", null, "Lines"), count),
+			lineList,
+			h("div", { class: "aur-share-label" }, h("span", null, "Format")),
+			segmented(Object.entries(SHARE_FORMATS).map(([k, f]) => [k, f.label]), "format"),
+			h("div", { class: "aur-share-label" }, h("span", null, "Background")),
+			segmented(BACKGROUNDS, "bg"),
+			h("div", { class: "aur-panel-actions" }, copyBtn, saveBtn),
+		),
+	);
+	const el = h("div", { class: "aur-share", hidden: true, onclick: (e) => e.target === el && close() }, card);
+	// Keep keys (Escape is handled by the overlay) and the wheel inside the sheet.
+	el.addEventListener("keydown", (e) => e.key !== "Escape" && e.stopPropagation());
+	el.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+
+	function renderLines() {
+		const ls = info.lyrics?.lines || [];
+		lineList.replaceChildren(
+			...ls.flatMap((l, i) =>
+				l.gap || !l.text
+					? []
+					: [
+							h(
+								"button",
+								{
+									class: "aur-share-line",
+									"aria-pressed": String(selected.has(i)),
+									onclick: (e) => {
+										if (selected.has(i)) selected.delete(i);
+										else if (selected.size >= MAX_LINES) return ctx.toast(`Up to ${MAX_LINES} lines`);
+										else selected.add(i);
+										e.currentTarget.setAttribute("aria-pressed", String(selected.has(i)));
+										render();
+									},
+								},
+								l.text,
+							),
+						],
+			),
+		);
+		lineList.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: "center" });
+	}
+
+	async function render() {
+		const token = ++renderToken;
+		count.textContent = `${selected.size} / ${MAX_LINES}`;
+		copyBtn.disabled = saveBtn.disabled = !selected.size;
+		const ls = info.lyrics?.lines || [];
+		const lines = [...selected].sort((a, b) => a - b).map((i) => ls[i]?.text).filter(Boolean);
+		const cover = await loadImage(info.track?.image);
+		if (token !== renderToken) return;
+		// Make sure the lyric font is loaded before measuring with it.
+		try {
+			await document.fonts?.load?.(`${info.weight} 40px ${info.font}`, lines.join(" ") || "Aa");
+		} catch {
+			/* draw with whatever is available */
+		}
+		if (token !== renderToken) return;
+		drawShareCard(canvas, { ...info.style, lines: lines.length ? lines : ["Pick a line to share"], title: info.track?.title, artist: info.track?.artist, cover, format: opts.format, bg: opts.bg });
+		canvas.dataset.format = opts.format;
+	}
+
+	const toBlob = () => new Promise((resolve, reject) => {
+		try {
+			canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("empty image"))), "image/png");
+		} catch (e) {
+			reject(e); // tainted canvas
+		}
+	});
+
+	async function copy() {
+		try {
+			const blob = await toBlob();
+			await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+			ctx.toast("Image copied — paste it anywhere");
+		} catch (e) {
+			console.warn("[aurora-lyrics] copy image failed", e);
+			ctx.toast("Couldn't copy the image here — try Save PNG");
+		}
+	}
+
+	async function save() {
+		const name = `${[info.track?.artist, info.track?.title].filter(Boolean).join(" - ") || "lyrics"}.png`.replace(/[\\/:*?"<>|]+/g, "");
+		try {
+			const blob = await toBlob();
+			if (globalThis.showSaveFilePicker) {
+				try {
+					const handle = await globalThis.showSaveFilePicker({ suggestedName: name, types: [{ description: "PNG image", accept: { "image/png": [".png"] } }] });
+					const w = await handle.createWritable();
+					await w.write(blob);
+					await w.close();
+					return ctx.toast("Image saved");
+				} catch (e) {
+					if (e?.name === "AbortError") return; // user cancelled
+				}
+			}
+			const url = URL.createObjectURL(blob);
+			h("a", { href: url, download: name }).click();
+			setTimeout(() => URL.revokeObjectURL(url), 10000);
+			ctx.toast("Image saved to Downloads");
+		} catch (e) {
+			console.warn("[aurora-lyrics] save image failed", e);
+			ctx.toast("Couldn't save the image");
+		}
+	}
+
+	/** @param {number} [lineIdx] line to preselect (default: the current line and the next one) */
+	function open(lineIdx) {
+		const c = ctx.getContext();
+		if (!c.lyrics?.lines?.some((l) => !l.gap && l.text)) return ctx.toast("No lyrics to share");
+		const cs = getComputedStyle(c.root);
+		const sample = c.root.querySelector(".aur-line .aur-main") || c.root;
+		const ss = getComputedStyle(sample);
+		info = {
+			track: c.track,
+			lyrics: c.lyrics,
+			font: ss.fontFamily,
+			weight: ss.fontWeight,
+			style: {
+				font: ss.fontFamily,
+				weight: ss.fontWeight,
+				uiFont: cs.fontFamily,
+				accent: canvasColor(cs.getPropertyValue("--aur-accent").trim(), "#ffffff"),
+				c1: canvasColor(cs.getPropertyValue("--aur-c1").trim(), "#4b3b78"),
+				c2: canvasColor(cs.getPropertyValue("--aur-c2").trim(), "#14203a"),
+			},
+		};
+		const ls = c.lyrics.lines;
+		const firstReal = (from) => ls.findIndex((l, i) => i >= from && !l.gap && l.text);
+		const start = firstReal(Math.max(0, lineIdx ?? c.active));
+		selected = new Set();
+		if (start >= 0) {
+			selected.add(start);
+			const second = lineIdx == null ? firstReal(start + 1) : -1;
+			if (second >= 0) selected.add(second);
+		}
+		renderLines();
+		el.hidden = false;
+		void el.offsetWidth;
+		el.classList.add("is-open");
+		copyBtn.focus({ preventScroll: true });
+		render();
+	}
+
+	function close() {
+		if (el.hidden) return;
+		el.classList.remove("is-open");
+		setTimeout(() => !el.classList.contains("is-open") && (el.hidden = true), 250);
+		ctx.onClose?.();
+	}
+
+	return { el, open, close, isOpen: () => !el.hidden && el.classList.contains("is-open") };
+}
+
 // ---- overlay.js ------------------------------------------------------------
 // The overlay controller: builds the full-screen UI once (lazily), owns the playback loop,
 // loads lyrics on track changes, and applies settings live.
@@ -3222,6 +3899,7 @@ const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.cs
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
 const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
+const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {
 	return !!target?.closest?.("input, textarea, select, [contenteditable='true']");
@@ -3273,92 +3951,92 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 	// DOM
 	// ---------------------------------------------------------------------------
 	function build() {
-		const bgStack = h("div", { class: "fal-bg-stack" });
+		const bgStack = h("div", { class: "aur-bg-stack" });
 		const bg = h(
 			"div",
-			{ class: "fal-bg", "aria-hidden": "true" },
+			{ class: "aur-bg", "aria-hidden": "true" },
 			bgStack,
-			h("div", { class: "fal-bg-gradient" }),
-			h("div", { class: "fal-bg-shade" }),
-			h("div", { class: "fal-bg-grain" }),
+			h("div", { class: "aur-bg-gradient" }),
+			h("div", { class: "aur-bg-shade" }),
+			h("div", { class: "aur-bg-grain" }),
 		);
 
-		const cover = h("img", { class: "fal-cover", alt: "" });
-		const title = h("div", { class: "fal-title" });
-		const artist = h("div", { class: "fal-artist" });
-		const header = h("div", { class: "fal-header fal-chrome" }, cover, h("div", { class: "fal-meta" }, title, artist));
+		const cover = h("img", { class: "aur-cover", alt: "" });
+		const title = h("div", { class: "aur-title" });
+		const artist = h("div", { class: "aur-artist" });
+		const header = h("div", { class: "aur-header aur-chrome" }, cover, h("div", { class: "aur-meta" }, title, artist));
 
-		const stage = h("div", { class: "fal-stage", role: "main" });
+		const stage = h("div", { class: "aur-stage", role: "main" });
 
 		// Split view: big cover (click = play/pause) + track info beside the lyrics.
-		const artA = h("img", { class: "fal-art", alt: "", decoding: "async" });
-		const artB = h("img", { class: "fal-art", alt: "", decoding: "async" });
-		const artHint = h("span", { class: "fal-art-hint", html: ICONS.pause() });
-		// .fal-disc holds the art (it spins in the Vinyl layout); grooves/shine only show there.
-		const disc = h("span", { class: "fal-disc" }, artA, artB, h("span", { class: "fal-disc-grooves", "aria-hidden": "true" }));
+		const artA = h("img", { class: "aur-art", alt: "", decoding: "async" });
+		const artB = h("img", { class: "aur-art", alt: "", decoding: "async" });
+		const artHint = h("span", { class: "aur-art-hint", html: ICONS.pause() });
+		// .aur-disc holds the art (it spins in the Vinyl layout); grooves/shine only show there.
+		const disc = h("span", { class: "aur-disc" }, artA, artB, h("span", { class: "aur-disc-grooves", "aria-hidden": "true" }));
 		const artWrap = h(
 			"button",
-			{ class: "fal-art-wrap", title: "Play / pause", "aria-label": "Play / pause", onclick: () => (playerCommand("togglePlay"), setTimeout(kick, 60)) },
+			{ class: "aur-art-wrap", title: "Play / pause", "aria-label": "Play / pause", onclick: () => (playerCommand("togglePlay"), setTimeout(kick, 60)) },
 			disc,
-			h("span", { class: "fal-disc-shine", "aria-hidden": "true" }),
+			h("span", { class: "aur-disc-shine", "aria-hidden": "true" }),
 			artHint,
 		);
-		const sideTitle = h("div", { class: "fal-side-title" });
-		const sideArtist = h("div", { class: "fal-side-artist" });
-		const sideAlbum = h("div", { class: "fal-side-album" });
-		const side = h("div", { class: "fal-side", role: "region", "aria-label": "Now playing" }, artWrap, h("div", { class: "fal-side-meta" }, sideTitle, sideArtist, sideAlbum));
+		const sideTitle = h("div", { class: "aur-side-title" });
+		const sideArtist = h("div", { class: "aur-side-artist" });
+		const sideAlbum = h("div", { class: "aur-side-album" });
+		const side = h("div", { class: "aur-side", role: "region", "aria-label": "Now playing" }, artWrap, h("div", { class: "aur-side-meta" }, sideTitle, sideArtist, sideAlbum));
 
-		const iconBtn = (label, icon, onclick, cls = "fal-icon-btn") => h("button", { class: cls, title: label, "aria-label": label, html: icon, onclick });
+		const iconBtn = (label, icon, onclick, cls = "aur-icon-btn") => h("button", { class: cls, title: label, "aria-label": label, html: icon, onclick });
 
 		// ---- Player (bottom centre): progress + transport. Lyrics info bottom-left, actions right.
-		const elapsed = h("span", { class: "fal-time" }, "0:00");
-		const remaining = h("span", { class: "fal-time is-right" }, "-0:00");
-		const tip = h("span", { class: "fal-progress-tip", "aria-hidden": "true" }, "0:00");
+		const elapsed = h("span", { class: "aur-time" }, "0:00");
+		const remaining = h("span", { class: "aur-time is-right" }, "-0:00");
+		const tip = h("span", { class: "aur-progress-tip", "aria-hidden": "true" }, "0:00");
 		const bar = h(
 			"div",
-			{ class: "fal-progress", role: "slider", "aria-label": "Seek", tabindex: "0", "aria-valuemin": "0" },
-			h("div", { class: "fal-progress-track" }, h("div", { class: "fal-progress-fill" })),
-			h("div", { class: "fal-progress-knob-rail" }, h("div", { class: "fal-progress-knob" })),
+			{ class: "aur-progress", role: "slider", "aria-label": "Seek", tabindex: "0", "aria-valuemin": "0" },
+			h("div", { class: "aur-progress-track" }, h("div", { class: "aur-progress-fill" })),
+			h("div", { class: "aur-progress-knob-rail" }, h("div", { class: "aur-progress-knob" })),
 			tip,
 		);
-		const scrub = h("div", { class: "fal-scrub" }, bar, h("div", { class: "fal-times" }, elapsed, remaining));
+		const scrub = h("div", { class: "aur-scrub" }, bar, h("div", { class: "aur-times" }, elapsed, remaining));
 
 		const act = (fn) => () => (fn(), setTimeout(() => (state.psAt = 0), 120), setTimeout(kick, 60));
 		// Play/pause: both icons live in the button and cross-fade/rotate (no icon swap flash).
 		const playBtn = h(
 			"button",
-			{ class: "fal-play-btn", title: "Play / pause", "aria-label": "Play / pause", onclick: act(() => playerCommand("togglePlay")) },
-			h("span", { class: "fal-pp is-play", html: ICONS.play() }),
-			h("span", { class: "fal-pp is-pause", html: ICONS.pause() }),
+			{ class: "aur-play-btn", title: "Play / pause", "aria-label": "Play / pause", onclick: act(() => playerCommand("togglePlay")) },
+			h("span", { class: "aur-pp is-play", html: ICONS.play() }),
+			h("span", { class: "aur-pp is-pause", html: ICONS.pause() }),
 		);
-		const shuffleBtn = iconBtn("Shuffle", ICONS.shuffle(), act(() => playerCommand("toggleShuffle")), "fal-icon-btn fal-toggle");
-		const repeatBtn = iconBtn("Repeat", ICONS.repeat(), act(() => playerCommand("toggleRepeat")), "fal-icon-btn fal-toggle");
+		const shuffleBtn = iconBtn("Shuffle", ICONS.shuffle(), act(() => playerCommand("toggleShuffle")), "aur-icon-btn aur-toggle");
+		const repeatBtn = iconBtn("Repeat", ICONS.repeat(), act(() => playerCommand("toggleRepeat")), "aur-icon-btn aur-toggle");
 		const transport = h(
 			"div",
-			{ class: "fal-transport" },
+			{ class: "aur-transport" },
 			shuffleBtn,
-			iconBtn("Previous", ICONS.prev(), act(() => playerCommand("back")), "fal-icon-btn fal-skip"),
+			iconBtn("Previous", ICONS.prev(), act(() => playerCommand("back")), "aur-icon-btn aur-skip"),
 			playBtn,
-			iconBtn("Next", ICONS.next(), act(() => playerCommand("next")), "fal-icon-btn fal-skip"),
+			iconBtn("Next", ICONS.next(), act(() => playerCommand("next")), "aur-icon-btn aur-skip"),
 			repeatBtn,
 		);
 
 		// Lyrics info: source chip (opens the source picker) + timing offset.
-		const source = h("button", { class: "fal-source", title: "Lyrics source: choose, reload, import", onclick: () => panel.toggle("track") }, "—");
-		const offsetOut = h("button", { class: "fal-offset", title: "Lyric offset (+ = earlier). Click to reset.", onclick: () => settings.set("offset", 0) });
-		const trBtn = iconBtn("Translate lyrics (T)", ICONS.translate(), () => settings.set("translate", !settings.get("translate")), "fal-icon-btn fal-toggle fal-tr-btn");
+		const source = h("button", { class: "aur-source", title: "Lyrics source: choose, reload, import", onclick: () => panel.toggle("track") }, "—");
+		const offsetOut = h("button", { class: "aur-offset", title: "Lyric offset (+ = earlier). Click to reset.", onclick: () => settings.set("offset", 0) });
+		const trBtn = iconBtn("Translate lyrics (T)", ICONS.translate(), () => settings.set("translate", !settings.get("translate")), "aur-icon-btn aur-toggle aur-tr-btn");
 		const offsetGroup = h(
 			"div",
-			{ class: "fal-offset-group", role: "group", "aria-label": "Lyric offset" },
-			iconBtn("Lyrics later by 100 ms ( [ )", ICONS.minus(), () => nudgeOffset(-100), "fal-mini-btn"),
+			{ class: "aur-offset-group", role: "group", "aria-label": "Lyric offset" },
+			iconBtn("Lyrics later by 100 ms ( [ )", ICONS.minus(), () => nudgeOffset(-100), "aur-mini-btn"),
 			offsetOut,
-			iconBtn("Lyrics earlier by 100 ms ( ] )", ICONS.plus(), () => nudgeOffset(100), "fal-mini-btn"),
+			iconBtn("Lyrics earlier by 100 ms ( ] )", ICONS.plus(), () => nudgeOffset(100), "aur-mini-btn"),
 		);
 
 		// Actions: like, volume, settings, fullscreen, close.
-		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "fal-icon-btn fal-heart");
+		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "aur-icon-btn aur-heart");
 		const muteBtn = iconBtn("Mute", ICONS.volHigh(), act(() => playerCommand("toggleMute")));
-		const vol = h("input", { type: "range", class: "fal-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
+		const vol = h("input", { type: "range", class: "aur-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
 		vol.addEventListener("input", () => {
 			state.volDragging = true;
 			vol.style.setProperty("--v", vol.value);
@@ -3369,22 +4047,24 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const dock = h(
 			"div",
-			{ class: "fal-player fal-chrome", role: "toolbar", "aria-label": "Playback controls" },
-			h("div", { class: "fal-player-side is-left" }, source, trBtn, offsetGroup),
-			h("div", { class: "fal-player-center" }, scrub, transport),
+			{ class: "aur-player aur-chrome", role: "toolbar", "aria-label": "Playback controls" },
+			h("div", { class: "aur-player-side is-left" }, source, trBtn, offsetGroup),
+			h("div", { class: "aur-player-center" }, scrub, transport),
 			h(
 				"div",
-				{ class: "fal-player-side is-right" },
+				{ class: "aur-player-side is-right" },
 				heartBtn,
-				h("div", { class: "fal-volume" }, muteBtn, vol),
-				h("span", { class: "fal-sep", "aria-hidden": "true" }),
+				h("div", { class: "aur-volume" }, muteBtn, vol),
+				h("span", { class: "aur-sep", "aria-hidden": "true" }),
+				iconBtn("Share lyrics as an image (S)", ICONS.share(), () => openShare()),
+				iconBtn("Mini lyrics (Alt+M)", ICONS.mini(), () => (settings.set("miniLyrics", true), close())),
 				iconBtn("Settings", ICONS.settings(), () => panel.toggle("settings")),
 				fsBtn,
 				iconBtn("Close (Esc)", ICONS.close(), close),
 			),
 		);
 		// Hairline progress at the very bottom, visible only while the controls are hidden.
-		const miniProgress = h("div", { class: "fal-mini-progress", "aria-hidden": "true" }, h("div", { class: "fal-mini-fill" }));
+		const miniProgress = h("div", { class: "aur-mini-progress", "aria-hidden": "true" }, h("div", { class: "aur-mini-fill" }));
 		for (const el of [dock, header]) {
 			el.addEventListener("mouseenter", () => (state.hoverChrome = true));
 			el.addEventListener("mouseleave", () => ((state.hoverChrome = false), wake()));
@@ -3430,7 +4110,20 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			setTimeout(kick, 60);
 		});
 
-		const toastEl = h("div", { class: "fal-toast", role: "status", "aria-live": "polite" });
+		const toastEl = h("div", { class: "aur-toast", role: "status", "aria-live": "polite" });
+
+		// Queue peek: the next track, shown near the end of the current one. Click to skip to it.
+		const upArt = h("img", { class: "aur-upnext-art", alt: "", decoding: "async" });
+		const upTitle = h("div", { class: "aur-upnext-title" });
+		const upArtist = h("div", { class: "aur-upnext-artist" });
+		const upWhen = h("span", { class: "aur-upnext-when" });
+		const upNext = h(
+			"button",
+			{ class: "aur-upnext", "aria-live": "polite", onclick: act(() => playerCommand("next")) },
+			upArt,
+			h("div", { class: "aur-upnext-text" }, h("div", { class: "aur-upnext-label" }, "Up next", upWhen), upTitle, upArtist),
+			h("span", { class: "aur-upnext-skip", html: ICONS.next() }),
+		);
 
 		const panel = createPanel({
 			getTrack: () => state.track,
@@ -3471,21 +4164,30 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			toast,
 		});
 
+		const share = createShareSheet({
+			getContext: () => ({ track: state.track, lyrics: state.lyrics, active: ui?.view.active ?? -1, root }),
+			toast,
+			onClose: () => root.focus({ preventScroll: true }),
+		});
+
 		const root = h(
 			"div",
-			{ id: "fal-root", class: "fal-root", role: "dialog", "aria-modal": "true", "aria-label": "Aurora Lyrics", tabindex: "-1", hidden: true },
+			{ id: "aur-root", class: "aur-root", role: "dialog", "aria-modal": "true", "aria-label": "Aurora Lyrics", tabindex: "-1", hidden: true },
 			bg,
-			h("div", { class: "fal-drag", "aria-hidden": "true" }), // keeps the window draggable
+			h("div", { class: "aur-drag", "aria-hidden": "true" }), // keeps the window draggable
 			header,
 			side,
 			stage,
 			dock,
 			miniProgress,
 			panel.el,
+			share.el,
+			upNext,
 			toastEl,
 		);
 
 		const view = new LyricsView(stage, {
+			onShare: (i) => openShare(i),
 			onSeek: (t) => {
 				// Seek so that the *effective* (offset-adjusted) position lands on the line.
 				seek(t - settings.get("offset") + 20);
@@ -3518,7 +4220,7 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, panel, view };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -3536,11 +4238,13 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const { root, view } = ui;
 		const st = root.style;
 		ensureFont(all.font);
-		st.setProperty("--fal-font", FONTS[all.font]?.stack || FONTS.spotify.stack);
-		st.setProperty("--fal-fs", `${all.fontSize}px`);
-		st.setProperty("--fal-gap", `${all.lineSpacing}em`);
-		st.setProperty("--fal-fw", all.fontWeight);
-		st.setProperty("--fal-shade", String(all.bgOpacity));
+		st.setProperty("--aur-font", FONTS[all.font]?.stack || FONTS.spotify.stack);
+		st.setProperty("--aur-fs", `${all.fontSize}px`);
+		st.setProperty("--aur-gap", `${all.lineSpacing}em`);
+		st.setProperty("--aur-fw", all.fontWeight);
+		st.setProperty("--aur-shade", String(all.bgOpacity));
+		if (all.accent === "album") st.removeProperty("--aur-user-accent");
+		else st.setProperty("--aur-user-accent", all.accent);
 
 		const layout = all.animation === "fade" || all.animation === "cinematic" ? "stack" : "list";
 		const reduced = reducedMotion(all);
@@ -3551,6 +4255,8 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			color: all.textColor,
 			context: all.showContext ? "on" : "off",
 			glow: all.glow,
+			duet: all.duetColors ? "on" : "off",
+			accent: all.accent === "album" ? "album" : "custom",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
@@ -3570,11 +4276,11 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		if (key === "view") {
 			// Cross-fade into the new layout instead of jumping.
-			root.classList.remove("fal-view-swap");
+			root.classList.remove("aur-view-swap");
 			void root.offsetWidth;
-			root.classList.add("fal-view-swap");
+			root.classList.add("aur-view-swap");
 			clearTimeout(state.viewSwapTimer);
-			state.viewSwapTimer = setTimeout(() => root.classList.remove("fal-view-swap"), 900);
+			state.viewSwapTimer = setTimeout(() => root.classList.remove("aur-view-swap"), 900);
 		}
 		if (RELAYOUT_KEYS.has(key)) nextFrame(() => view.relayout());
 		if (SOURCE_KEYS.has(key) && state.open) loadLyrics();
@@ -3607,16 +4313,16 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const { clientWidth: w, clientHeight: hgt } = ui.root;
 		if (!w || !hgt) return;
 		const scale = (Math.max(w, hgt) * 1.9) / BG_SIZE;
-		ui.root.style.setProperty("--fal-bg-scale", scale.toFixed(3));
-		ui.root.style.setProperty("--fal-bg-blur", `${(settings.get("blur") / scale).toFixed(2)}px`);
+		ui.root.style.setProperty("--aur-bg-scale", scale.toFixed(3));
+		ui.root.style.setProperty("--aur-bg-blur", `${(settings.get("blur") / scale).toFixed(2)}px`);
 	}
 
 	function updateBackground(track) {
 		const url = track?.image;
 		if (!url || url === state.bgUrl) return;
 		state.bgUrl = url;
-		const blobs = ["b1", "b2", "b3"].map((c) => h("img", { class: `fal-blob ${c}`, alt: "", src: url, width: BG_SIZE, height: BG_SIZE }));
-		const layer = h("div", { class: "fal-bg-layer" }, blobs);
+		const blobs = ["b1", "b2", "b3"].map((c) => h("img", { class: `aur-blob ${c}`, alt: "", src: url, width: BG_SIZE, height: BG_SIZE }));
+		const layer = h("div", { class: "aur-bg-layer" }, blobs);
 		ui.bgStack.append(layer);
 		const reveal = () => {
 			if (state.bgUrl !== url) return layer.remove();
@@ -3634,9 +4340,10 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 				.then((c) => {
 					if (!c || state.track?.uri !== track.uri) return;
 					const st = ui.root.style;
-					st.setProperty("--fal-c1", c.VIBRANT || c.PROMINENT || "#4b3b78");
-					st.setProperty("--fal-c2", c.DARK_VIBRANT || c.DESATURATED || "#14203a");
-					st.setProperty("--fal-accent", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#ffffff");
+					// Album colours; styles.css swaps in the user's accent when one is chosen.
+					st.setProperty("--aur-album-c1", c.VIBRANT || c.PROMINENT || "#4b3b78");
+					st.setProperty("--aur-album-c2", c.DARK_VIBRANT || c.DESATURATED || "#14203a");
+					st.setProperty("--aur-album-accent", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#ffffff");
 				})
 				.catch(() => {});
 		}
@@ -3823,7 +4530,7 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 	/**
 	 * Ask every source for the current track (ignoring on/off switches, cache and pins) and
-	 * record what each returned. Shown in the ✎ panel; also exposed as FullscreenLyrics.testSources().
+	 * record what each returned. Shown in the ✎ panel; also exposed as AuroraLyrics.testSources().
 	 */
 	async function testSources() {
 		const track = getCurrentTrack();
@@ -3899,6 +4606,7 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			ui.elapsed.textContent = fmtTime(pos);
 			ui.remaining.textContent = `-${fmtTime(dur - pos)}`;
 			ui.bar.setAttribute("aria-valuemax", String(Math.round(dur / 1000)));
+			updateUpNext(pos, dur);
 		}
 		const playing = isPlaying();
 		if (playing !== state.playing) {
@@ -3913,6 +4621,28 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			state.psAt = now;
 			renderPlayerState(playerState());
 		}
+	}
+
+	/** Show / fill / hide the "Up next" card (called once per second of playback). */
+	function updateUpNext(pos, dur) {
+		const left = dur - pos;
+		const next =
+			settings.get("queuePeek") && dur > 45000 && left <= UP_NEXT_MS && left > 700 && state.ps.repeat !== 2 && !state.scrubbing ? getNextTrack() : null;
+		const card = ui.upNext;
+		if (!next || next.uri === state.track?.uri) {
+			card.classList.remove("is-on");
+			return;
+		}
+		if (card.dataset.uri !== next.uri) {
+			card.dataset.uri = next.uri;
+			ui.upTitle.textContent = next.title;
+			ui.upArtist.textContent = next.artist;
+			ui.upArt.hidden = !next.image;
+			if (next.image) ui.upArt.src = next.image;
+			card.title = `Play “${next.title}” now`;
+		}
+		ui.upWhen.textContent = ` · in ${Math.max(1, Math.ceil(left / 1000))}s`;
+		card.classList.add("is-on");
 	}
 
 	function renderPlayerState(ps) {
@@ -4022,6 +4752,7 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (!state.open) return;
 		state.open = false;
 		ui.panel.close();
+		ui.share.close();
 		ui.view.stopBrowsing(true);
 		ui.root.classList.remove("is-open");
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -4029,6 +4760,13 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 		kick(); // cancels pending frames because state.open is false
 		state.lastFocus?.focus?.({ preventScroll: true });
 		onOpenChange?.(false);
+	}
+
+	/** Share sheet; `lineIdx` preselects that line (right-click on a line). */
+	function openShare(lineIdx) {
+		if (!ui) return;
+		ui.panel.close();
+		ui.share.open(lineIdx);
 	}
 
 	async function toggleFullscreen() {
@@ -4040,7 +4778,7 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			}
 		} catch (e) {
 			toast("Fullscreen isn't available here");
-			console.warn("[fal] fullscreen failed", e);
+			console.warn("[aurora-lyrics] fullscreen failed", e);
 		}
 	}
 
@@ -4060,16 +4798,18 @@ function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (e.key === "Escape") {
 				e.preventDefault();
 				e.stopPropagation();
-				if (ui.panel.isOpen()) ui.panel.close();
+				if (ui.share.isOpen()) ui.share.close();
+				else if (ui.panel.isOpen()) ui.panel.close();
 				else if (ui.view.browsing) ui.view.stopBrowsing();
 				else close();
 				return;
 			}
-			if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+			if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey || ui.share.isOpen()) return;
 			if (e.key === "[") nudgeOffset(-100);
 			else if (e.key === "]") nudgeOffset(100);
 			else if (e.key === "f" || e.key === "F") toggleFullscreen();
 			else if (e.key === "t" || e.key === "T") settings.set("translate", !settings.get("translate"));
+			else if (e.key === "s" || e.key === "S") openShare();
 			else return;
 			e.preventDefault();
 			e.stopPropagation();
@@ -4114,28 +4854,35 @@ const NPV_ANCHOR = ".main-nowPlayingView-nowPlayingWidget";
 const ANCHOR_Y = 0.34; // active line position within the card body
 const LEAD_MS = 40;
 
-function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
+function createNowPlayingCard({ openOverlay, isOverlayOpen, onState, toggleMini }) {
 	const state = { uri: null, lyrics: null, source: null, token: 0, active: -2, wordIdx: -1, raf: 0, timer: 0, visible: false };
 	let lineEls = [];
 	let wordData = []; // per line: { words, spans } | null
 
 	// ---- DOM
-	const src = h("span", { class: "fal-npv-src" });
+	const src = h("span", { class: "aur-npv-src" });
 	const openBtn = h("button", {
-		class: "fal-npv-open",
+		class: "aur-npv-open",
 		title: "Open fullscreen lyrics (Alt+L)",
 		"aria-label": "Open fullscreen lyrics",
 		html: ICONS.fullscreen(),
 		onclick: (e) => (e.stopPropagation(), openOverlay()),
 	});
-	const lines = h("div", { class: "fal-npv-lines" });
-	const msg = h("div", { class: "fal-npv-msg" });
-	const body = h("div", { class: "fal-npv-body", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, lines, msg);
-	const card = h("div", { class: "fal-npv", "data-fal-npv": "" }, h("div", { class: "fal-npv-head" }, h("h2", { class: "fal-npv-title" }, "Lyrics"), src, openBtn), body);
+	const lines = h("div", { class: "aur-npv-lines" });
+	const msg = h("div", { class: "aur-npv-msg" });
+	const body = h("div", { class: "aur-npv-body", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, lines, msg);
+	const miniBtn = h("button", {
+		class: "aur-npv-open",
+		title: "Mini lyrics (Alt+M)",
+		"aria-label": "Mini lyrics",
+		html: ICONS.mini(),
+		onclick: (e) => (e.stopPropagation(), toggleMini?.()),
+	});
+	const card = h("div", { class: "aur-npv", "data-aur-npv": "" }, h("div", { class: "aur-npv-head" }, h("h2", { class: "aur-npv-title" }, "Lyrics"), src, miniBtn, openBtn), body);
 
 	// ---- mounting
 	function unhideSpotify() {
-		for (const el of document.querySelectorAll("[data-fal-hidden]")) el.removeAttribute("data-fal-hidden");
+		for (const el of document.querySelectorAll("[data-aur-hidden]")) el.removeAttribute("data-aur-hidden");
 	}
 	function mount() {
 		if (!settings.get("npvCard")) {
@@ -4145,7 +4892,7 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		}
 		const spotifyCard = document.querySelector(SPOTIFY_CARD);
 		if (spotifyCard) {
-			if (!spotifyCard.hasAttribute("data-fal-hidden")) spotifyCard.setAttribute("data-fal-hidden", "");
+			if (!spotifyCard.hasAttribute("data-aur-hidden")) spotifyCard.setAttribute("data-aur-hidden", "");
 			if (spotifyCard.previousElementSibling !== card) spotifyCard.before(card);
 		} else {
 			const anchor = document.querySelector(NPV_ANCHOR);
@@ -4175,6 +4922,7 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (key === "npvCard" || key === "*") mount();
 		if (["providers", "searchUntil", "estimateWords", "*"].includes(key)) load();
 		else if (key === "translate" || key === "translateTo") translateCard();
+		if (key === "duetColors" || key === "*") card.dataset.duet = settings.get("duetColors") ? "on" : "off";
 	});
 
 	// ---- lyrics
@@ -4185,6 +4933,7 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		wordData = [];
 		state.active = -2;
 		card.classList.remove("is-unsynced");
+		onState?.(state.uri, null, text);
 	}
 
 	async function load() {
@@ -4239,6 +4988,7 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		const kind = l.synced ? (l.hasWords ? "word sync" : "synced") : "plain";
 		src.textContent = `${SOURCE_LABELS[source] || source} · ${kind}`;
 		card.classList.toggle("is-unsynced", !l.synced);
+		card.dataset.duet = settings.get("duetColors") ? "on" : "off";
 
 		const frag = document.createDocumentFragment();
 		lineEls = [];
@@ -4247,20 +4997,20 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 			let el;
 			let wd = null;
 			if (line.gap) {
-				el = h("div", { class: "fal-npv-line is-gap" }, "• • •");
+				el = h("div", { class: "aur-npv-line is-gap" }, "• • •");
 			} else if (line.words && l.synced) {
-				el = h("div", { class: "fal-npv-line" });
+				el = h("div", { class: "aur-npv-line" });
 				const spans = line.words.map((w) => {
 					const m = w.text.match(/^(\s*)([\s\S]*?)(\s*)$/);
 					if (m[1]) el.append(m[1]);
-					const span = h("span", { class: "fal-npv-w" }, m[2]);
+					const span = h("span", { class: "aur-npv-w" }, m[2]);
 					el.append(span);
 					if (m[3]) el.append(m[3]);
 					return span;
 				});
 				wd = { words: line.words, spans };
 			} else {
-				el = h("div", { class: "fal-npv-line" }, line.text);
+				el = h("div", { class: "aur-npv-line" }, line.text);
 			}
 			if (l.synced && line.time != null && !line.gap) {
 				el.addEventListener("click", (e) => {
@@ -4270,24 +5020,27 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 				});
 				el.title = "Jump here";
 			}
+			const singer = line.gap ? null : (line.singer ?? (line.opposite ? 1 : null));
+			if (singer) el.dataset.singer = String(singer);
 			lineEls.push(el);
 			wordData.push(wd);
 			frag.append(el);
 		}
 		lines.replaceChildren(frag);
 		lines.style.transform = "";
+		onState?.(state.uri, l);
 		translateCard();
 		kick();
 	}
 
 	async function translateCard() {
-		for (const el of lines.querySelectorAll(".fal-npv-tr")) el.remove();
+		for (const el of lines.querySelectorAll(".aur-npv-tr")) el.remove();
 		const l = state.lyrics;
 		if (!l || !settings.get("translate")) return;
 		try {
 			const res = await translateLyrics(l, resolveTarget(settings.get("translateTo")));
 			if (state.lyrics !== l || res.sameLanguage) return;
-			res.lines.forEach((t, i) => t && lineEls[i]?.append(h("div", { class: "fal-npv-tr" }, t)));
+			res.lines.forEach((t, i) => t && lineEls[i]?.append(h("div", { class: "aur-npv-tr" }, t)));
 			state.active = -2; // re-measure scroll position with the taller lines
 			kick();
 		} catch {
@@ -4307,8 +5060,10 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (idx !== state.active) activate(idx);
 		const wd = idx >= 0 ? wordData[idx] : null;
 		if (wd) updateWords(wd, pos + LEAD_MS);
-		if (isPlaying()) state.raf = requestAnimationFrame(tick);
-		else state.timer = setTimeout(tick, 300);
+		if (isPlaying()) {
+			state.raf = requestAnimationFrame(tick);
+			state.timer = setTimeout(tick, 200); // rAF stalls in occluded windows
+		} else state.timer = setTimeout(tick, 300);
 	}
 	function kick() {
 		tick();
@@ -4319,7 +5074,7 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 		if (prev >= 0 && lineEls[prev]) {
 			lineEls[prev].classList.remove("is-active");
 			const wd = wordData[prev];
-			if (wd) for (const s of wd.spans) s.classList.remove("sung", "now"), s.style.removeProperty("--fal-wp");
+			if (wd) for (const s of wd.spans) s.classList.remove("sung", "now"), s.style.removeProperty("--aur-wp");
 		}
 		lineEls.forEach((el, i) => el.classList.toggle("is-past", i < idx));
 		state.active = idx;
@@ -4340,24 +5095,316 @@ function createNowPlayingCard({ openOverlay, isOverlayOpen }) {
 			spans.forEach((s, i) => {
 				s.classList.toggle("sung", i < k);
 				s.classList.toggle("now", i === k);
-				if (i !== k) s.style.removeProperty("--fal-wp");
+				if (i !== k) s.style.removeProperty("--aur-wp");
 			});
 			state.wordIdx = k;
 		}
 		if (k >= 0 && k < spans.length) {
 			const w = words[k];
 			const p = w.end > w.time ? Math.min(1, Math.max(0, (pos - w.time) / (w.end - w.time))) : 1;
-			spans[k].style.setProperty("--fal-wp", p.toFixed(3));
+			spans[k].style.setProperty("--aur-wp", p.toFixed(3));
 		}
 	}
 
 	mount();
+	if (state.uri !== getCurrentTrack()?.uri) load(); // also feeds mini lyrics when the card is off
 	return {
 		onSongChange: () => load(),
 		onPlayPause: kick,
 		onProgress: () => !isPlaying() && kick(),
 		onOverlayClosed: kick,
 		useLyrics,
+	};
+}
+
+// ---- mini.js ---------------------------------------------------------------
+// Mini lyrics: a small floating pill with the current line (word fill) and the next one, shown
+// over Spotify while the fullscreen view is closed. Drag it anywhere (position is remembered),
+// click the text to open the fullscreen view. Where the browser supports Document
+// Picture-in-Picture it can also pop out into an always-on-top window of its own.
+//
+// Lyrics come from the Now Playing card's lookup (see npv.js → main.js), so there is no
+// second search for the same song.
+
+
+const MINI_LEAD_MS = 40; // highlight words slightly early, as in the other views
+const PIP_SIZE = { width: 480, height: 150 };
+const MINI_UP_NEXT_MS = 20000; // same window as the overlay's "Up next" card
+
+function createMiniLyrics({ openOverlay, isOverlayOpen }) {
+	const state = { upAt: 0, lyrics: null, message: "", uri: null, active: -2, wordIdx: -1, raf: 0, rafWin: null, timer: 0, pip: null, words: null };
+
+	// ---- DOM
+	const art = h("img", { class: "aur-float-art", alt: "", decoding: "async" });
+	const cur = h("div", { class: "aur-float-cur" });
+	const next = h("div", { class: "aur-float-next" });
+	const text = h("div", { class: "aur-float-text", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, cur, next);
+	const btn = (label, icon, onclick, cls = "") => h("button", { class: `aur-float-btn ${cls}`, title: label, "aria-label": label, html: icon, onclick: (e) => (e.stopPropagation(), onclick()) });
+	const pipBtn = btn("Pop out (always on top)", ICONS.popOut(), () => popOut(), "is-pip-btn");
+	pipBtn.hidden = !("documentPictureInPicture" in globalThis);
+	const actions = h(
+		"div",
+		{ class: "aur-float-actions" },
+		pipBtn,
+		btn("Open fullscreen lyrics (Alt+L)", ICONS.fullscreen(), () => openOverlay()),
+		btn("Close mini lyrics (Alt+M)", ICONS.close(), () => (state.pip ? state.pip.close() : settings.set("miniLyrics", false))),
+	);
+	const el = h("div", { class: "aur-float", role: "region", "aria-label": "Mini lyrics", hidden: true }, art, text, actions);
+	document.body.append(el);
+
+	// ---- position + dragging (the pill, not the buttons; a short drag still counts as a click)
+	function place() {
+		if (state.pip) return;
+		const pos = settings.get("miniPos");
+		const w = el.offsetWidth || 420;
+		const hgt = el.offsetHeight || 64;
+		const vw = window.innerWidth;
+		const vh = window.innerHeight;
+		// Default: centred just above Spotify's player bar.
+		const x = pos ? pos.x * vw : vw / 2;
+		const y = pos ? pos.y * vh : vh - 96 - hgt / 2;
+		el.style.left = `${Math.round(clamp(x - w / 2, 8, Math.max(8, vw - w - 8)))}px`;
+		el.style.top = `${Math.round(clamp(y - hgt / 2, 8, Math.max(8, vh - hgt - 8)))}px`;
+	}
+	let drag = null;
+	el.addEventListener("pointerdown", (e) => {
+		if (state.pip || e.button !== 0 || e.target.closest(".aur-float-btn")) return;
+		const r = el.getBoundingClientRect();
+		drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId };
+	});
+	el.addEventListener("pointermove", (e) => {
+		if (!drag || e.pointerId !== drag.id) return;
+		if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+		if (!drag.moved) {
+			drag.moved = true;
+			el.setPointerCapture(e.pointerId);
+			el.classList.add("is-dragging");
+		}
+		el.style.left = `${Math.round(clamp(e.clientX - drag.dx, 8, window.innerWidth - el.offsetWidth - 8))}px`;
+		el.style.top = `${Math.round(clamp(e.clientY - drag.dy, 8, window.innerHeight - el.offsetHeight - 8))}px`;
+	});
+	const endDrag = (e) => {
+		if (!drag || e.pointerId !== drag.id) return;
+		const moved = drag.moved;
+		drag = null;
+		if (!moved) return;
+		el.classList.remove("is-dragging");
+		const r = el.getBoundingClientRect();
+		settings.set("miniPos", { x: (r.left + r.width / 2) / window.innerWidth, y: (r.top + r.height / 2) / window.innerHeight });
+		// Swallow the click that ends a drag, so dropping on the text doesn't open fullscreen.
+		el.addEventListener("click", (ev) => ev.stopPropagation(), { capture: true, once: true });
+	};
+	el.addEventListener("pointerup", endDrag);
+	el.addEventListener("pointercancel", endDrag);
+	window.addEventListener("resize", () => place());
+
+	// ---- visibility
+	function shouldShow() {
+		return !!state.pip || (settings.get("miniLyrics") && !isOverlayOpen());
+	}
+	function refresh() {
+		const show = shouldShow();
+		if (show === !el.hidden) return kick();
+		if (show) {
+			el.hidden = false;
+			place();
+			state.active = -2;
+			el.classList.remove("is-in");
+			void el.offsetWidth;
+			el.classList.add("is-in");
+		} else {
+			el.hidden = true;
+		}
+		kick();
+	}
+	settings.subscribe((key) => {
+		if (key === "miniLyrics" || key === "*") refresh();
+		if (key === "duetColors" || key === "*") el.dataset.duet = settings.get("duetColors") ? "on" : "off";
+	});
+	el.dataset.duet = settings.get("duetColors") ? "on" : "off";
+	setTimeout(refresh); // after main.js has finished wiring (isOverlayOpen needs the overlay)
+
+	// Alt+M anywhere toggles it (physical key, so any keyboard layout works).
+	window.addEventListener(
+		"keydown",
+		(e) => {
+			if (!(e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.code === "KeyM")) return;
+			e.preventDefault();
+			e.stopPropagation();
+			toggle();
+		},
+		true,
+	);
+	function toggle() {
+		if (state.pip) return state.pip.close();
+		settings.set("miniLyrics", !settings.get("miniLyrics"));
+	}
+
+	// ---- content
+	/** From the Now Playing card: lyrics for `uri`, or null with a message. */
+	function setLyrics(uri, lyrics, message = "") {
+		state.uri = uri;
+		state.lyrics = lyrics;
+		state.message = message;
+		state.active = -2;
+		state.wordIdx = -1;
+		const track = getCurrentTrack();
+		if (track?.image && art.getAttribute("src") !== track.image) art.src = track.image;
+		art.hidden = !track?.image;
+		tint(track);
+		if (!lyrics) showLines(message || "", "");
+		else if (!lyrics.synced) showLines(track ? `${track.title}` : "", "Lyrics aren't synced · click to read them");
+		kick();
+	}
+
+	function tint(track) {
+		const extract = globalThis.Spicetify?.colorExtractor;
+		if (!track?.uri || typeof extract !== "function") return;
+		Promise.resolve(extract(track.uri))
+			.then((c) => c && state.uri === track.uri && el.style.setProperty("--float-c", c.DARK_VIBRANT || c.VIBRANT || c.PROMINENT || "#2a2a33"))
+			.catch(() => {});
+	}
+
+	/** Swap the two lines with a short enter animation. `a` may be a node or text. */
+	function showLines(a, b, singer = null) {
+		cur.replaceChildren(a);
+		next.textContent = b || "";
+		if (singer) cur.dataset.singer = String(singer);
+		else delete cur.dataset.singer;
+		for (const n of [cur, next]) {
+			n.classList.remove("is-enter");
+			void n.offsetWidth;
+			n.classList.add("is-enter");
+		}
+	}
+
+	function lineNode(line) {
+		if (line.gap) return h("span", { class: "aur-float-dots" }, h("i"), h("i"), h("i"));
+		if (!line.words) return line.text;
+		const frag = document.createDocumentFragment();
+		const spans = line.words.map((w) => {
+			const m = w.text.match(/^(\s*)([\s\S]*?)(\s*)$/);
+			if (m[1]) frag.append(m[1]);
+			const span = h("span", { class: "aur-float-w" }, m[2]);
+			frag.append(span);
+			if (m[3]) frag.append(m[3]);
+			return span;
+		});
+		state.words = { words: line.words, spans };
+		return frag;
+	}
+
+	function activate(idx) {
+		const ls = state.lyrics.lines;
+		state.active = idx;
+		state.wordIdx = -1;
+		state.words = null;
+		const nextText = (from) => ls.slice(from).find((l) => !l.gap)?.text || "";
+		if (idx < 0) return showLines(lineNode({ gap: true }), nextText(0));
+		const line = ls[idx];
+		showLines(lineNode(line), nextText(idx + 1), line.gap ? null : (line.singer ?? (line.opposite ? 1 : null)));
+	}
+
+	function updateWords(pos) {
+		const { words, spans } = state.words;
+		const k = findLineIndex(words, pos);
+		if (k !== state.wordIdx) {
+			spans.forEach((s, i) => {
+				s.classList.toggle("sung", i < k);
+				if (i !== k) s.style.removeProperty("--aur-wp");
+			});
+			state.wordIdx = k;
+		}
+		if (k >= 0 && k < spans.length) {
+			const w = words[k];
+			const p = w.end > w.time ? clamp((pos - w.time) / (w.end - w.time), 0, 1) : 1;
+			spans[k].style.setProperty("--aur-wp", p.toFixed(3));
+		}
+	}
+
+	/** After the last lyric line, near the end of the song: "Up next · title — artist". */
+	function peekNext() {
+		const ls = state.lyrics.lines;
+		if (state.active < 0 || ls.slice(state.active + 1).some((l) => !l.gap)) return;
+		const dur = getDuration();
+		const t = settings.get("queuePeek") && dur > 45000 && dur - getPosition() <= MINI_UP_NEXT_MS ? getNextTrack() : null;
+		const text = t && t.uri !== state.uri ? `Up next · ${t.title}${t.artist ? ` — ${t.artist}` : ""}` : "";
+		if (next.textContent !== text) next.textContent = text;
+	}
+
+	// ---- loop: rAF of whichever window shows the pill (the PiP window keeps running while
+	// Spotify's own window is minimised), a slow timer while paused.
+	function stop() {
+		if (state.raf) state.rafWin?.cancelAnimationFrame(state.raf);
+		clearTimeout(state.timer);
+		state.raf = state.timer = 0;
+	}
+	function tick() {
+		stop();
+		if (el.hidden || !state.lyrics?.synced) return;
+		const pos = getPosition() + settings.get("offset");
+		const idx = findLineIndex(state.lyrics.lines, pos);
+		if (idx !== state.active) activate(idx);
+		if (state.words) updateWords(pos + MINI_LEAD_MS);
+		const now = performance.now();
+		if (now - state.upAt > 1000) {
+			state.upAt = now;
+			peekNext();
+		}
+		if (isPlaying()) {
+			state.rafWin = state.pip || window;
+			state.raf = state.rafWin.requestAnimationFrame(tick);
+			// rAF stalls in occluded / background windows; the timer keeps lines on time.
+			state.timer = setTimeout(tick, 200);
+		} else state.timer = setTimeout(tick, 300);
+	}
+	function kick() {
+		tick();
+	}
+
+	// ---- Document Picture-in-Picture
+	async function popOut() {
+		const api = globalThis.documentPictureInPicture;
+		if (!api || state.pip) return;
+		let pip;
+		try {
+			pip = await api.requestWindow(PIP_SIZE);
+		} catch (e) {
+			// e.g. the host app can't open extra windows ("no window"): don't offer it again.
+			console.warn("[aurora-lyrics] pop-out failed", e);
+			pipBtn.hidden = true;
+			next.textContent = "Pop-out isn't available in this Spotify version";
+			return;
+		}
+		// Same styles as the main window (Spotify's fonts + ours).
+		for (const node of document.querySelectorAll('link[rel="stylesheet"], style')) pip.document.head.append(node.cloneNode(true));
+		pip.document.documentElement.className = document.documentElement.className;
+		pip.document.body.classList.add("aur-float-pip-body");
+		pip.document.title = "Aurora Lyrics";
+		stop();
+		state.pip = pip;
+		el.classList.add("is-pip");
+		el.style.left = el.style.top = "";
+		el.hidden = false;
+		pip.document.body.append(el);
+		pip.addEventListener("pagehide", () => {
+			stop();
+			state.pip = null;
+			el.classList.remove("is-pip");
+			document.body.append(el);
+			el.hidden = true; // refresh() decides whether it shows in Spotify again
+			refresh();
+		});
+		state.active = -2;
+		kick();
+	}
+
+	return {
+		setLyrics,
+		refresh,
+		toggle,
+		onPlayPause: kick,
+		onProgress: kick, // ~1/s and on seeks
 	};
 }
 
@@ -4376,8 +5423,8 @@ async function waitForSpicetify(timeoutMs = 60000) {
 }
 
 async function main() {
-	if (globalThis.__falLoaded) return; // guard against double injection
-	globalThis.__falLoaded = true;
+	if (globalThis.__auroraLyricsLoaded) return; // guard against double injection
+	globalThis.__auroraLyricsLoaded = true;
 
 	const S = await waitForSpicetify();
 
@@ -4388,16 +5435,30 @@ async function main() {
 
 	let playbarBtn = null;
 	let card = null;
+	let mini = null;
 	const overlay = createOverlay({
 		onOpenChange: (open) => {
 			if (playbarBtn) playbarBtn.active = open;
 			if (!open) card?.onOverlayClosed();
+			mini?.refresh();
 		},
 		onLyrics: (uri, lyrics, source) => card?.useLyrics(uri, lyrics, source),
 	});
+	const isOverlayOpen = () => overlay.isOpen();
+	// Mini lyrics: a floating pill over Spotify (fed by the Now Playing card's lookup).
+	try {
+		mini = createMiniLyrics({ openOverlay: () => overlay.open(), isOverlayOpen });
+	} catch (e) {
+		console.warn(`[${EXT_ID}] mini lyrics unavailable`, e);
+	}
 	// Our lyrics card in Spotify's right-hand Now Playing panel.
 	try {
-		card = createNowPlayingCard({ openOverlay: () => overlay.open(), isOverlayOpen: () => overlay.isOpen() });
+		card = createNowPlayingCard({
+			openOverlay: () => overlay.open(),
+			isOverlayOpen,
+			onState: (uri, lyrics, message) => mini?.setLyrics(uri, lyrics, message),
+			toggleMini: () => mini?.toggle(),
+		});
 	} catch (e) {
 		console.warn(`[${EXT_ID}] Now Playing card unavailable`, e);
 	}
@@ -4416,11 +5477,11 @@ async function main() {
 	}
 
 	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange()));
-	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause()));
-	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress()));
+	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause(), mini?.onPlayPause()));
+	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress(), mini?.onProgress()));
 
-	// Small public handle for debugging from DevTools: window.FullscreenLyrics.open()
-	globalThis.FullscreenLyrics = { open: overlay.open, close: overlay.close, toggle: overlay.toggle, testSources: overlay.testSources };
+	// Small public handle for debugging from DevTools: window.AuroraLyrics.open()
+	globalThis.AuroraLyrics = { open: overlay.open, close: overlay.close, toggle: overlay.toggle, testSources: overlay.testSources, toggleMini: () => mini?.toggle() };
 	console.info(`[${EXT_ID}] loaded`);
 }
 

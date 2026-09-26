@@ -70,11 +70,11 @@
 			document.getElementById("prev").onclick = Player.back;
 			// ?demo: open the overlay on a nice moment (used to render docs/preview.png).
 			if (/[?&]demo(&|$)/.test(location.search)) {
-				localStorage.setItem("fullscreen-animated-lyrics:settings", JSON.stringify({ seenTip: true, autoHideControls: false }));
+				localStorage.setItem("aurora-lyrics:settings", JSON.stringify({ seenTip: true, autoHideControls: false }));
 				const start = () => {
-					if (!window.FullscreenLyrics) return setTimeout(start, 100); // wait for the extension
+					if (!window.AuroraLyrics) return setTimeout(start, 100); // wait for the extension
 					Player.seek(13100);
-					FullscreenLyrics.open();
+					AuroraLyrics.open();
 					setTimeout(() => state.playing && Player.togglePlay(), 3500);
 				};
 				start();

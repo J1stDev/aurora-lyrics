@@ -7,7 +7,8 @@
 //     meta: { ti?, ar?, al?, by?, offset?, length? },
 //     lines: Line[]
 //   }
-//   Line = { time: ms|null, end: ms|null, text: string, gap?: true, words: Word[]|null }
+//   Line = { time: ms|null, end: ms|null, text: string, gap?: true, words: Word[]|null,
+//            bg?: { text, words }, opposite?: true, singer?: 0|1|2 }   (bg/opposite/singer: optional extras)
 //   Word = { time: ms, end: ms, text: string }   // text keeps its trailing space
 //
 // All times are milliseconds with the LRC [offset:] already applied.
@@ -27,6 +28,15 @@ function toMs(min, sec, frac) {
 	let ms = 0;
 	if (frac) ms = frac.length === 1 ? +frac * 100 : frac.length === 2 ? +frac * 10 : +frac;
 	return (+min * 60 + +sec) * 1000 + ms;
+}
+
+/**
+ * Duet voices. Lines may carry `singer`: 0 = lead, 1 = second singer, 2 = together / group.
+ * A2 LRC numbers voices v1, v2, …; v1000+ is the conventional "all voices" marker.
+ */
+export function voiceToSinger(n) {
+	if (n >= 1000) return 2;
+	return n >= 1 ? (n - 1) % 2 : null;
 }
 
 /** True when the text contains at least one line-level LRC timestamp. */
@@ -97,8 +107,14 @@ export function parseLRC(text, opts = {}) {
 			continue; // untimed text inside a synced file is ignored
 		}
 
-		// A2 voice markers ("v1:") and stray whitespace.
-		const content = line.slice(contentStart).replace(/^v\d+:\s*/i, "");
+		// A2 voice markers ("v1:", "v2:"): who sings the line in a duet. Stripped from the text.
+		let content = line.slice(contentStart);
+		let singer = null;
+		const voice = content.match(/^v(\d+):\s*/i);
+		if (voice) {
+			singer = voiceToSinger(Number(voice[1]));
+			content = content.slice(voice[0].length);
+		}
 		const parsedWords = parseWords(content);
 		const plain = (parsedWords ? parsedWords.plain : content).replace(/\s+/g, " ").trim();
 
@@ -113,7 +129,7 @@ export function parseLRC(text, opts = {}) {
 					text: w.text,
 				}));
 			}
-			lines.push({ time: t, end: null, text: plain, words });
+			lines.push({ time: t, end: null, text: plain, words, singer, opposite: singer === 1 });
 		}
 	}
 
@@ -181,6 +197,7 @@ export function finalizeSynced(lines, meta = {}, duration) {
 		const out = { time: l.time, end: null, text: gap ? "" : text, gap: gap || undefined, words: gap ? null : words };
 		if (bg && !gap) out.bg = bg;
 		if (l.opposite && !gap) out.opposite = true; // duet: other singer, shown on the opposite side
+		if (l.singer != null && !gap) out.singer = l.singer; // duet: who sings it (see voiceToSinger)
 		return out;
 	});
 
