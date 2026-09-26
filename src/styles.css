@@ -2132,19 +2132,26 @@
 @keyframes aur-fx-breathe { 50% { transform: scale(1.12); opacity: 0.7; } }
 @keyframes aur-fx-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
 
-/* Aurora: two slow ribbons of light drifting across the sky. */
+/* Aurora: two slow ribbons of light drifting across the sky. The angle is drawn by the
+   gradient itself and the layer is far larger than the screen, so it only ever translates and
+   its edges can never come into view (a tilted box would show its edges when composited next
+   to frosted-glass effects, e.g. under the Aurora Spotify theme). No blend mode, same reason. */
 .aur-root[data-fx="aurora"] :is(.aur-fx-a, .aur-fx-b) {
 	display: block;
-	inset: -25% -35%;
-	background: linear-gradient(100deg, transparent 28%, color-mix(in oklab, var(--aur-accent) 55%, #7b5cff) 40%, transparent 52%, color-mix(in oklab, var(--aur-c1) 55%, #2ee6a8) 64%, transparent 76%);
-	opacity: 0.2;
-	mix-blend-mode: screen;
+	inset: -100%;
+	background: linear-gradient(100deg, transparent 38%, color-mix(in oklab, var(--aur-accent) 55%, #7b5cff) 44%, transparent 50%, color-mix(in oklab, var(--aur-c1) 55%, #2ee6a8) 56%, transparent 62%);
+	opacity: 0.16;
 	animation: aur-fx-ribbon 28s ease-in-out infinite alternate;
 }
-.aur-root[data-fx="aurora"] .aur-fx-b { opacity: 0.13; animation-duration: 37s; animation-direction: alternate-reverse; transform: scaleX(-1); }
+.aur-root[data-fx="aurora"] .aur-fx-b {
+	opacity: 0.1;
+	background: linear-gradient(80deg, transparent 40%, color-mix(in oklab, var(--aur-c1) 55%, #2ee6a8) 46%, transparent 52%);
+	animation-duration: 37s;
+	animation-direction: alternate-reverse;
+}
 @keyframes aur-fx-ribbon {
-	from { transform: translate3d(-8%, 5%, 0) skewY(-12deg); }
-	to { transform: translate3d(8%, -6%, 0) skewY(-5deg); }
+	from { transform: translate3d(-6%, 4%, 0); }
+	to { transform: translate3d(6%, -5%, 0); }
 }
 
 /* Neon: a glowing tube frame around the screen, breathing, with a cyan floor glow. */
@@ -2156,7 +2163,7 @@
 		inset 0 0 0 2px color-mix(in oklab, var(--aur-accent) 55%, transparent);
 	animation: aur-fx-pulse 4.5s ease-in-out infinite;
 }
-.aur-root[data-fx="neon"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 45%; background: radial-gradient(60% 100% at 50% 100%, rgba(34, 211, 238, 0.22), transparent 70%); mix-blend-mode: screen; }
+.aur-root[data-fx="neon"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 45%; background: radial-gradient(60% 100% at 50% 100%, rgba(34, 211, 238, 0.18), transparent 70%); }
 
 /* Minimal: nothing added, and a lighter grain. */
 .aur-root[data-fx="minimal"] .aur-bg-grain { opacity: 0.04; }
