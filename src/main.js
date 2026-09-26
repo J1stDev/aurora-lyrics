@@ -61,7 +61,12 @@ export async function main() {
 	// Buttons: each API is optional across Spicetify versions, so register what exists.
 	const label = "Aurora Lyrics (Alt+L)";
 	try {
-		if (S.Topbar?.Button) new S.Topbar.Button(label, ICONS.lyrics(16), () => overlay.toggle());
+		if (S.Topbar?.Button) {
+			const tb = new S.Topbar.Button(label, ICONS.lyrics(20), () => overlay.toggle());
+			// Round like Spotify's global-nav buttons (Home, Marketplace…); styles in styles.css.
+			const el = tb.element?.matches?.("button") ? tb.element : tb.element?.querySelector?.("button") || tb.element;
+			el?.classList.add("aur-topbar-btn");
+		}
 	} catch (e) {
 		console.warn(`[${EXT_ID}] topbar button unavailable`, e);
 	}

@@ -1831,3 +1831,30 @@
 /* artist / album names that open their Spotify page */
 .aur-link { display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-decoration: underline transparent 1px; text-underline-offset: 3px; transition: color 0.2s ease, text-decoration-color 0.2s ease; }
 .aur-link:hover, .aur-link:focus-visible { color: #fff; text-decoration-color: currentColor; outline: none; }
+
+/* ============================================================== top-bar button
+   Matches Spotify's round global-nav buttons (Home, Marketplace): a 48px circle on the
+   elevated background, subdued icon that brightens on hover. Uses Spotify's own theme
+   variables so Spicetify themes recolour it too. */
+.aur-topbar-btn {
+	display: inline-grid !important;
+	place-items: center;
+	width: 48px !important;
+	height: 48px !important;
+	min-width: 48px;
+	margin-inline: 8px;
+	padding: 0 !important;
+	border: 0;
+	border-radius: 50% !important;
+	background-color: var(--background-elevated-base, #1f1f1f) !important;
+	color: var(--text-subdued, #b3b3b3) !important;
+	cursor: pointer;
+	transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.aur-topbar-btn:hover, .aur-topbar-btn:focus-visible {
+	background-color: var(--background-elevated-highlight, #2a2a2a) !important;
+	color: var(--text-base, #fff) !important;
+	transform: scale(1.04);
+}
+.aur-topbar-btn:active { transform: scale(0.98); }
+.aur-topbar-btn svg { width: 20px; height: 20px; }
