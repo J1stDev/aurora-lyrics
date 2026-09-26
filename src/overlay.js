@@ -3,7 +3,7 @@
 
 import { h, clamp, nextFrame } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO } from "./settings.js";
-import { getCurrentTrack, getNextTrack, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
+import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
 import { lyricsCache, localLyrics } from "./cache.js";
 import { toLRC, estimateWords } from "./lrc.js";
@@ -495,12 +495,18 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	// ---------------------------------------------------------------------------
 	function updateTrackChrome(track) {
 		ui.title.textContent = track?.title || "";
-		ui.artist.textContent = track ? [track.artist, track.album].filter(Boolean).join(" • ") : "";
+		// Artist and album names open their Spotify page (and close the overlay).
+		const link = (text, uri) =>
+			uri ? h("button", { class: "aur-link", title: `Go to ${text}`, onclick: (e) => (e.stopPropagation(), openUri(uri) && close()) }, text) : h("span", null, text);
+		const artistNodes = () =>
+			(track?.artistLinks?.length ? track.artistLinks : track?.artist ? [{ name: track.artist }] : []).flatMap((a, i) => (i ? [", ", link(a.name, a.uri)] : [link(a.name, a.uri)]));
+		const albumNode = () => (track?.album ? link(track.album, track.albumUri) : null);
+		ui.artist.replaceChildren(...artistNodes(), ...(track?.album ? [" • ", albumNode()] : []));
 		if (track?.image) ui.cover.src = track.image;
 		ui.cover.hidden = !track?.image;
 		ui.sideTitle.textContent = track?.title || "";
-		ui.sideArtist.textContent = track?.artist || "";
-		ui.sideAlbum.textContent = track?.album || "";
+		ui.sideArtist.replaceChildren(...artistNodes());
+		ui.sideAlbum.replaceChildren(...(track?.album ? [albumNode()] : []));
 		updateSideArt(track?.image);
 		updateBackground(track);
 	}

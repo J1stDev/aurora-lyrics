@@ -33,8 +33,17 @@ export function getCurrentTrack() {
 	const images = item.album?.images || item.images || [];
 	const biggest = images.length ? [...images].sort((a, b) => (b.width || 0) - (a.width || 0))[0]?.url : null;
 
+	// Links for the artist / album names (clickable in the overlay).
+	const artistLinks = Array.isArray(item.artists) && item.artists.length
+		? item.artists.filter((a) => a?.name).map((a) => ({ name: a.name, uri: a.uri || null }))
+		: meta.artist_name
+			? [{ name: meta.artist_name, uri: meta.artist_uri || null }]
+			: [];
+
 	return {
 		uri,
+		artistLinks,
+		albumUri: item.album?.uri || meta.album_uri || null,
 		id: parts[1] === "track" ? parts[2] : null,
 		title: item.name || meta.title || "",
 		artist: artists ? artists.join(", ") : meta.artist_name || "",
@@ -80,6 +89,15 @@ export function getNextTrack() {
 		}
 	}
 	return null;
+}
+
+/** Open a Spotify page ("spotify:album:ID" / "spotify:artist:ID") in the main view. */
+export function openUri(uri) {
+	const m = /^spotify:(album|artist|show|playlist):([A-Za-z0-9]+)$/.exec(uri || "");
+	const history = globalThis.Spicetify?.Platform?.History;
+	if (!m || !history?.push) return false;
+	history.push(`/${m[1]}/${m[2]}`);
+	return true;
 }
 
 /** Current playback position in ms, interpolated between player state updates. */

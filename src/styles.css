@@ -1827,3 +1827,7 @@
 .aur-upnext-skip svg { width: 14px; height: 14px; }
 .aur-upnext:hover .aur-upnext-skip { opacity: 1; background: rgba(255, 255, 255, 0.2); }
 .aur-root[data-motion="reduced"] .aur-upnext { transition: opacity 0.3s ease; transform: none; }
+
+/* artist / album names that open their Spotify page */
+.aur-link { display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-decoration: underline transparent 1px; text-underline-offset: 3px; transition: color 0.2s ease, text-decoration-color 0.2s ease; }
+.aur-link:hover, .aur-link:focus-visible { color: #fff; text-decoration-color: currentColor; outline: none; }

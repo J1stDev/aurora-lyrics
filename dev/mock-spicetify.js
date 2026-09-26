@@ -94,8 +94,8 @@
 			item: {
 				uri: t.uri,
 				name: t.name,
-				artists: [{ name: t.artist }],
-				album: { name: t.album, images: [{ url: t.img, width: 640 }] },
+				artists: [{ name: t.artist, uri: `spotify:artist:${t.uri.split(":")[2]}a` }],
+				album: { name: t.album, uri: `spotify:album:${t.uri.split(":")[2]}b`, images: [{ url: t.img, width: 640 }] },
 				duration: { milliseconds: t.dur },
 				metadata: { title: t.name, artist_name: t.artist, album_title: t.album },
 			},
@@ -241,6 +241,7 @@
 		Topbar: { Button },
 		Playbar: { Button },
 		Config: { version: "mock" },
+		Platform: { History: { push: (path) => ((window.mock.lastNav = path), console.info("[mock] navigate", path)) } },
 		// Queue in Spicetify.Queue's shape (a delimiter first, like the real one sometimes has).
 		get Queue() {
 			const n = TRACKS[(state.idx + 1) % TRACKS.length];
