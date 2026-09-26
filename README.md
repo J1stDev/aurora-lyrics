@@ -99,7 +99,7 @@ Press **S** (or right-click a line) and build a ready-to-post image:
 - **Size**: Square, Portrait or Story.
 - **Background**: blurred album art, gradient, accent colour, dark or light.
 - **Text**: left or centred, and a size slider.
-- **Extras**: cover and track info, the translation under each line (when translation is on), and a small *Aurora Lyrics* credit.
+- **Extras**: text glow on or off, cover and track info, the translation under each line (when translation is on), and a small *Aurora Lyrics* credit.
 
 Then **Copy image** (or Ctrl+C) and paste it anywhere, **Save PNG**, **Share…** (when your system supports it), or **Copy text** to paste the lines as plain text. Your choices are remembered for next time.
 

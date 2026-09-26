@@ -5,7 +5,7 @@
 // locally; the only network use is loading the cover image (CORS-enabled Spotify CDN). If the
 // cover can't be used on a canvas, album-art backgrounds fall back to the gradient.
 
-import { h, clamp } from "./util.js";
+import { h, clamp, nextFrame } from "./util.js";
 import { ICONS } from "./icons.js";
 import { store } from "./storage.js";
 
@@ -29,7 +29,7 @@ const BACKGROUNDS = [
 ];
 const MAX_LINES = 8;
 const OPTS_KEY = "aurora-lyrics:share";
-const DEFAULT_OPTS = { style: "classic", format: "portrait", bg: "album", align: "left", size: 100, info: true, tr: true, credit: false };
+const DEFAULT_OPTS = { style: "classic", format: "portrait", bg: "album", align: "left", size: 100, glow: true, info: true, tr: true, credit: false };
 
 const images = new Map();
 /** Load an image for canvas use (CORS), cached; resolves null if it can't be used. */
@@ -255,7 +255,7 @@ function drawLyrics(ctx, o, fit, x, top, align, pal) {
 		ctx.save();
 		ctx.font = `${o.weight} ${Math.round(fit.size)}px ${o.font}`;
 		ctx.fillStyle = pal.text;
-		if (pal.glow) {
+		if (pal.glow && o.glow !== false) {
 			ctx.shadowColor = pal.glow;
 			ctx.shadowBlur = fit.size * 0.38;
 		}
@@ -297,7 +297,7 @@ function drawTrackInfo(ctx, o, x, y, maxW, pal, { align = "left", titleSize, art
  * @param {HTMLCanvasElement} canvas
  * @param {{ lines: {text: string, tr?: string|null}[], title: string, artist: string,
  *   cover: HTMLImageElement|null, format: string, style: string, bg: string, align: string,
- *   size: number, info: boolean, credit: boolean, font: string, uiFont: string,
+ *   size: number, glow?: boolean, info: boolean, credit: boolean, font: string, uiFont: string,
  *   weight: string|number, accent: string, c1: string, c2: string }} opts
  */
 export function drawShareCard(canvas, opts) {
@@ -440,7 +440,7 @@ export function createShareSheet(ctx) {
 	let lastClicked = -1;
 	let info = null; // snapshot of the context when opened
 	let renderToken = 0;
-	let frame = 0;
+	let pending = false;
 
 	const canvas = h("canvas", { class: "aur-share-canvas", "aria-label": "Share image preview" });
 	const lineList = h("div", { class: "aur-share-lines", role: "group", "aria-label": "Lines to include" });
@@ -529,7 +529,7 @@ export function createShareSheet(ctx) {
 			label("Text"),
 			alignSeg,
 			h("div", { class: "aur-share-size" }, h("span", null, "Size"), sizeInput, sizeOut),
-			h("div", { class: "aur-share-toggles" }, toggle("info", "Cover and track info"), trToggle, toggle("credit", "Aurora Lyrics credit")),
+			h("div", { class: "aur-share-toggles" }, toggle("glow", "Text glow"), toggle("info", "Cover and track info"), trToggle, toggle("credit", "Aurora Lyrics credit")),
 		),
 		h("div", { class: "aur-share-actions" }, exportBtns),
 	);
@@ -600,10 +600,14 @@ export function createShareSheet(ctx) {
 			.map((i) => ({ text: ls[i].text, tr: opts.tr && hasTr() ? info.tr[i] || null : null }));
 	};
 
-	// ---- rendering (coalesced to one per frame)
+	// ---- rendering (coalesced to one per frame; nextFrame also runs when frames are throttled)
 	function render() {
-		cancelAnimationFrame(frame);
-		frame = requestAnimationFrame(() => draw());
+		if (pending) return;
+		pending = true;
+		nextFrame(() => {
+			pending = false;
+			draw();
+		});
 	}
 	async function draw() {
 		const token = ++renderToken;
