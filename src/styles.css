@@ -1834,17 +1834,19 @@
 	border-radius: 14px;
 	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
-.aur-share-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
-.aur-share-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.aur-share-side { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; max-height: min(78vh, 720px); }
+.aur-share-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 2px; }
+.aur-share-scroll { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; margin-right: -8px; padding-right: 8px; scrollbar-width: thin; }
 .aur-share-label { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
 .aur-share-count { font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .aur-share-lines {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-	flex: 1 1 auto;
+	flex: none;
+	height: 26vh;
 	min-height: 120px;
-	max-height: 38vh;
+	max-height: 260px;
 	overflow-y: auto;
 	padding: 4px;
 	border-radius: 12px;
@@ -1859,11 +1861,25 @@
 	line-height: 1.35;
 	text-align: left;
 	color: rgba(255, 255, 255, 0.62);
+	user-select: none;
 	transition: background 0.15s ease, color 0.15s ease;
 }
 .aur-share-line:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .aur-share-line[aria-pressed="true"] { background: rgba(30, 215, 96, 0.14); color: #fff; box-shadow: inset 3px 0 0 var(--aur-green); }
-.aur-share .aur-panel-actions { margin-top: 12px; }
+.aur-share-quick { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.aur-share-link { padding: 0; font-weight: 700; color: rgba(255, 255, 255, 0.8); }
+.aur-share-link:hover { color: #fff; text-decoration: underline; }
+.aur-share-tip { margin-left: auto; color: rgba(255, 255, 255, 0.4); }
+.aur-share .aur-segmented.is-disabled { opacity: 0.4; pointer-events: none; }
+.aur-share .aur-seg { padding: 0 6px; font-size: 12px; }
+.aur-share-size { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-top: 4px; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
+.aur-share-toggles { display: flex; flex-direction: column; margin-top: 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); }
+.aur-share-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; font-size: 13px; cursor: pointer; }
+.aur-share-toggle + .aur-share-toggle { border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.aur-share-toggle[hidden] { display: none; }
+.aur-share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.aur-share-actions .aur-btn { justify-content: center; }
+.aur-share-actions .aur-btn[hidden] { display: none; }
 @media (max-width: 760px) {
 	.aur-share-card { grid-template-columns: 1fr; overflow-y: auto; }
 	.aur-share-canvas { max-width: 100%; max-height: 40vh; }

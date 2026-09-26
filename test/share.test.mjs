@@ -44,3 +44,9 @@ test("describeQueueItem reads both queue shapes and skips delimiters", async () 
 		image: "https://i/l",
 	});
 });
+
+test("shareText joins lines and credits the song", async () => {
+	const { shareText } = await import("../src/share.js");
+	assert.equal(shareText(["Line one", "Line two"], "Song", "Artist"), "Line one\nLine two\n— Song · Artist");
+	assert.equal(shareText(["Solo"], "", ""), "Solo");
+});

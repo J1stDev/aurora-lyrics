@@ -291,7 +291,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		const share = createShareSheet({
-			getContext: () => ({ track: state.track, lyrics: state.lyrics, active: ui?.view.active ?? -1, root }),
+			getContext: () => ({ track: state.track, lyrics: state.lyrics, tr: ui?.view.tr || null, active: ui?.view.active ?? -1, root }),
 			toast,
 			onClose: () => root.focus({ preventScroll: true }),
 		});
