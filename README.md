@@ -1,4 +1,6 @@
-# Aurora Lyrics
+<p align="center"><img src="docs/icon.png" width="128" alt="Aurora Lyrics icon"></p>
+
+<h1 align="center">Aurora Lyrics</h1>
 
 **Beautiful, full-screen lyrics for Spotify that light up word by word as the song plays.**
 
