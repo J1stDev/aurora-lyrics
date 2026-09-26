@@ -29,11 +29,13 @@ export async function main() {
 	document.head.append(style);
 
 	let playbarBtn = null;
+	let playbarEl = null; // the player-bar button element, styled as a liquid-glass tile
 	let card = null;
 	let mini = null;
 	const overlay = createOverlay({
 		onOpenChange: (open) => {
 			if (playbarBtn) playbarBtn.active = open;
+			playbarEl?.classList.toggle("is-on", open);
 			if (!open) card?.onOverlayClosed();
 			mini?.refresh();
 		},
@@ -71,12 +73,26 @@ export async function main() {
 		console.warn(`[${EXT_ID}] topbar button unavailable`, e);
 	}
 	try {
-		if (S.Playbar?.Button) playbarBtn = new S.Playbar.Button(label, ICONS.lyrics(16), () => overlay.toggle(), false, false);
+		if (S.Playbar?.Button) {
+			playbarBtn = new S.Playbar.Button(label, ICONS.lyrics(16), () => overlay.toggle(), false, false);
+			const el = playbarBtn.element;
+			playbarEl = el?.matches?.("button") ? el : el?.querySelector?.("button") || el || null;
+			playbarEl?.classList.add("aur-pb-btn");
+			tintPlaybar();
+		}
 	} catch (e) {
 		console.warn(`[${EXT_ID}] playbar button unavailable`, e);
 	}
 
-	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange()));
+	// The glass tile glows in the album's colour while the lyrics are open.
+	function tintPlaybar() {
+		const uri = S.Player.data?.item?.uri;
+		if (!playbarEl || !uri || typeof S.colorExtractor !== "function") return;
+		Promise.resolve(S.colorExtractor(uri))
+			.then((c) => c && playbarEl.style.setProperty("--aur-pb-c", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#b98cff"))
+			.catch(() => {});
+	}
+	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange(), tintPlaybar()));
 	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause(), mini?.onPlayPause()));
 	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress(), mini?.onProgress()));
 
