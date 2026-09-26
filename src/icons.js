@@ -6,7 +6,19 @@ const filled = (body, size = 20) => `<svg width="${size}" height="${size}" viewB
 
 export const ICONS = {
 	// Topbar / playbar button: stacked lyric lines with a music note.
-	lyrics: (size = 16) => svg('<path d="M4 5h16M4 10h11M4 15h8"/><path d="M17 20.5V13l4-1"/><circle cx="15" cy="20.5" r="2"/>', size),
+	// Drawn like Spotify's own top-bar icons: solid shapes on a 16px grid in currentColor, so it
+	// matches their weight and follows the theme's hover / active colours. Same motif as the
+	// logo: three lyric lines (the middle one longest) and a note at the top right.
+	lyrics: (size = 16) =>
+		`<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">` +
+		'<rect x="1" y="3.6" width="8" height="1.6" rx=".8"/>' +
+		'<rect x="1" y="7.4" width="12" height="1.6" rx=".8"/>' +
+		'<rect x="1" y="11.2" width="10" height="1.6" rx=".8"/>' +
+		// note: head, stem, and a small flag
+		'<circle cx="11.9" cy="5.1" r="1.45"/>' +
+		'<rect x="12.55" y="0.6" width="0.8" height="4.6" rx=".4"/>' +
+		'<path d="M12.95 .6c.25 1 .9 1.4 1.6 1.8.5.3.75.8.6 1.5-.25-.55-.8-.9-1.5-1.1l-.7-.2z"/>' +
+		"</svg>",
 	close: () => svg('<path d="M6 6l12 12M18 6L6 18"/>'),
 	settings: () => svg('<path d="M4 7h9M18 7h2M4 17h3M12 17h8"/><circle cx="15.5" cy="7" r="2.3"/><circle cx="9.5" cy="17" r="2.3"/>'),
 	reload: () => svg('<path d="M20 11a8 8 0 1 0-2.34 5.66"/><path d="M20 4v7h-7"/>'),
