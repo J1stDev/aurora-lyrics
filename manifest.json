@@ -1,11 +1,11 @@
 [
 	{
 		"name": "Aurora Lyrics",
-		"description": "Full-screen animated lyrics: word-by-word sync from Apple Music, Musixmatch, NetEase and more, 7 layouts (vinyl, poster, captions…), translation, and a live lyrics card in the Now Playing panel.",
+		"description": "Beautiful full-screen synced lyrics that light up word by word (karaoke style) from Apple Music, Musixmatch, NetEase, Spotify and LRCLIB. 7 layouts, 12 themes, 10 motions and 11 word animations, translation, mini floating lyrics, shareable lyric images, Songsterr guitar tabs and a live lyrics card in the Now Playing panel.",
 		"preview": "docs/preview.png",
 		"main": "dist/aurora-lyrics.js",
 		"readme": "README.md",
-		"authors": [{ "name": "yamac" }],
-		"tags": ["lyrics", "fullscreen", "karaoke", "word-sync", "translation"]
+		"authors": [{ "name": "J1stDev", "url": "https://github.com/J1stDev" }],
+		"tags": ["lyrics", "synced lyrics", "karaoke", "fullscreen", "word-sync", "translation", "apple music", "musixmatch", "themes", "mini player"]
 	}
 ]
