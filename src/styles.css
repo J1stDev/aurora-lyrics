@@ -67,6 +67,20 @@
 .aur-root[data-glow="radiant"] { --aur-glow-k: 1.7; }
 .aur-root[data-glow="off"] { --aur-glow-k: 0; }
 .aur-root[data-color="accent"] { --aur-hi: color-mix(in srgb, var(--aur-accent) 42%, #fff); }
+/* Album gradient: text runs from a light accent colour to a light version of the album's deep
+   colour across each line (the two most different colours in the palette). Words know their position along the line (--wx, set by view.js),
+   so every word style (sweeps, glow, karaoke…) picks it up through --aur-hi. Lines without
+   word timing, and duet lines (they have their own colours), use the midpoint. */
+.aur-root[data-color="gradient"] {
+	--aur-grad-a: color-mix(in oklab, var(--aur-accent) 78%, #fff);
+	--aur-grad-b: color-mix(in oklab, var(--aur-c2) 50%, #fff);
+	--aur-hi: color-mix(in oklab, var(--aur-grad-a) 50%, var(--aur-grad-b));
+}
+.aur-root[data-color="gradient"] .aur-line:not([data-singer]) .aur-w {
+	--aur-hi: color-mix(in oklab, var(--aur-grad-a) calc((1 - var(--wx, 0.5)) * 100%), var(--aur-grad-b));
+	--aur-kink: var(--aur-hi);
+	color: var(--aur-hi);
+}
 /* Custom accent colour: replaces the album's accent everywhere, and the gradient background
    is built from it (a deep and a dark shade) so the whole scene matches. */
 .aur-root[data-accent="custom"] {
@@ -782,6 +796,28 @@
 	transition-timing-function: ease-out, cubic-bezier(0.2, 1.45, 0.35, 1), ease-out, ease, ease;
 	transition-delay: 0.1s, 0.1s, 0.1s, 0s, 0s;
 }
+
+/* ---- Depth (list): the lyrics float in 3D space. The active line is in front; the others
+   recede into the distance by how far they are from it (--ad) and fade out. The whole scene
+   drifts slowly and tilts gently towards the pointer (--aur-tx / --aur-ty, set by overlay.js). */
+.aur-root[data-anim="depth"] { --aur-stagger: 22ms; --aur-move: 1.15s; --aur-move-ease: cubic-bezier(0.22, 1, 0.36, 1); }
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] { perspective: 1300px; perspective-origin: 50% 40%; }
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-lines {
+	transform-style: preserve-3d;
+	transform: rotateX(var(--aur-tx, 0deg)) rotateY(var(--aur-ty, 0deg));
+	transition: transform 1.4s cubic-bezier(0.22, 1, 0.36, 1);
+	animation: aur-depth-drift 26s ease-in-out infinite alternate;
+}
+@keyframes aur-depth-drift {
+	from { translate: -1.2% 0.6% 0; rotate: y -1.5deg; }
+	to { translate: 1.2% -0.6% 0; rotate: y 1.5deg; }
+}
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: translate3d(0, var(--aur-y, 0px), calc(var(--ad, 0) * -140px));
+}
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.62 - var(--ad, 0) * 0.1); }
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
+.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; transform: translate3d(0, var(--aur-y, 0px), 40px); }
 
 /* ============================================================== context off */
 

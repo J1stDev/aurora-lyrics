@@ -329,6 +329,20 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (!tabsPop.hidden && !tabsPop.contains(e.target) && !tabsBtn.contains(e.target)) closeTabs();
 		});
 
+		// Depth motion: the lyric scene tilts gently towards the pointer (at most one update a frame).
+		let tiltPending = false;
+		root.addEventListener("pointermove", (e) => {
+			if (root.dataset.anim !== "depth" || root.dataset.motion === "reduced" || tiltPending) return;
+			tiltPending = true;
+			nextFrame(() => {
+				tiltPending = false;
+				const nx = e.clientX / window.innerWidth - 0.5;
+				const ny = e.clientY / window.innerHeight - 0.5;
+				stage.style.setProperty("--aur-ty", `${(nx * 7).toFixed(2)}deg`);
+				stage.style.setProperty("--aur-tx", `${(-ny * 5).toFixed(2)}deg`);
+			});
+		});
+
 		// Activity → show controls; idle → hide them (and the cursor).
 		for (const ev of ["pointermove", "pointerdown", "wheel"]) root.addEventListener(ev, wake, { passive: true });
 

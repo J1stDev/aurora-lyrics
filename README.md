@@ -12,7 +12,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 
 - 🎤 **Word-by-word lyrics** from Apple Music, Musixmatch, NetEase and more. Each word lights up as it's sung.
 - 🌌 **Looks gorgeous**: the album art drifts behind the lyrics, lines glide in with a soft spring, and the current line glows.
-- 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 10 line motions, 11 word animations, fonts, colours and your own accent colour.
+- 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 11 line motions, 11 word animations, fonts, colours and your own accent colour.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
 - 📸 **Share** your favourite lines as a ready-to-post image.
@@ -69,7 +69,7 @@ With the mouse:
 ### Lyrics that follow the music
 
 - Words light up as they're sung, in 11 styles: **Fill**, **Glow**, **Pop**, **Rise**, **Letters**, **Karaoke**, **Focus** (blur to sharp), **Bounce**, **Neon** (flickers on in colour), **Typewriter** and **Shimmer** (a band of light sweeps through).
-- Lines move in 10 styles (*Motion → Style*): **Flow**, **Slide**, **Scale**, **Spring** and **Wheel** (a 3D drum) scroll the whole song; **Fade**, **Cinematic**, **Swipe**, **Zoom** and **Flip** (split-flap) show one line at a time.
+- Lines move in 11 styles (*Motion → Style*): **Flow**, **Slide**, **Scale**, **Spring**, **Wheel** (a 3D drum) and **Depth** (lines float in 3D and the scene tilts towards your mouse) scroll the whole song; **Fade**, **Cinematic**, **Swipe**, **Zoom** and **Flip** (split-flap) show one line at a time.
 - Background vocals appear as a smaller line under the main one.
 - In **duets**, each singer gets their own colour and side.
 - Instrumental breaks show three dots that fill up until the singing starts again.
@@ -80,6 +80,7 @@ With the mouse:
 - **Layouts** (*Look → Layout*): Split, Mirrored, Poster, Vinyl (a spinning record), Stage, Captions, and Lyrics only.
 - **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge, Retro (amber terminal), Synthwave, Concert, Zen, Sunset and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back. Each theme also brings its own **ambience**: aurora ribbons, CRT scanlines (Retro), a neon grid and sun (Synthwave), stage spotlights (Concert), letterbox bars (Cinema), twinkling stars (Midnight) and more. Turn it off with *Look → Theme → Theme ambience*.
 - **Accent colour**: taken from the album cover, or pick your own.
+- **Album gradient** text (*Look → Text → Colour*): each line runs from one album colour to another.
 - Eight fonts (including Mono and Condensed), four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient or solid).
 
 ### Mini lyrics

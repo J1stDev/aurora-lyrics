@@ -216,6 +216,8 @@ export class LyricsView {
 				if (line.words) {
 					el.classList.add("has-words");
 					pairs = addWords(main, line.words);
+					// Each word's position along the line (0..1), for the album-gradient text colour.
+					pairs.forEach((p, k) => p.span.style.setProperty("--wx", pairs.length > 1 ? (k / (pairs.length - 1)).toFixed(3) : "0.5"));
 				} else {
 					main.textContent = line.text;
 				}
