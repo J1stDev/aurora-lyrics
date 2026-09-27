@@ -325,8 +325,12 @@ export class LyricsView {
 		if (line.gap) {
 			const p = clamp((pos - line.time) / Math.max(1, line.end - line.time), 0, 1);
 			this.lineEls[idx].style.setProperty("--aur-gp", p.toFixed(3));
-		} else if (this.wordEls[idx] && this.wordSync) {
-			this.updateWords(idx, pos);
+		} else {
+			// Line progress (to the end of its last word when it has word timing), for themes.
+			const end = line.words?.at(-1)?.end ?? line.end;
+			const p = clamp((pos - line.time) / Math.max(1, end - line.time), 0, 1);
+			this.lineEls[idx].style.setProperty("--aur-lp", p.toFixed(3));
+			if (this.wordEls[idx] && this.wordSync) this.updateWords(idx, pos);
 		}
 	}
 

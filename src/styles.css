@@ -2306,10 +2306,43 @@
 	10%, 28%, 100% { opacity: 1; }
 }
 
-/* Minimal: nothing added, and a lighter grain. */
-.aur-root[data-fx="minimal"] .aur-bg-grain { opacity: 0.04; }
+/* Minimal: an editorial page. No grain, only a faint wash of the album's colour from the
+   top corner. The current line carries a small line number and a hairline that fills as the
+   line is sung; instrumental breaks show three short dashes instead of dots. */
+.aur-root[data-fx="minimal"] .aur-bg-grain { opacity: 0; }
+.aur-root[data-fx="minimal"] .aur-fx-a {
+	display: block;
+	inset: 0;
+	background: linear-gradient(160deg, color-mix(in oklab, var(--aur-c1) 22%, transparent), transparent 55%);
+}
+.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-lines { counter-reset: aur-ln; }
+.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) { counter-increment: aur-ln; }
+.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
+	content: counter(aur-ln, decimal-leading-zero);
+	position: absolute;
+	left: var(--hx, 0px);
+	width: var(--hw, 100%);
+	top: calc(var(--hy, 0px) + var(--hh, 100%) + 0.14em);
+	padding-top: 8px;
+	font: 600 11px/1 var(--aur-ui-font);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.14em;
+	color: rgba(255, 255, 255, 0.42);
+	background: linear-gradient(90deg, rgba(255, 255, 255, 0.6) calc(var(--aur-lp, 0) * 100%), rgba(255, 255, 255, 0.12) 0) top left / 100% 1px no-repeat;
+	opacity: 0;
+	transition: opacity 0.6s ease;
+	pointer-events: none;
+}
+.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; }
+.aur-root[data-fx="minimal"] .aur-dots i { width: 0.7em; height: 2px; border-radius: 1px; }
+.aur-root[data-fx="minimal"] .is-active .aur-dots { animation: none; }
+.aur-root[data-fx="minimal"] .is-active .aur-dots i { transform: none; }
 
-/* Karaoke: a warm spotlight swinging gently over a glowing stage floor. */
+/* Karaoke: a karaoke bar. The current line is outlined like on-screen karaoke captions and
+   a timing bar under it fills in the accent colour; before each verse the three dots count
+   down (they vanish one by one, right to left, until it's time to sing). A warm spotlight
+   swings over the stage and flashes on every new line, the stage floor glows, and a
+   mirror ball scatters sparkles that glitter harder through instrumental breaks. */
 .aur-root[data-fx="karaoke"] .aur-fx-a {
 	display: block;
 	top: -10%;
@@ -2318,9 +2351,73 @@
 	bottom: 0;
 	background: conic-gradient(from 180deg at 50% 0%, transparent 160deg, rgba(255, 238, 205, 0.12) 172deg, rgba(255, 238, 205, 0.2) 180deg, rgba(255, 238, 205, 0.12) 188deg, transparent 200deg);
 	transform-origin: 50% 0%;
+	opacity: 0.8;
 	animation: aur-fx-sway 10s ease-in-out infinite alternate;
 }
+.aur-root[data-fx="karaoke"][data-lb="a"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-a 1.2s ease-out; }
+.aur-root[data-fx="karaoke"][data-lb="b"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-b 1.2s ease-out; }
+@keyframes aur-fx-flash-a { from { opacity: 1; } }
+@keyframes aur-fx-flash-b { from { opacity: 1; } }
 .aur-root[data-fx="karaoke"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 40%; background: radial-gradient(55% 70% at 50% 100%, color-mix(in oklab, var(--aur-accent) 32%, transparent), transparent 75%); }
+.aur-root[data-fx="karaoke"] .aur-fx-c {
+	display: block;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: -420px;
+	background-image:
+		radial-gradient(2px 2px at 30px 50px, rgba(255, 255, 255, 0.9), transparent),
+		radial-gradient(1.6px 1.6px at 160px 140px, color-mix(in oklab, var(--aur-accent) 50%, #fff), transparent),
+		radial-gradient(2.4px 2.4px at 300px 30px, rgba(255, 236, 190, 0.85), transparent),
+		radial-gradient(1.4px 1.4px at 380px 230px, rgba(255, 255, 255, 0.7), transparent),
+		radial-gradient(2px 2px at 90px 300px, color-mix(in oklab, var(--aur-accent) 40%, #fff), transparent),
+		radial-gradient(1.8px 1.8px at 240px 360px, rgba(255, 255, 255, 0.8), transparent);
+	background-size: 420px 420px;
+	opacity: 0.35;
+	transition: opacity 2s ease;
+	animation: aur-fx-ball 38s linear infinite, aur-fx-twinkle 1.7s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="karaoke"][data-gap="on"] .aur-fx-c { opacity: 0.75; }
+@keyframes aur-fx-ball { to { transform: translate3d(-420px, 0, 0); } }
+/* classic karaoke colours: words wait in white and turn a vivid accent as they're sung */
+.aur-root[data-fx="karaoke"] .aur-stage .aur-line.is-active {
+	--aur-dim: rgba(255, 255, 255, 0.9);
+	--aur-kink: oklch(from var(--aur-accent) 0.78 max(c, 0.16) h);
+}
+.aur-root[data-fx="karaoke"][data-duet="on"] .aur-stage .aur-line.is-active[data-singer] { --aur-kink: var(--aur-hi); }
+/* outlined captions */
+.aur-root[data-fx="karaoke"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c),
+.aur-root[data-fx="karaoke"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-fx="karaoke"][data-words="off"] .aur-stage .is-active .aur-main {
+	filter:
+		drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+		drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
+		drop-shadow(0 0.06em 0 rgba(0, 0, 0, 0.45))
+		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--aur-glow-k)), transparent));
+}
+/* the timing bar */
+.aur-root[data-fx="karaoke"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
+	content: "";
+	position: absolute;
+	left: var(--hx, 0px);
+	width: var(--hw, 100%);
+	top: calc(var(--hy, 0px) + var(--hh, 100%) + 0.16em);
+	height: max(4px, 0.08em);
+	border-radius: 99px;
+	background: linear-gradient(90deg, var(--aur-kink, color-mix(in srgb, var(--aur-accent) 70%, #fff)) calc(var(--aur-lp, 0) * 100%), rgba(255, 255, 255, 0.14) 0);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 12px color-mix(in oklab, var(--aur-accent) 35%, transparent);
+	opacity: 0;
+	transform: scaleX(0.7);
+	transition: opacity 0.5s ease, transform 0.7s var(--aur-spring);
+	pointer-events: none;
+}
+.aur-root[data-fx="karaoke"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; transform: none; }
+/* the countdown: dots vanish right to left through the break */
+.aur-root[data-fx="karaoke"] .aur-dots i { width: 0.36em; height: 0.36em; background: var(--aur-kink, color-mix(in srgb, var(--aur-accent) 70%, #fff)); box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent); }
+.aur-root[data-fx="karaoke"] .is-active .aur-dots { animation: none; }
+.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(3) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3, 1))); }
+.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(2) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 1, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1))); }
+.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(1) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 2, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1))); }
 
 /* Cinema: letterbox bars, a deep vignette and a lively film grain. */
 .aur-root[data-fx="cinema"] :is(.aur-fx-a, .aur-fx-b) { display: block; left: 0; right: 0; height: 7vh; background: #000; }
