@@ -113,6 +113,7 @@ export class LyricsView {
 	resetContent() {
 		this.stopBrowsing(true);
 		this.lyrics = null;
+		this.stage.closest(".aur-root")?.removeAttribute("data-gap");
 		this.list.replaceChildren();
 		this.lineEls = [];
 		this.wordEls = [];
@@ -351,6 +352,15 @@ export class LyricsView {
 		if (idx >= 0) {
 			els[idx].classList.add("is-active");
 			this.measureHalo(els[idx]);
+		}
+		// Line beat for theme ambience: data-lb flips a/b on every new line (so CSS can restart
+		// a one-shot animation by switching between two identical keyframes), and data-gap
+		// marks instrumental breaks.
+		const root = this.stage.closest(".aur-root");
+		if (root) {
+			const gap = idx < 0 || !!this.lyrics.lines[idx]?.gap;
+			if (!gap) root.dataset.lb = root.dataset.lb === "a" ? "b" : "a";
+			root.dataset.gap = gap ? "on" : "off";
 		}
 
 		// Direction drives the stagger order (leading edge moves first).
