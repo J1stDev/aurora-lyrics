@@ -2807,97 +2807,6 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-root[data-look="synthwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main { text-shadow: 0.05em 0.05em 0 rgba(34, 211, 238, 0.55); }
 .aur-root[data-look="synthwave"][data-words="on"] .aur-stage .aur-line.is-active .aur-w { text-shadow: 0.05em 0.05em 0 color-mix(in srgb, rgba(34, 211, 238, 0.6) calc(var(--aur-wp) * 100%), transparent); }
 
-/* Concert: a live show. Two stage beams tinted with the album's colour sweep from the rig
-   (faster, as a light show, through instrumental breaks), haze glows over a crowd silhouette
-   dotted with swaying phone lights, the stage strobes on every new line, and a LIVE badge
-   pulses in the corner. The lyrics are set in big capitals. */
-.aur-root[data-fx="concert"] :is(.aur-fx-a, .aur-fx-b) {
-	--beam: color-mix(in oklab, var(--aur-accent) 35%, #fff4d6);
-	display: block;
-	top: -20%;
-	width: 60%;
-	height: 150%;
-	background: conic-gradient(from 160deg at 20% 0%, transparent 0deg, color-mix(in oklab, var(--beam) 8%, transparent) 8deg, color-mix(in oklab, var(--beam) 17%, transparent) 12deg, color-mix(in oklab, var(--beam) 8%, transparent) 16deg, transparent 24deg);
-	transform-origin: 20% 0%;
-	animation: aur-fx-beam 11s ease-in-out infinite alternate;
-}
-.aur-root[data-fx="concert"] .aur-fx-a { left: -8%; }
-.aur-root[data-fx="concert"] .aur-fx-b { --beam: color-mix(in oklab, var(--aur-c1) 45%, #d6e8ff); right: -8%; transform: scaleX(-1); animation-name: aur-fx-beam-r; animation-duration: 13s; }
-.aur-root[data-fx="concert"][data-gap="on"] .aur-fx-a { animation-duration: 2.6s; }
-.aur-root[data-fx="concert"][data-gap="on"] .aur-fx-b { animation-duration: 3.1s; }
-@keyframes aur-fx-beam { from { transform: rotate(-14deg); } to { transform: rotate(10deg); } }
-@keyframes aur-fx-beam-r { from { transform: scaleX(-1) rotate(-12deg); } to { transform: scaleX(-1) rotate(12deg); } }
-/* haze over the crowd */
-.aur-root[data-fx="concert"] .aur-fx::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: radial-gradient(ellipse at 50% 115%, color-mix(in oklab, var(--aur-accent) 30%, transparent), transparent 60%);
-	opacity: 0.8;
-	transition: opacity 2s ease;
-	animation: aur-fx-pulse 6s ease-in-out infinite;
-}
-.aur-root[data-fx="concert"][data-gap="on"] .aur-fx::before { opacity: 1; }
-/* the crowd: two rows of heads and shoulders */
-.aur-root[data-fx="concert"] .aur-fx-c {
-	display: block;
-	left: -40px;
-	right: -40px;
-	bottom: 0;
-	height: 120px;
-	background:
-		radial-gradient(circle 15px at 30px 34px, #08080c 95%, transparent) 0 100% / 62px 86px repeat-x,
-		radial-gradient(30px 28px at 30px 84px, #08080c 95%, transparent) 0 100% / 62px 86px repeat-x,
-		radial-gradient(circle 12px at 22px 28px, #121019 95%, transparent) 17px calc(100% - 24px) / 50px 70px repeat-x,
-		radial-gradient(24px 22px at 22px 68px, #121019 95%, transparent) 17px calc(100% - 24px) / 50px 70px repeat-x;
-	opacity: 0.92;
-	animation: aur-fx-crowd 1.9s ease-in-out infinite alternate;
-}
-@keyframes aur-fx-crowd { to { transform: translateY(3px); } }
-/* phone lights held up in the crowd */
-.aur-root[data-fx="concert"] .aur-fx-c::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: -30px;
-	height: 60px;
-	background:
-		radial-gradient(3px 4px at 9% 40%, #fff, transparent), radial-gradient(9px 9px at 9% 40%, rgba(255, 255, 255, 0.25), transparent),
-		radial-gradient(3px 4px at 27% 25%, #fff, transparent), radial-gradient(9px 9px at 27% 25%, rgba(255, 255, 255, 0.25), transparent),
-		radial-gradient(3px 4px at 46% 55%, #fff, transparent), radial-gradient(9px 9px at 46% 55%, rgba(255, 255, 255, 0.25), transparent),
-		radial-gradient(3px 4px at 63% 30%, #fff, transparent), radial-gradient(9px 9px at 63% 30%, rgba(255, 255, 255, 0.25), transparent),
-		radial-gradient(3px 4px at 81% 48%, #fff, transparent), radial-gradient(9px 9px at 81% 48%, rgba(255, 255, 255, 0.25), transparent),
-		radial-gradient(3px 4px at 94% 22%, #fff, transparent), radial-gradient(9px 9px at 94% 22%, rgba(255, 255, 255, 0.25), transparent);
-	animation: aur-fx-phones 4s ease-in-out infinite alternate;
-}
-@keyframes aur-fx-phones { from { transform: translateX(-10px) rotate(-1deg); } to { transform: translateX(10px) rotate(1deg); } }
-/* strobe on every new line */
-.aur-root[data-fx="concert"] .aur-bg-shade::after { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
-.aur-root[data-fx="concert"][data-bganim="on"][data-lb="a"] .aur-bg-shade::after { animation: aur-fx-strobe-a 0.45s ease-out; }
-.aur-root[data-fx="concert"][data-bganim="on"][data-lb="b"] .aur-bg-shade::after { animation: aur-fx-strobe-b 0.45s ease-out; }
-@keyframes aur-fx-strobe-a { from { opacity: 0.1; } }
-@keyframes aur-fx-strobe-b { from { opacity: 0.1; } }
-/* LIVE badge */
-.aur-root[data-fx="concert"] .aur-fx::after {
-	content: "LIVE";
-	position: absolute;
-	top: 32px;
-	right: 150px;
-	padding: 6px 11px 6px 24px;
-	border-radius: 99px;
-	font: 800 11px/1 var(--aur-ui-font);
-	letter-spacing: 0.2em;
-	color: #fff;
-	background: radial-gradient(circle 4px at 12px 50%, #ff3b3b 90%, transparent), rgba(0, 0, 0, 0.35);
-	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-	animation: aur-fx-live 1.6s ease-in-out infinite;
-}
-@keyframes aur-fx-live { 50% { opacity: 0.65; } }
-/* big capitals */
-.aur-root[data-look="concert"] .aur-stage .aur-line { text-transform: uppercase; letter-spacing: 0.01em; }
-.aur-root[data-look="concert"] .aur-stage .aur-tr { text-transform: none; letter-spacing: normal; }
-
 /* Zen: a still pond. One soft pool of light breathes slowly (brighter through instrumental
    breaks), every new line drops a ripple that spreads out from the centre, and a few soft motes
    drift down. The lyrics are a pale sage, spaced a little wider, and each line settles into
@@ -3122,8 +3031,6 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
    carries data-bt / data-bar, flipping a/b on every beat / bar, and --aur-beat (one beat). Themes
    react on bars for big moves and on beats for small ones; tempo-matched loops use --aur-beat.
    Without beat data none of this applies and themes react to lyric lines only. */
-@keyframes aur-fx-hop-a { 35% { transform: translateY(-5px); } }
-@keyframes aur-fx-hop-b { 35% { transform: translateY(-5px); } }
 @keyframes aur-fx-swell-a { from { transform: scale(1.1); } }
 @keyframes aur-fx-swell-b { from { transform: scale(1.1); } }
 @keyframes aur-fx-blip-a { 0% { opacity: 0.75; } 100% { opacity: 0.55; } }
@@ -3151,14 +3058,6 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-root[data-fx="synthwave"][data-gap="on"] .aur-bg[data-beats="on"] .aur-fx-b { animation-duration: var(--aur-beat); }
 .aur-root[data-fx="synthwave"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-c { animation: aur-fx-flash-a 0.5s ease-out; }
 .aur-root[data-fx="synthwave"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-c { animation: aur-fx-flash-b 0.5s ease-out; }
-/* Concert: the crowd jumps on every beat, the beams sweep over four bars (one bar through
-   breaks), the haze flares on the bar, and the beams burn brighter in loud sections */
-.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-c { animation: aur-fx-hop-a calc(var(--aur-beat) * 0.7) ease-out; }
-.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-c { animation: aur-fx-hop-b calc(var(--aur-beat) * 0.7) ease-out; }
-.aur-root[data-fx="concert"] .aur-bg[data-beats="on"] :is(.aur-fx-a, .aur-fx-b) { animation-duration: calc(var(--aur-beat) * 16); opacity: calc(0.5 + 0.5 * var(--aur-energy, 0.8)); transition: opacity 2s ease; }
-.aur-root[data-fx="concert"][data-gap="on"] .aur-bg[data-beats="on"] :is(.aur-fx-a, .aur-fx-b) { animation-duration: calc(var(--aur-beat) * 4); }
-.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-fx-pulse 6s ease-in-out infinite, aur-fx-flash-a 0.6s ease-out; }
-.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx::before { animation: aur-fx-pulse 6s ease-in-out infinite, aur-fx-flash-b 0.6s ease-out; }
 /* Gothic: the candles flare on the bar */
 .aur-root[data-fx="gothic"] .aur-fx::before { transform-origin: 50% 100%; }
 .aur-root[data-fx="gothic"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-fx-flame 3.4s steps(27) infinite, aur-fx-swell-a 1s ease-out; }
