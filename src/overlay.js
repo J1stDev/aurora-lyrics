@@ -411,6 +411,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			accent: all.accent === "album" ? "album" : "custom",
 			tabs: all.tabsButton ? "on" : "off",
 			fx: all.ambience ? all.themeFx || "none" : "none",
+			look: all.themeFx || "none", // the theme's lyric styling, independent of the ambience toggle
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle === "custom" && !all.customBg ? "album" : all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",

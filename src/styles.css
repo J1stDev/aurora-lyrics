@@ -2159,7 +2159,9 @@
 /* ============================================================== theme ambience
    Each theme gets its own atmosphere, drawn in three spare layers (.aur-fx-a/b/c) between the
    background and the lyrics. data-fx is the last theme picked (it stays when you tweak
-   settings afterwards) and "none" when ambience is off. Gradients only, no filters; motion
+   settings afterwards) and "none" when ambience is off. A theme's styling of the lyrics
+   themselves is keyed on data-look instead (the same theme id), so it stays when ambience is
+   off. Gradients only, no filters; motion
    is transform / opacity and pauses with the animated background (reduced motion stops it). */
 .aur-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .aur-fx > i { position: absolute; display: none; }
@@ -2295,12 +2297,12 @@
 	animation: aur-fx-pulse 5s ease-in-out infinite;
 }
 /* unlit tubes: the lines around the current one are outlines only */
-.aur-root[data-fx="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) .aur-main {
+.aur-root[data-look="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) .aur-main {
 	-webkit-text-stroke: max(1px, 0.022em) color-mix(in oklab, var(--aur-hi) 75%, transparent);
 }
-.aur-root[data-fx="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) :is(.aur-main, .aur-w, .aur-c) { color: transparent; }
+.aur-root[data-look="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) :is(.aur-main, .aur-w, .aur-c) { color: transparent; }
 /* the current line flickers on like a tube striking */
-.aur-root[data-fx="neon"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-strike 0.55s linear; }
+.aur-root[data-look="neon"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-strike 0.55s linear; }
 @keyframes aur-fx-strike {
 	0%, 18%, 38% { opacity: 0.25; }
 	10%, 28%, 100% { opacity: 1; }
@@ -2315,9 +2317,9 @@
 	inset: 0;
 	background: linear-gradient(160deg, color-mix(in oklab, var(--aur-c1) 22%, transparent), transparent 55%);
 }
-.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-lines { counter-reset: aur-ln; }
-.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) { counter-increment: aur-ln; }
-.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
+.aur-root[data-look="minimal"] .aur-stage[data-mode="synced"] .aur-lines { counter-reset: aur-ln; }
+.aur-root[data-look="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) { counter-increment: aur-ln; }
+.aur-root[data-look="minimal"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
 	content: counter(aur-ln, decimal-leading-zero);
 	position: absolute;
 	left: var(--hx, 0px);
@@ -2333,10 +2335,10 @@
 	transition: opacity 0.6s ease;
 	pointer-events: none;
 }
-.aur-root[data-fx="minimal"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; }
-.aur-root[data-fx="minimal"] .aur-dots i { width: 0.7em; height: 2px; border-radius: 1px; }
-.aur-root[data-fx="minimal"] .is-active .aur-dots { animation: none; }
-.aur-root[data-fx="minimal"] .is-active .aur-dots i { transform: none; }
+.aur-root[data-look="minimal"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; }
+.aur-root[data-look="minimal"] .aur-dots i { width: 0.7em; height: 2px; border-radius: 1px; }
+.aur-root[data-look="minimal"] .is-active .aur-dots { animation: none; }
+.aur-root[data-look="minimal"] .is-active .aur-dots i { transform: none; }
 
 /* Karaoke: a karaoke bar. The current line is outlined like on-screen karaoke captions and
    a timing bar under it fills in the accent colour; before each verse the three dots count
@@ -2380,15 +2382,15 @@
 .aur-root[data-fx="karaoke"][data-gap="on"] .aur-fx-c { opacity: 0.75; }
 @keyframes aur-fx-ball { to { transform: translate3d(-420px, 0, 0); } }
 /* classic karaoke colours: words wait in white and turn a vivid accent as they're sung */
-.aur-root[data-fx="karaoke"] .aur-stage .aur-line.is-active {
+.aur-root[data-look="karaoke"] .aur-stage .aur-line.is-active {
 	--aur-dim: rgba(255, 255, 255, 0.9);
 	--aur-kink: oklch(from var(--aur-accent) 0.78 max(c, 0.16) h);
 }
-.aur-root[data-fx="karaoke"][data-duet="on"] .aur-stage .aur-line.is-active[data-singer] { --aur-kink: var(--aur-hi); }
+.aur-root[data-look="karaoke"][data-duet="on"] .aur-stage .aur-line.is-active[data-singer] { --aur-kink: var(--aur-hi); }
 /* outlined captions */
-.aur-root[data-fx="karaoke"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c),
-.aur-root[data-fx="karaoke"] .aur-stage .is-active:not(.has-words) .aur-main,
-.aur-root[data-fx="karaoke"][data-words="off"] .aur-stage .is-active .aur-main {
+.aur-root[data-look="karaoke"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c),
+.aur-root[data-look="karaoke"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-look="karaoke"][data-words="off"] .aur-stage .is-active .aur-main {
 	filter:
 		drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
 		drop-shadow(0 0 1px rgba(0, 0, 0, 0.9))
@@ -2396,7 +2398,7 @@
 		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--aur-glow-k)), transparent));
 }
 /* the timing bar */
-.aur-root[data-fx="karaoke"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
 	content: "";
 	position: absolute;
 	left: var(--hx, 0px);
@@ -2411,13 +2413,13 @@
 	transition: opacity 0.5s ease, transform 0.7s var(--aur-spring);
 	pointer-events: none;
 }
-.aur-root[data-fx="karaoke"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; transform: none; }
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; transform: none; }
 /* the countdown: dots vanish right to left through the break */
-.aur-root[data-fx="karaoke"] .aur-dots i { width: 0.36em; height: 0.36em; background: var(--aur-kink, color-mix(in srgb, var(--aur-accent) 70%, #fff)); box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent); }
-.aur-root[data-fx="karaoke"] .is-active .aur-dots { animation: none; }
-.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(3) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3, 1))); }
-.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(2) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 1, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1))); }
-.aur-root[data-fx="karaoke"] .is-active .aur-dots i:nth-child(1) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 2, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1))); }
+.aur-root[data-look="karaoke"] .aur-dots i { width: 0.36em; height: 0.36em; background: var(--aur-kink, color-mix(in srgb, var(--aur-accent) 70%, #fff)); box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent); }
+.aur-root[data-look="karaoke"] .is-active .aur-dots { animation: none; }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(3) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3, 1))); }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(2) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 1, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1))); }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(1) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 2, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1))); }
 
 /* Cinema: letterbox bars, a deep vignette and a lively film grain. */
 .aur-root[data-fx="cinema"] :is(.aur-fx-a, .aur-fx-b) { display: block; left: 0; right: 0; height: 7vh; background: #000; }
@@ -2486,13 +2488,13 @@
 @keyframes aur-fx-roll { from { transform: translateY(-30vh); } to { transform: translateY(130vh); } }
 .aur-root[data-fx="retro"] .aur-bg-grain { opacity: 0.12; }
 /* phosphor glow */
-.aur-root[data-fx="retro"] .aur-stage .aur-line .aur-main {
+.aur-root[data-look="retro"] .aur-stage .aur-line .aur-main {
 	text-shadow:
 		0 0 0.08em color-mix(in oklab, var(--aur-accent) 55%, transparent),
 		0 0 0.45em color-mix(in oklab, var(--aur-accent) 22%, transparent);
 }
 /* sync glitch on each new line: a sideways jolt with colour fringes */
-.aur-root[data-fx="retro"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-glitch 0.32s steps(1); }
+.aur-root[data-look="retro"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-glitch 0.32s steps(1); }
 @keyframes aur-fx-glitch {
 	0% { transform: translateX(0.06em); text-shadow: -0.05em 0 rgba(255, 40, 90, 0.7), 0.05em 0 rgba(40, 200, 255, 0.7); }
 	25% { transform: translateX(-0.04em) skewX(-4deg); }
@@ -2500,7 +2502,7 @@
 	75%, 100% { transform: none; }
 }
 /* block caret while typing */
-.aur-root[data-fx="retro"][data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c::after {
+.aur-root[data-look="retro"][data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c::after {
 	top: 0.12em;
 	bottom: 0.06em;
 	right: -0.6em;
@@ -2509,7 +2511,7 @@
 	background: color-mix(in oklab, var(--aur-accent) 75%, transparent);
 }
 /* blinking block cursor at the end of the line (once it's sung, or straight away without word timing) */
-.aur-root[data-fx="retro"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.is-gap) .aur-main::after {
+.aur-root[data-look="retro"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.is-gap) .aur-main::after {
 	content: "";
 	display: inline-block;
 	width: 0.5em;
@@ -2520,9 +2522,9 @@
 	box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent);
 	animation: aur-fx-blink 1.05s steps(1) infinite;
 }
-.aur-root[data-fx="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words .aur-main::after { opacity: clamp(0, (var(--aur-lp, 0) - 0.97) * 40, 1); }
+.aur-root[data-look="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words .aur-main::after { opacity: clamp(0, (var(--aur-lp, 0) - 0.97) * 40, 1); }
 @keyframes aur-fx-blink { 50% { background: transparent; box-shadow: none; } }
-.aur-root[data-fx="retro"] .aur-dots i { width: 0.34em; height: 0.56em; border-radius: 0; }
+.aur-root[data-look="retro"] .aur-dots i { width: 0.34em; height: 0.56em; border-radius: 0; }
 
 /* Synthwave: a retro-future sunset. Stars over neon-edged mountains, a striped sun whose
    stripes scroll down and which pulses on every new line, and a neon grid racing toward you
@@ -2606,10 +2608,10 @@
 	clip-path: polygon(0 100%, 0 62%, 5% 44%, 10% 60%, 17% 18%, 24% 56%, 29% 42%, 35% 72%, 40% 100%, 60% 100%, 65% 68%, 71% 34%, 76% 54%, 83% 12%, 89% 48%, 94% 36%, 100% 58%, 100% 100%);
 }
 /* 80s logo lettering: forward lean and a cyan chrome offset */
-.aur-root[data-fx="synthwave"] .aur-stage .aur-main { transform: skewX(-7deg); }
-.aur-root[data-fx="synthwave"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
-.aur-root[data-fx="synthwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main { text-shadow: 0.05em 0.05em 0 rgba(34, 211, 238, 0.55); }
-.aur-root[data-fx="synthwave"][data-words="on"] .aur-stage .aur-line.is-active .aur-w { text-shadow: 0.05em 0.05em 0 color-mix(in srgb, rgba(34, 211, 238, 0.6) calc(var(--e, 1) * 100%), transparent); }
+.aur-root[data-look="synthwave"] .aur-stage .aur-main { transform: skewX(-7deg); }
+.aur-root[data-look="synthwave"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
+.aur-root[data-look="synthwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main { text-shadow: 0.05em 0.05em 0 rgba(34, 211, 238, 0.55); }
+.aur-root[data-look="synthwave"][data-words="on"] .aur-stage .aur-line.is-active .aur-w { text-shadow: 0.05em 0.05em 0 color-mix(in srgb, rgba(34, 211, 238, 0.6) calc(var(--aur-wp) * 100%), transparent); }
 
 /* Concert: two stage beams sweeping from the rig, and warm haze over the crowd. */
 .aur-root[data-fx="concert"] :is(.aur-fx-a, .aur-fx-b) {

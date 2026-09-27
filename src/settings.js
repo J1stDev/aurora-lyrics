@@ -342,7 +342,8 @@ export const settings = {
 		if (!theme) return;
 		// Leaving a look of the user's own: keep it so it can be restored.
 		if (!matchTheme(current)) this.setMany({ customLook: { ...pickLook(current), themeFx: current.themeFx } });
-		this.setMany({ ...themeLook(theme), themeFx: theme.id });
+		// Picking a theme asks for its whole look, so its ambience comes back on too.
+		this.setMany({ ...themeLook(theme), themeFx: theme.id, ambience: true });
 	},
 	reset() {
 		current = { ...DEFAULTS, ...EXTRA_DEFAULTS, seenTip: current.seenTip };
