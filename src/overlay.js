@@ -1,7 +1,7 @@
 // The overlay controller: builds the full-screen UI once (lazily), owns the playback loop,
 // loads lyrics on track changes, and applies settings live.
 
-import { h, clamp, nextFrame } from "./util.js";
+import { h, clamp, nextFrame, setText } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO } from "./settings.js";
 import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
@@ -16,11 +16,15 @@ import { ICONS } from "./icons.js";
 import { loadBackground } from "./media.js";
 
 const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.css
+const OPEN_MS = 750; // the overlay's fade/scale-in (styles.css), after which Spotify's page is hidden
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
 const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
 // Motion styles that stack lines at the centre (one line in focus) instead of a scrolling list.
 const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip"]);
+// Themes that draw the current line's progress (--aur-lp, written every frame, which restyles
+// the whole line, so only when something uses it).
+const LINE_PROGRESS_LOOKS = new Set(["minimal", "karaoke"]);
 const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {
@@ -213,7 +217,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			// Time preview under the pointer (hover and while dragging).
 			const f = fracAt(e);
 			bar.style.setProperty("--hx", f.toFixed(4));
-			tip.textContent = fmtTime(f * getDuration());
+			setText(tip, fmtTime(f * getDuration()));
 			if (!state.scrubbing) return;
 			state.scrubFrac = f;
 			renderProgress();
@@ -423,7 +427,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			view: all.view,
 			wordanim: all.wordAnim,
 		});
-		view.setOptions({ layout, wordSync: all.wordSync, autoScroll: all.unsyncedAutoScroll, reduced, wordAnim: all.wordAnim, showBg: all.showBgVocals });
+		view.setOptions({ lineProgress: LINE_PROGRESS_LOOKS.has(all.themeFx), layout, wordSync: all.wordSync, autoScroll: all.unsyncedAutoScroll, reduced, wordAnim: all.wordAnim, showBg: all.showBgVocals });
 		sizeBackground();
 
 		ui.offsetOut.textContent = `${all.offset > 0 ? "+" : ""}${all.offset} ms`;
@@ -809,8 +813,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const sec = Math.floor(pos / 1000);
 		if (sec !== state.progressSec) {
 			state.progressSec = sec;
-			ui.elapsed.textContent = fmtTime(pos);
-			ui.remaining.textContent = `-${fmtTime(dur - pos)}`;
+			setText(ui.elapsed, fmtTime(pos));
+			setText(ui.remaining, `-${fmtTime(dur - pos)}`);
 			ui.bar.setAttribute("aria-valuemax", String(Math.round(dur / 1000)));
 			updateUpNext(pos, dur);
 			// Song progress for theme ambience (Sunset's sun sets, Midnight's moon rises).
@@ -850,7 +854,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (next.image) ui.upArt.src = next.image;
 			card.title = `Play “${next.title}” now`;
 		}
-		ui.upWhen.textContent = ` · in ${Math.max(1, Math.ceil(left / 1000))}s`;
+		setText(ui.upWhen, ` · in ${Math.max(1, Math.ceil(left / 1000))}s`);
 		card.classList.add("is-on");
 	}
 
@@ -946,6 +950,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		sizeBackground();
 		void ui.root.offsetHeight; // flush so the fade-in transition runs
 		ui.root.classList.add("is-open");
+		// Once the fade-in is done, stop Spotify's own page from rendering underneath: it's fully
+		// covered, but its layers would otherwise still be composited every frame (a big cost on
+		// large windows). visibility keeps its layout and scroll positions intact.
+		clearTimeout(state.coverTimer);
+		state.coverTimer = setTimeout(() => state.open && document.documentElement.classList.add("aur-covered"), OPEN_MS);
 		ui.root.focus({ preventScroll: true });
 		wake();
 		if (state.stale || state.track?.uri !== getCurrentTrack()?.uri) loadLyrics();
@@ -965,6 +974,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		ui.share.close();
 		closeTabs();
 		ui.view.stopBrowsing(true);
+		clearTimeout(state.coverTimer);
+		document.documentElement.classList.remove("aur-covered");
 		ui.root.classList.remove("is-open");
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 		state.closeTimer = setTimeout(() => (ui.root.hidden = true), CLOSE_MS);

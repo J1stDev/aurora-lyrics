@@ -9,6 +9,10 @@ export function clamp(v, min, max) {
 /** Tiny hyperscript helper: h("div", { class: "x", onclick }, child, "text") */
 export function h(tag, attrs, ...children) {
 	const node = document.createElement(tag);
+	// Spicetify's wrapper rescans every element not marked like this (reading its computed
+	// style) each time any node in the page is added or removed. Our elements are never
+	// scroll containers it needs to touch, so mark them to keep them out of that scan.
+	node.setAttribute("data-scroll-optimized", "");
 	if (attrs) {
 		for (const [k, v] of Object.entries(attrs)) {
 			if (v == null || v === false) continue;
@@ -25,6 +29,20 @@ export function h(tag, attrs, ...children) {
 		node.append(c instanceof Node ? c : document.createTextNode(String(c)));
 	}
 	return node;
+}
+
+/**
+ * Set an element's text by editing its text node in place when it has exactly one, so the
+ * change doesn't add or remove nodes. Spicetify's wrapper rescans the whole page (~60 ms on a
+ * big library view) every time a node is added or removed anywhere, so text that changes
+ * while playing (clock, countdowns) must go through here.
+ */
+export function setText(el, text) {
+	const s = text == null ? "" : String(text);
+	const n = el.firstChild;
+	if (n && n.nodeType === 3 && !n.nextSibling) {
+		if (n.data !== s) n.data = s;
+	} else el.textContent = s;
 }
 
 /**

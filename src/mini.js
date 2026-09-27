@@ -6,7 +6,7 @@
 // Lyrics come from the Now Playing card's lookup (see npv.js → main.js), so there is no
 // second search for the same song.
 
-import { h, clamp } from "./util.js";
+import { h, clamp, setText } from "./util.js";
 import { settings } from "./settings.js";
 import { getCurrentTrack, getNextTrack, getPosition, getDuration, isPlaying } from "./player.js";
 import { findLineIndex } from "./lrc.js";
@@ -21,7 +21,13 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 
 	// ---- DOM
 	const art = h("img", { class: "aur-float-art", alt: "", decoding: "async" });
-	const cur = h("div", { class: "aur-float-cur" });
+	// The current line is drawn into nodes reused from line to line: text changes in place and
+	// spare word slots are hidden, so a new line never adds or removes nodes (Spicetify's wrapper
+	// rescans the whole page whenever that happens; see setText in util.js).
+	const dots = h("span", { class: "aur-float-dots", hidden: true }, h("i"), h("i"), h("i"));
+	const plain = h("span", { class: "aur-float-plain" }, "");
+	const cur = h("div", { class: "aur-float-cur" }, dots, plain);
+	const slots = []; // { span, gap }: a word and the whitespace text node after it
 	const next = h("div", { class: "aur-float-next" });
 	const text = h("div", { class: "aur-float-text", title: "Open fullscreen lyrics", onclick: () => openOverlay() }, cur, next);
 	const btn = (label, icon, onclick, cls = "") => h("button", { class: `aur-float-btn ${cls}`, title: label, "aria-label": label, html: icon, onclick: (e) => (e.stopPropagation(), onclick()) });
@@ -157,10 +163,10 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 			.catch(() => {});
 	}
 
-	/** Swap the two lines with a short enter animation. `a` may be a node or text. */
+	/** Swap the two lines with a short enter animation. `a` is a line ({ gap } or one with text / words) or plain text. */
 	function showLines(a, b, singer = null) {
-		cur.replaceChildren(a);
-		next.textContent = b || "";
+		setCur(a);
+		setText(next, b);
 		if (singer) cur.dataset.singer = String(singer);
 		else delete cur.dataset.singer;
 		for (const n of [cur, next]) {
@@ -170,20 +176,36 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 		}
 	}
 
-	function lineNode(line) {
-		if (line.gap) return h("span", { class: "aur-float-dots" }, h("i"), h("i"), h("i"));
-		if (!line.words) return line.text;
-		const frag = document.createDocumentFragment();
-		const spans = line.words.map((w) => {
-			const m = w.text.match(/^(\s*)([\s\S]*?)(\s*)$/);
-			if (m[1]) frag.append(m[1]);
-			const span = h("span", { class: "aur-float-w" }, m[2]);
-			frag.append(span);
-			if (m[3]) frag.append(m[3]);
-			return span;
-		});
-		state.words = { words: line.words, spans };
-		return frag;
+	function setCur(content) {
+		const line = typeof content === "string" ? null : content;
+		const words = line && !line.gap ? line.words : null;
+		dots.hidden = !line?.gap;
+		plain.hidden = !!(line?.gap || words);
+		setText(plain, plain.hidden ? "" : line ? line.text : content);
+		const n = words ? words.length : 0;
+		const spans = [];
+		for (let i = 0; i < Math.max(n, slots.length); i++) {
+			if (i >= n) {
+				if (!slots[i].span.hidden) (slots[i].span.hidden = true), (slots[i].gap.data = "");
+				continue;
+			}
+			if (i === slots.length) {
+				const span = h("span", { class: "aur-float-w", hidden: true }, "");
+				const gap = document.createTextNode("");
+				cur.append(span, gap);
+				slots.push({ span, gap });
+			}
+			const { span, gap } = slots[i];
+			const m = words[i].text.match(/^(\s*)([\s\S]*?)(\s*)$/);
+			const lead = i + 1 < n ? words[i + 1].text.match(/^\s*/)[0] : "";
+			setText(span, m[2]);
+			if (gap.data !== m[3] + lead) gap.data = m[3] + lead;
+			span.classList.remove("sung");
+			span.style.removeProperty("--aur-wp");
+			span.hidden = false;
+			spans.push(span);
+		}
+		state.words = words ? { words, spans } : null;
 	}
 
 	function activate(idx) {
@@ -192,9 +214,9 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 		state.wordIdx = -1;
 		state.words = null;
 		const nextText = (from) => ls.slice(from).find((l) => !l.gap)?.text || "";
-		if (idx < 0) return showLines(lineNode({ gap: true }), nextText(0));
+		if (idx < 0) return showLines({ gap: true }, nextText(0));
 		const line = ls[idx];
-		showLines(lineNode(line), nextText(idx + 1), line.gap ? null : (line.singer ?? (line.opposite ? 1 : null)));
+		showLines(line, nextText(idx + 1), line.gap ? null : (line.singer ?? (line.opposite ? 1 : null)));
 	}
 
 	function updateWords(pos) {
@@ -221,7 +243,7 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 		const dur = getDuration();
 		const t = settings.get("queuePeek") && dur > 45000 && dur - getPosition() <= MINI_UP_NEXT_MS ? getNextTrack() : null;
 		const text = t && t.uri !== state.uri ? `Up next · ${t.title}${t.artist ? ` — ${t.artist}` : ""}` : "";
-		if (next.textContent !== text) next.textContent = text;
+		setText(next, text);
 	}
 
 	// ---- loop: rAF of whichever window shows the pill (the PiP window keeps running while

@@ -287,7 +287,8 @@ export class LyricsView {
 		});
 	}
 
-	setOptions({ layout, wordSync, autoScroll, reduced, wordAnim, showBg }) {
+	setOptions({ layout, wordSync, autoScroll, reduced, wordAnim, showBg, lineProgress }) {
+		if (lineProgress != null) this.lineProgress = lineProgress;
 		if (layout && layout !== this.layout) {
 			this.layout = layout;
 			this.stopBrowsing(true);
@@ -326,10 +327,15 @@ export class LyricsView {
 			const p = clamp((pos - line.time) / Math.max(1, line.end - line.time), 0, 1);
 			this.lineEls[idx].style.setProperty("--aur-gp", p.toFixed(3));
 		} else {
-			// Line progress (to the end of its last word when it has word timing), for themes.
+			// Line progress (to the end of its last word when it has word timing), for themes:
+			// "is-sung" once it's through, and --aur-lp every frame only when a theme draws it
+			// (a custom property on the line restyles every word in it).
+			const el = this.lineEls[idx];
 			const end = line.words?.at(-1)?.end ?? line.end;
 			const p = clamp((pos - line.time) / Math.max(1, end - line.time), 0, 1);
-			this.lineEls[idx].style.setProperty("--aur-lp", p.toFixed(3));
+			if (this.lineProgress) el.style.setProperty("--aur-lp", p.toFixed(3));
+			const sung = p >= 0.97;
+			if (sung !== el.classList.contains("is-sung")) el.classList.toggle("is-sung", sung);
 			if (this.wordEls[idx] && this.wordSync) this.updateWords(idx, pos);
 		}
 	}
@@ -343,7 +349,7 @@ export class LyricsView {
 		if (prev >= -1) {
 			for (let i = Math.max(0, prev - WINDOW); i <= Math.min(n - 1, prev + WINDOW); i++) {
 				els[i].removeAttribute("data-d");
-				els[i].classList.remove("is-active");
+				els[i].classList.remove("is-active", "is-sung");
 			}
 			if (prev >= 0) this.resetWords(prev);
 		}

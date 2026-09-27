@@ -59,6 +59,14 @@
 		transform 0.7s var(--aur-ease);
 }
 .aur-root[hidden] { display: none; }
+/* While the overlay is fully open, Spotify's own page underneath is hidden (overlay.js adds
+   aur-covered after the fade-in): it can't be seen, but would still be composited every frame. */
+html.aur-covered body > :not(.aur-root) { visibility: hidden !important; }
+/* Its CSS animations would keep ticking on the main thread every frame too; pause them. */
+html.aur-covered body > :not(.aur-root, .aur-float),
+html.aur-covered body > :not(.aur-root, .aur-float) *,
+html.aur-covered body > :not(.aur-root, .aur-float) *::before,
+html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-state: paused !important; }
 .aur-root.is-open { opacity: 1; transform: none; }
 .aur-root *, .aur-root *::before, .aur-root *::after { box-sizing: border-box; }
 .aur-root ::selection { background: rgba(255, 255, 255, 0.28); }
@@ -112,7 +120,9 @@
 	object-fit: cover;
 	filter: blur(var(--aur-bg-blur)) saturate(1.7) brightness(0.92);
 	transform: translate(var(--bx, 0), var(--by, 0)) scale(calc(var(--aur-bg-scale) * var(--bs, 1)));
-	animation: aur-spin var(--bt, 120s) linear infinite;
+	/* Stepped at ~25-50 updates a second instead of every frame: the drift is far too slow to
+	   see the difference, but each update redraws the whole screen on the GPU. */
+	animation: aur-spin var(--bt, 120s) steps(3600) infinite;
 	will-change: transform;
 }
 .aur-blob.b3 { --bt: 150s; animation-direction: reverse; }
@@ -132,7 +142,7 @@
 		radial-gradient(35% 35% at 75% 20%, color-mix(in srgb, var(--aur-accent) 40%, transparent) 0%, transparent 70%),
 		#0b0b10;
 	transition: opacity 1s ease;
-	animation: aur-drift 36s ease-in-out infinite alternate;
+	animation: aur-drift 36s steps(1080) infinite alternate; /* stepped, see .aur-blob */
 }
 .aur-root[data-bg="gradient"] .aur-bg-gradient { opacity: 1; }
 .aur-root:not([data-bg="gradient"]) .aur-bg-gradient { animation: none; }
@@ -153,8 +163,7 @@
 .aur-bg-grain {
 	position: absolute;
 	inset: 0;
-	opacity: 0.08;
-	mix-blend-mode: overlay;
+	opacity: 0.035; /* plain alpha, not a blend mode: blending made a full-screen pass every frame */
 	background-size: 180px 180px;
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 	pointer-events: none;
@@ -287,8 +296,10 @@
 	--hop: sin(calc(var(--e) * 3.14159)); /* 0 → 1 (mid-way) → 0, smooth at both ends */
 	--edge: 0.75em; /* soft edge of the sweep, constant regardless of word width */
 	transform-origin: 50% 90%;
-	will-change: transform;
 }
+/* Only the word being sung moves every frame, so only it gets its own layer. */
+.aur-root[data-words="on"] .is-active.has-words .aur-w.now:not(.has-chars),
+.aur-root[data-words="on"] .is-active.has-words .aur-w.now .aur-c { will-change: transform; }
 /* (.aur-w .aur-c so this out-ranks the :is() rule above, whose specificity is its most specific argument) */
 .aur-root[data-words="on"] .is-active.has-words .aur-w .aur-c {
 	--wave: 2.6; /* how many letters are in motion at once */
@@ -533,8 +544,21 @@
 
 /* Every line applies the list's scroll offset (--aur-y) itself, so each line can move with its
    own delay (--aur-k × --aur-stagger): the leading edge moves first and the rest follow. */
+/* Lines near the active one (they carry data-d) sit on their own GPU layers (the 3D
+   transform) so they glide smoothly; lines further away are out of view, so they use a flat
+   transform and jump without animating instead of each keeping a layer of its own. */
 .aur-root[data-layout="list"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: translate(0, var(--aur-y, 0px)) scale(var(--aur-s));
+	transition: none;
+}
+.aur-root[data-layout="list"] .aur-stage[data-mode="synced"] .aur-line:is([data-d], .is-active) {
 	transform: translate3d(0, var(--aur-y, 0px), 0) scale(var(--aur-s));
+	transition:
+		opacity 0.7s var(--aur-ease),
+		transform var(--aur-move) var(--aur-move-ease) calc(var(--aur-k) * var(--aur-stagger)),
+		filter 0.7s var(--aur-ease),
+		color 0.5s ease,
+		text-shadow 0.7s ease;
 }
 .aur-root[data-anim="flow"] .aur-line { --aur-s: 0.96; }
 .aur-root[data-anim="scale"] .aur-line { --aur-s: 0.8; }
@@ -2002,8 +2026,9 @@
 	background-clip: text;
 }
 .aur-float[data-duet="on"] .aur-float-cur[data-singer="1"] .aur-float-w.sung,
-.aur-float[data-duet="on"] .aur-float-cur[data-singer="1"]:not(:has(.aur-float-w)) { color: #ffd3e6; }
+.aur-float[data-duet="on"] .aur-float-cur[data-singer="1"]:not(:has(.aur-float-w:not([hidden]))) { color: #ffd3e6; }
 .aur-float-dots { display: inline-flex; gap: 6px; padding: 6px 0; }
+.aur-float-cur > [hidden] { display: none; }
 .aur-float-dots i { width: 7px; height: 7px; border-radius: 50%; background: #fff; opacity: 0.35; animation: aur-float-dot 1.4s ease-in-out infinite; }
 .aur-float-dots i:nth-child(2) { animation-delay: 0.18s; }
 .aur-float-dots i:nth-child(3) { animation-delay: 0.36s; }
@@ -2183,7 +2208,8 @@
    twinkle above. Every new line makes the sky flare a little, and it glows brighter through
    instrumental breaks. Every layer is far wider than the screen and only ever translates, with
    no blend modes, so its edges never show (tilted or blended layers show hard edges when
-   composited next to frosted-glass effects). */
+   composited next to frosted-glass effects). The slow drifts are stepped (~30 updates a
+   second) like the album background, so they don't redraw the whole screen every frame. */
 .aur-root[data-fx="aurora"] .aur-fx-a {
 	display: block;
 	left: -45%;
@@ -2202,11 +2228,11 @@
 	mask-composite: intersect;
 	opacity: 0.3;
 	transition: opacity 3s ease;
-	animation: aur-fx-arc 34s ease-in-out infinite alternate;
+	animation: aur-fx-arc 34s steps(1020) infinite alternate;
 }
 .aur-root[data-fx="aurora"][data-gap="on"] .aur-fx-a { opacity: 0.42; }
-.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-a 2.6s ease-out; }
-.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-b 2.6s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-arc 34s steps(1020) infinite alternate, aur-fx-flare-a 2.6s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-arc 34s steps(1020) infinite alternate, aur-fx-flare-b 2.6s ease-out; }
 @keyframes aur-fx-arc {
 	from { transform: translate3d(-9%, 2%, 0); }
 	to { transform: translate3d(9%, -3%, 0); }
@@ -2218,7 +2244,7 @@
 	inset: -100%;
 	background: linear-gradient(100deg, transparent 40%, color-mix(in oklab, var(--aur-accent) 55%, #7b5cff) 45%, transparent 50%, color-mix(in oklab, var(--aur-c1) 55%, #2ee6a8) 55%, transparent 60%);
 	opacity: 0.08;
-	animation: aur-fx-ribbon 41s ease-in-out infinite alternate-reverse;
+	animation: aur-fx-ribbon 41s steps(1230) infinite alternate-reverse; /* stepped like the arc */
 }
 @keyframes aur-fx-ribbon {
 	from { transform: translate3d(-6%, 4%, 0); }
@@ -2494,7 +2520,7 @@
 	70% { transform: translate(17vw, -24vh); opacity: 0.8; }
 	85% { opacity: 0; }
 }
-.aur-root[data-fx="cinema"] .aur-bg-grain { opacity: 0.14; animation: aur-fx-grain 0.6s steps(3) infinite; }
+.aur-root[data-fx="cinema"] .aur-bg-grain { opacity: 0.07; animation: aur-fx-grain 0.6s steps(3) infinite; }
 @keyframes aur-fx-grain {
 	0% { background-position: 0 0; }
 	33% { background-position: -47px 31px; }
@@ -2646,7 +2672,7 @@
 	animation: aur-fx-roll 8s linear infinite;
 }
 @keyframes aur-fx-roll { from { transform: translateY(-30vh); } to { transform: translateY(130vh); } }
-.aur-root[data-fx="retro"] .aur-bg-grain { opacity: 0.12; }
+.aur-root[data-fx="retro"] .aur-bg-grain { opacity: 0.06; }
 /* phosphor glow */
 .aur-root[data-look="retro"] .aur-stage .aur-line .aur-main {
 	text-shadow:
@@ -2682,7 +2708,7 @@
 	box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent);
 	animation: aur-fx-blink 1.05s steps(1) infinite;
 }
-.aur-root[data-look="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words .aur-main::after { opacity: clamp(0, (var(--aur-lp, 0) - 0.97) * 40, 1); }
+.aur-root[data-look="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words:not(.is-sung) .aur-main::after { opacity: 0; }
 @keyframes aur-fx-blink { 50% { background: transparent; box-shadow: none; } }
 .aur-root[data-look="retro"] .aur-dots i { width: 0.34em; height: 0.56em; border-radius: 0; }
 
@@ -2908,7 +2934,7 @@
 	animation: aur-fx-motes 80s linear infinite;
 }
 @keyframes aur-fx-motes { to { transform: translate3d(100px, 400px, 0); } }
-.aur-root[data-fx="zen"] .aur-bg-grain { opacity: 0.05; }
+.aur-root[data-fx="zen"] .aur-bg-grain { opacity: 0.02; }
 /* pale sage lyrics, settling into focus */
 .aur-root[data-look="zen"][data-color="white"] { --aur-hi: color-mix(in oklab, var(--aur-accent) 16%, #fff); }
 .aur-root[data-look="zen"] .aur-stage .aur-line { letter-spacing: 0.015em; }
@@ -3204,7 +3230,7 @@
 	box-shadow: 0 0 22px color-mix(in oklab, var(--float-c) 35%, rgba(255, 79, 216, 0.45)), inset 0 0 18px color-mix(in oklab, var(--float-c) 20%, rgba(255, 79, 216, 0.15));
 }
 .aur-float[data-style="neon"] .aur-float-w.sung,
-.aur-float[data-style="neon"] .aur-float-cur:not(:has(.aur-float-w)) { color: #fff; text-shadow: 0 0 10px rgba(255, 120, 230, 0.7); }
+.aur-float[data-style="neon"] .aur-float-cur:not(:has(.aur-float-w:not([hidden]))) { color: #fff; text-shadow: 0 0 10px rgba(255, 120, 230, 0.7); }
 
 /* recording state of the Record clip button */
 .aur-share-clip.is-recording { background: rgba(255, 70, 90, 0.2) !important; box-shadow: inset 0 0 0 1px rgba(255, 90, 110, 0.6); }
