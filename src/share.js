@@ -311,6 +311,13 @@ export function drawShareCard(canvas, opts) {
 	const pal = light
 		? { text: "#15151a", sub: "rgba(21,21,26,0.62)", glow: null, card: "rgba(255,255,255,0.72)", cardLine: "rgba(0,0,0,0.06)" }
 		: { text: "#ffffff", sub: "rgba(255,255,255,0.7)", glow: withAlpha(o.accent, 0.5), card: "rgba(10,10,14,0.38)", cardLine: "rgba(255,255,255,0.1)" };
+	// Every lyric block goes through place(): it records where the lyrics sit (animated clips
+	// redraw them frame by frame over a background drawn with skipLyrics) and draws them.
+	let placed = null;
+	const place = (fit, x, top, align) => {
+		placed = { fit, x, top, align };
+		if (!o.skipLyrics) drawLyrics(ctx, o, fit, x, top, align, pal);
+	};
 	const pad = Math.round(W * 0.08);
 	const base = W * 0.088 * (o.size / 100);
 	const showArt = o.info && o.cover;
@@ -347,14 +354,14 @@ export function drawShareCard(canvas, opts) {
 			drawTrackInfo(ctx, o, tx, cy + ip + art * 0.46, cx + cw - ip - tx, pal, { titleSize: W * 0.034 });
 		}
 		const alignX = o.align === "center" ? W / 2 : cx + ip;
-		drawLyrics(ctx, o, fit, alignX, cy + ip + header, o.align, pal);
+		place(fit, alignX, cy + ip + header, o.align);
 	} else if (o.style === "center") {
 		// Centred lyrics; small cover and track info centred at the bottom.
 		const art = W * 0.1;
 		const footer = o.info ? (showArt ? art + W * 0.035 : 0) + W * 0.075 : 0;
 		const fit = fitLyrics(ctx, o, blocks, W - pad * 2, H - pad * 2.4 - footer, base);
 		const top = pad + (H - pad * 2 - footer - fit.height) / 2;
-		drawLyrics(ctx, o, fit, W / 2, top, "center", pal);
+		place(fit, W / 2, top, "center");
 		if (o.info) {
 			let fy = H - pad - W * 0.075;
 			if (showArt) {
@@ -377,7 +384,7 @@ export function drawShareCard(canvas, opts) {
 		const lyricsTop = qTop + qSize * 0.45;
 		const fit = fitLyrics(ctx, o, blocks, W - pad * 2, H - lyricsTop - pad - footer, base);
 		const x = o.align === "center" ? W / 2 : pad;
-		drawLyrics(ctx, o, fit, x, lyricsTop, o.align, pal);
+		place(fit, x, lyricsTop, o.align);
 		if (o.info) {
 			const fy = Math.min(H - pad - W * 0.045, lyricsTop + fit.height + W * 0.12);
 			ctx.textAlign = o.align;
@@ -405,7 +412,7 @@ export function drawShareCard(canvas, opts) {
 		const fit = fitLyrics(ctx, o, blocks, W - pad * 2, bottom - pad, base);
 		// Centred in portrait / story; nearer the top in square (reads like a quote).
 		const top = pad + Math.max(0, (bottom - pad - fit.height) * (o.format === "square" ? 0.35 : 0.5));
-		drawLyrics(ctx, o, fit, o.align === "center" ? W / 2 : pad, top, o.align, pal);
+		place(fit, o.align === "center" ? W / 2 : pad, top, o.align);
 	}
 
 	if (o.credit) {
@@ -417,7 +424,131 @@ export function drawShareCard(canvas, opts) {
 		ctx.globalAlpha = 1;
 		ctx.textAlign = "left";
 	}
-	return canvas;
+	return { canvas, layout: placed, pal, light };
+}
+
+// ---------------------------------------------------------------------------------------
+// Animated clips: the selected lines light up word by word (at the song's own timing) over the
+// card's background, which slowly zooms in. Recorded live from the preview canvas.
+// ---------------------------------------------------------------------------------------
+
+export const CLIP_MAX_MS = 15000;
+const CLIP_LEAD_MS = 700; // before the first line starts
+const CLIP_TAIL_MS = 1400; // held after the last line is sung
+const UNSYNCED_LINE_MS = 2600;
+
+/**
+ * Timeline for a clip. lines: Line objects (see lrc.js) in order. Times become relative to the
+ * clip start; each line ends where the next selected line starts (so held notes don't linger).
+ * @returns {{ blocks: {time:number,end:number,words:{time:number,end:number,text:string}[]|null}[], duration: number }}
+ */
+export function clipTimeline(lines, synced) {
+	if (!lines.length) return { blocks: [], duration: 0 };
+	if (!synced || lines.some((l) => l.time == null)) {
+		const blocks = lines.map((l, i) => ({ time: CLIP_LEAD_MS + i * UNSYNCED_LINE_MS, end: CLIP_LEAD_MS + (i + 1) * UNSYNCED_LINE_MS - 300, words: null }));
+		return { blocks, duration: Math.min(CLIP_MAX_MS, blocks[blocks.length - 1].end + CLIP_TAIL_MS) };
+	}
+	const t0 = lines[0].time - CLIP_LEAD_MS;
+	const blocks = lines.map((l, i) => {
+		const next = lines[i + 1]?.time;
+		const lastWord = l.words?.length ? l.words[l.words.length - 1].end : null;
+		let end = lastWord ?? l.end ?? l.time + 3000;
+		if (next != null) end = Math.min(end, next);
+		end = Math.min(end, l.time + 8000);
+		return {
+			time: l.time - t0,
+			end: end - t0,
+			words: l.words?.length ? l.words.map((w) => ({ time: w.time - t0, end: Math.min(w.end, end) - t0, text: w.text })) : null,
+		};
+	});
+	return { blocks, duration: Math.min(CLIP_MAX_MS, blocks[blocks.length - 1].end + CLIP_TAIL_MS) };
+}
+
+/** How much of a line has been sung at time t (0..1), by characters so the sweep is even. */
+export function sungFraction(block, t) {
+	if (t <= block.time) return 0;
+	if (t >= block.end) return 1;
+	if (block.words) {
+		let total = 0;
+		let sung = 0;
+		for (const w of block.words) {
+			const n = w.text.length;
+			total += n;
+			if (t >= w.end) sung += n;
+			else if (t > w.time) sung += (n * (t - w.time)) / Math.max(1, w.end - w.time);
+		}
+		return total ? sung / total : 0;
+	}
+	return (t - block.time) / Math.max(1, block.end - block.time);
+}
+
+/** One frame of a clip: background (zooming slowly), then each line dim with a bright sweep. */
+function drawClipFrame(ctx, clip, t) {
+	const { W, H, base, layout, pal, light, blocks, o, duration } = clip;
+	const k = 1 + 0.045 * Math.min(1, t / duration);
+	ctx.drawImage(base, (W - W * k) / 2, (H - H * k) / 2, W * k, H * k);
+	const { fit, x, top, align } = layout;
+	const dim = light ? "rgba(21,21,26,0.28)" : "rgba(255,255,255,0.3)";
+	const fadeIn = Math.min(1, t / 450);
+	const edge = fit.size * 0.45;
+	let y = top + fit.lh * 0.8;
+	ctx.globalAlpha = fadeIn;
+	fit.wrapped.forEach((b, bi) => {
+		const block = blocks[bi] || { time: 0, end: 1, words: null };
+		const total = b.lines.reduce((n, l) => n + l.length, 0) + Math.max(0, b.lines.length - 1);
+		let sungChars = sungFraction(block, t) * total;
+		ctx.font = `${o.weight} ${Math.round(fit.size)}px ${o.font}`;
+		ctx.textAlign = "left";
+		for (const line of b.lines) {
+			const w = ctx.measureText(line).width;
+			const left = align === "center" ? x - w / 2 : x;
+			const seg = Math.max(0, Math.min(line.length, sungChars));
+			sungChars -= line.length + 1;
+			ctx.fillStyle = dim;
+			ctx.fillText(line, left, y);
+			if (seg > 0) {
+				const whole = Math.floor(seg);
+				const sungW = ctx.measureText(line.slice(0, whole)).width + (seg - whole) * ctx.measureText(line[whole] || "").width;
+				ctx.save();
+				if (seg < line.length) {
+					const g = ctx.createLinearGradient(left, 0, left + sungW + edge, 0);
+					const stop = Math.max(0, Math.min(1, sungW / (sungW + edge)));
+					g.addColorStop(0, pal.text);
+					g.addColorStop(stop, pal.text);
+					g.addColorStop(1, light ? "rgba(21,21,26,0)" : "rgba(255,255,255,0)");
+					ctx.fillStyle = g;
+				} else ctx.fillStyle = pal.text;
+				if (pal.glow && o.glow !== false) {
+					ctx.shadowColor = pal.glow;
+					ctx.shadowBlur = fit.size * 0.38;
+				}
+				ctx.fillText(line, left, y);
+				ctx.restore();
+			}
+			y += fit.lh;
+		}
+		if (b.tr.length) {
+			ctx.font = `600 ${Math.round(fit.trSize)}px ${o.uiFont}`;
+			ctx.fillStyle = pal.sub;
+			ctx.textAlign = align;
+			y += fit.trGap - fit.lh * 0.8 + fit.trLh * 0.8;
+			for (const line of b.tr) {
+				ctx.fillText(line, x, y);
+				y += fit.trLh;
+			}
+			y += fit.lh * 0.8 - fit.trLh * 0.8;
+		}
+		if (bi < fit.wrapped.length - 1) y += fit.gap;
+	});
+	ctx.globalAlpha = 1;
+	ctx.textAlign = "left";
+}
+
+/** Best recording format this browser supports: MP4 where possible (Instagram, WhatsApp…), else WebM. */
+function clipMime() {
+	const MR = globalThis.MediaRecorder;
+	if (!MR) return null;
+	return ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MR.isTypeSupported?.(m)) || null;
 }
 
 /** Plain-text version of the selection, for pasting into a message. */
@@ -496,7 +627,8 @@ export function createShareSheet(ctx) {
 	const saveBtn = h("button", { class: "aur-btn", html: `${ICONS.download()}<span>Save PNG</span>`, onclick: () => save() });
 	const shareBtn = h("button", { class: "aur-btn", html: `${ICONS.share()}<span>Share…</span>`, onclick: () => nativeShare(), hidden: !navigator.canShare });
 	const textBtn = h("button", { class: "aur-btn aur-btn-ghost", html: `${ICONS.copy()}<span>Copy text</span>`, onclick: () => copyText() });
-	const exportBtns = [copyBtn, saveBtn, shareBtn, textBtn];
+	const clipBtn = h("button", { class: "aur-btn aur-share-clip", html: `${ICONS.video()}<span>Record clip</span>`, title: "Record a short video of these lines lighting up (max 15 s, silent)", onclick: () => recordClip(), hidden: !clipMime() });
+	const exportBtns = [copyBtn, saveBtn, shareBtn, clipBtn, textBtn];
 
 	const label = (text, extra) => h("div", { class: "aur-share-label" }, h("span", null, text), extra || null);
 	const side = h(
@@ -631,6 +763,74 @@ export function createShareSheet(ctx) {
 		canvas.dataset.format = opts.format;
 	}
 
+	// ---- animated clip
+	let recording = null; // { stop: () => void }
+	const selectedRaw = () => {
+		const ls = info.lyrics?.lines || [];
+		return [...selected].sort((a, b) => a - b).map((i) => ls[i]).filter((l) => l?.text);
+	};
+	async function recordClip() {
+		if (recording) return recording.stop(true); // second click cancels
+		const mime = clipMime();
+		const lines = selectedRaw();
+		if (!mime || !lines.length) return;
+		const { blocks, duration } = clipTimeline(lines, !!info.lyrics?.synced);
+		const cover = await loadImage(info.track?.image);
+		// Background + track info once, without the lyrics; lyrics are drawn per frame.
+		const base = document.createElement("canvas");
+		const drawn = drawShareCard(base, { ...info.style, ...opts, lines: selectedLines(), title: info.track?.title, artist: info.track?.artist, cover, skipLyrics: true });
+		canvas.width = base.width;
+		canvas.height = base.height;
+		const clip = { W: base.width, H: base.height, base, layout: drawn.layout, pal: drawn.pal, light: drawn.light, blocks, o: { ...info.style, ...opts }, duration };
+		const g = canvas.getContext("2d");
+		drawClipFrame(g, clip, 0);
+		let stream;
+		try {
+			stream = canvas.captureStream(30);
+		} catch (e) {
+			console.warn("[aurora-lyrics] clip capture failed", e);
+			render();
+			return ctx.toast("Can't record here (the cover image isn't allowed in videos)");
+		}
+		const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+		const chunks = [];
+		rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+		let cancelled = false;
+		let done = false;
+		const label = clipBtn.querySelector("span");
+		for (const b of exportBtns) if (b !== clipBtn) b.disabled = true;
+		clipBtn.classList.add("is-recording");
+		const finish = () => {
+			if (done) return;
+			done = true;
+			if (rec.state !== "inactive") rec.stop();
+		};
+		recording = { stop: (cancel) => ((cancelled = !!cancel), finish()) };
+		rec.onstop = async () => {
+			recording = null;
+			stream.getTracks().forEach((tr) => tr.stop());
+			clipBtn.classList.remove("is-recording");
+			label.textContent = "Record clip";
+			syncLines(); // re-enables the export buttons
+			render(); // back to the still preview
+			if (cancelled) return ctx.toast("Recording cancelled");
+			const type = mime.split(";")[0];
+			const ext = type === "video/mp4" ? "mp4" : "webm";
+			await saveFile(new Blob(chunks, { type }), fileName().replace(/\.png$/, `.${ext}`), type, ext);
+		};
+		rec.start(250);
+		const start = performance.now();
+		const frame = () => {
+			if (done) return;
+			const t = performance.now() - start;
+			drawClipFrame(g, clip, Math.min(t, duration));
+			label.textContent = `Recording… ${Math.ceil(Math.max(0, duration - t) / 1000)}s · click to stop`;
+			if (t >= duration) return finish();
+			nextFrame(frame);
+		};
+		frame();
+	}
+
 	// ---- export
 	const toBlob = () =>
 		new Promise((resolve, reject) => {
@@ -673,6 +873,30 @@ export function createShareSheet(ctx) {
 			if (e?.name === "AbortError") return; // user closed the share sheet
 			console.warn("[aurora-lyrics] share failed", e);
 			ctx.toast("Sharing isn't available here — try Copy image");
+		}
+	}
+
+	/** Save a blob: the system save dialog where available, else a download. */
+	async function saveFile(blob, name, type, ext) {
+		try {
+			if (globalThis.showSaveFilePicker) {
+				try {
+					const handle = await globalThis.showSaveFilePicker({ suggestedName: name, types: [{ description: ext.toUpperCase(), accept: { [type]: [`.${ext}`] } }] });
+					const w = await handle.createWritable();
+					await w.write(blob);
+					await w.close();
+					return ctx.toast(`${ext === "png" ? "Image" : "Clip"} saved`);
+				} catch (e) {
+					if (e?.name === "AbortError") return; // user cancelled
+				}
+			}
+			const url = URL.createObjectURL(blob);
+			h("a", { href: url, download: name }).click();
+			setTimeout(() => URL.revokeObjectURL(url), 30000);
+			ctx.toast(`${ext === "png" ? "Image" : "Clip"} saved to Downloads`);
+		} catch (e) {
+			console.warn("[aurora-lyrics] save failed", e);
+			ctx.toast("Couldn't save the file");
 		}
 	}
 
@@ -746,6 +970,7 @@ export function createShareSheet(ctx) {
 
 	function close() {
 		if (el.hidden) return;
+		recording?.stop(true);
 		el.classList.remove("is-open");
 		setTimeout(() => !el.classList.contains("is-open") && (el.hidden = true), 250);
 		ctx.onClose?.();

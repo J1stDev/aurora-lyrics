@@ -2504,3 +2504,8 @@
 }
 .aur-float[data-style="neon"] .aur-float-w.sung,
 .aur-float[data-style="neon"] .aur-float-cur:not(:has(.aur-float-w)) { color: #fff; text-shadow: 0 0 10px rgba(255, 120, 230, 0.7); }
+
+/* recording state of the Record clip button */
+.aur-share-clip.is-recording { background: rgba(255, 70, 90, 0.2) !important; box-shadow: inset 0 0 0 1px rgba(255, 90, 110, 0.6); }
+.aur-share-clip.is-recording svg { color: #ff5a6e; animation: aur-rec-pulse 1s ease-in-out infinite; }
+@keyframes aur-rec-pulse { 50% { opacity: 0.35; } }

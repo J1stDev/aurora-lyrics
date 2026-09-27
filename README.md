@@ -15,7 +15,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 - 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 11 line motions, 11 word animations, fonts, colours and your own accent colour.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
-- 📸 **Share** your favourite lines as a ready-to-post image.
+- 📸 **Share** your favourite lines as a ready-to-post image or an animated clip.
 - 🎸 **Guitar tabs**: one click to the song's tab on Songsterr.
 - 💬 **Lyrics in the Now Playing panel**: Spotify's small lyrics preview is replaced by a live, synced one.
 
@@ -103,7 +103,9 @@ Press **S** (or right-click a line) and build a ready-to-post image:
 - **Text**: left or centred, and a size slider.
 - **Extras**: text glow on or off, cover and track info, the translation under each line (when translation is on), and a small *Aurora Lyrics* credit.
 
-Then **Copy image** (or Ctrl+C) and paste it anywhere, **Save PNG**, **Share…** (when your system supports it), or **Copy text** to paste the lines as plain text. Your choices are remembered for next time.
+Then **Copy image** (or Ctrl+C) and paste it anywhere, **Save PNG**, **Share…** (when your system supports it), or **Copy text** to paste the lines as plain text.
+
+**Record clip** makes a short video (up to 15 s) of the same card with your lines lighting up word by word at the song's real timing, ready for Stories. It records live while you watch, saves as MP4 where supported (otherwise WebM), and is silent (extensions can't capture Spotify's audio). Your choices are remembered for next time.
 
 ### Translation
 

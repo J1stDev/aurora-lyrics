@@ -50,3 +50,31 @@ test("shareText joins lines and credits the song", async () => {
 	assert.equal(shareText(["Line one", "Line two"], "Song", "Artist"), "Line one\nLine two\n— Song · Artist");
 	assert.equal(shareText(["Solo"], "", ""), "Solo");
 });
+
+test("clipTimeline: relative times, lines end where the next one starts, 15 s cap", async () => {
+	const { clipTimeline, CLIP_MAX_MS } = await import("../src/share.js");
+	const lines = [
+		{ time: 10000, end: 20000, text: "a b", words: [{ time: 10000, end: 10500, text: "a " }, { time: 10500, end: 19000, text: "b" }] },
+		{ time: 12000, end: 14000, text: "c", words: null },
+	];
+	const { blocks, duration } = clipTimeline(lines, true);
+	assert.equal(blocks[0].time, 700);
+	assert.equal(blocks[0].end, 2700, "cut at the next line");
+	assert.equal(blocks[0].words[1].end, 2700);
+	assert.equal(blocks[1].time, 2700);
+	assert.equal(duration, 4700 + 1400);
+	const long = clipTimeline([{ time: 0, end: 60000, text: "x" }, { time: 30000, end: 60000, text: "y" }], true);
+	assert.equal(long.duration, CLIP_MAX_MS);
+	const plain = clipTimeline([{ time: null, text: "x" }, { time: null, text: "y" }], false);
+	assert.equal(plain.blocks[1].time, 700 + 2600);
+});
+
+test("sungFraction sweeps by characters through word timing", async () => {
+	const { sungFraction } = await import("../src/share.js");
+	const b = { time: 0, end: 2000, words: [{ time: 0, end: 1000, text: "ab" }, { time: 1000, end: 2000, text: "cd" }] };
+	assert.equal(sungFraction(b, 0), 0);
+	assert.equal(sungFraction(b, 500), 0.25);
+	assert.equal(sungFraction(b, 1000), 0.5);
+	assert.equal(sungFraction(b, 2500), 1);
+	assert.equal(sungFraction({ time: 0, end: 1000, words: null }, 250), 0.25);
+});
