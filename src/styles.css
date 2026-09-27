@@ -2421,11 +2421,75 @@
 .aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(2) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 1, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 1, 1))); }
 .aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(1) { opacity: calc(1 - clamp(0, var(--aur-gp, 0) * 3 - 2, 1)); transform: scale(calc(1 - 0.4 * clamp(0, var(--aur-gp, 0) * 3 - 2, 1))); }
 
-/* Cinema: letterbox bars, a deep vignette and a lively film grain. */
-.aur-root[data-fx="cinema"] :is(.aur-fx-a, .aur-fx-b) { display: block; left: 0; right: 0; height: 7vh; background: #000; }
-.aur-root[data-fx="cinema"] .aur-fx-a { top: 0; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); }
-.aur-root[data-fx="cinema"] .aur-fx-b { bottom: 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6); }
-.aur-root[data-fx="cinema"] .aur-fx-c { display: block; inset: 0; background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); }
+/* Cinema: a film projection. Letterbox bars slide in when the lyrics open and close in a
+   little further through instrumental breaks; the projector light wavers, scratches and dust
+   flicker across the frame, and the grain dances. The lyrics are ivory subtitles, each line
+   marked as a scene. */
+.aur-root[data-fx="cinema"] :is(.aur-fx-a, .aur-fx-b) {
+	display: block;
+	left: 0;
+	right: 0;
+	height: 7vh;
+	background: #000;
+	transition: transform 2.4s var(--aur-ease);
+	animation: aur-fx-bar-in 1.4s var(--aur-ease) both;
+}
+.aur-root[data-fx="cinema"] .aur-fx-a { top: 0; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); transform-origin: 50% 0; --from: -100%; }
+.aur-root[data-fx="cinema"] .aur-fx-b { bottom: 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6); transform-origin: 50% 100%; --from: 100%; }
+.aur-root[data-fx="cinema"][data-gap="on"] :is(.aur-fx-a, .aur-fx-b) { transform: scaleY(1.7); }
+@keyframes aur-fx-bar-in { from { translate: 0 var(--from); } to { translate: 0 0; } }
+.aur-root[data-fx="cinema"] .aur-fx-c {
+	display: block;
+	inset: 0;
+	background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+	animation: aur-fx-projector 3.2s steps(1) infinite;
+}
+@keyframes aur-fx-projector {
+	0%, 100% { opacity: 1; }
+	17% { opacity: 0.86; }
+	33% { opacity: 1; }
+	58% { opacity: 0.9; }
+	71% { opacity: 1; }
+	89% { opacity: 0.84; }
+}
+/* scratches: thin vertical hairlines that jump about */
+.aur-root[data-fx="cinema"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(255, 250, 235, 0.16) 50%, transparent calc(50% + 0.5px)) 0 0 / 100% 100% no-repeat,
+		linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(0, 0, 0, 0.35) 50%, transparent calc(50% + 0.5px)) 0 0 / 100% 100% no-repeat;
+	animation: aur-fx-scratch 1.9s steps(1) infinite;
+}
+@keyframes aur-fx-scratch {
+	0% { background-position: -22vw 0, 31vw 0; opacity: 1; }
+	14% { background-position: -21.8vw 0, 30vw 0; opacity: 0.4; }
+	27% { background-position: 14vw 0, -35vw 0; opacity: 0; }
+	41% { background-position: 13.7vw 0, -34vw 0; opacity: 0.9; }
+	63% { background-position: 38vw 0, 8vw 0; opacity: 0; }
+	80% { background-position: -6vw 0, 22vw 0; opacity: 0.7; }
+}
+/* dust: specks that pop up for a frame or two */
+.aur-root[data-fx="cinema"] .aur-fx-c::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(2px 3px at 18% 32%, rgba(0, 0, 0, 0.7), transparent),
+		radial-gradient(3px 2px at 71% 64%, rgba(255, 250, 235, 0.5), transparent),
+		radial-gradient(1.5px 4px at 44% 81%, rgba(0, 0, 0, 0.6), transparent),
+		radial-gradient(2px 2px at 86% 22%, rgba(255, 250, 235, 0.45), transparent);
+	animation: aur-fx-dust 1.3s steps(1) infinite;
+}
+@keyframes aur-fx-dust {
+	0% { transform: none; opacity: 1; }
+	20% { opacity: 0; }
+	35% { transform: translate(-31vw, 12vh) scaleX(-1); opacity: 1; }
+	55% { opacity: 0; }
+	70% { transform: translate(17vw, -24vh); opacity: 0.8; }
+	85% { opacity: 0; }
+}
 .aur-root[data-fx="cinema"] .aur-bg-grain { opacity: 0.14; animation: aur-fx-grain 0.6s steps(3) infinite; }
 @keyframes aur-fx-grain {
 	0% { background-position: 0 0; }
@@ -2433,13 +2497,48 @@
 	66% { background-position: 29px -53px; }
 	100% { background-position: 0 0; }
 }
+/* ivory subtitles, each line a scene */
+.aur-root[data-look="cinema"][data-color="white"] { --aur-hi: #f4ecdc; --aur-glow-tint: color-mix(in oklab, #ffe2b0 45%, #fff); }
+.aur-root[data-look="cinema"] .aur-stage .aur-line { letter-spacing: 0.005em; }
+.aur-root[data-look="cinema"] .aur-stage .aur-line.is-active .aur-main { text-shadow: 0 0.04em 0.3em rgba(0, 0, 0, 0.55); }
+.aur-root[data-look="cinema"] .aur-stage[data-mode="synced"] .aur-lines { counter-reset: aur-scene; }
+.aur-root[data-look="cinema"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) { counter-increment: aur-scene; }
+.aur-root[data-look="cinema"] .aur-stage[data-mode="synced"] .aur-line:not(.is-gap) .aur-main::after {
+	content: "SCENE " counter(aur-scene);
+	position: absolute;
+	left: var(--hx, 0px);
+	width: var(--hw, 100%);
+	top: calc(var(--hy, 0px) + var(--hh, 100%) + 0.35em);
+	font: 600 11px/1 var(--aur-ui-font);
+	letter-spacing: 0.42em;
+	color: rgba(244, 236, 220, 0.4);
+	text-shadow: none;
+	opacity: 0;
+	transform: translateY(-4px);
+	transition: opacity 1.2s ease 0.3s, transform 1.4s var(--aur-ease) 0.3s;
+	pointer-events: none;
+}
+.aur-root[data-look="cinema"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main::after { opacity: 1; transform: none; }
 
-/* Lounge: warm lamp light and slowly rising dust specks. */
+/* Lounge: a late-night jazz room. Warm lamp light that flickers like a candle, smoke drifting
+   through the air (thicker through instrumental breaks, and stirring on every new line), dust
+   rising in the light. The lyrics are cream with a warm glow, and in the Vinyl layout a
+   tonearm rests on the record while it plays and lifts off when paused. */
 .aur-root[data-fx="lounge"] .aur-fx-a {
 	display: block;
 	inset: 0;
-	background: radial-gradient(ellipse at 28% 18%, rgba(255, 170, 90, 0.2), transparent 60%), linear-gradient(rgba(120, 60, 20, 0.1), rgba(40, 15, 5, 0.25));
-	animation: aur-fx-pulse 7s ease-in-out infinite;
+	background: radial-gradient(ellipse at 28% 18%, rgba(255, 170, 90, 0.22), transparent 60%), linear-gradient(rgba(120, 60, 20, 0.1), rgba(40, 15, 5, 0.28));
+	animation: aur-fx-candle 6s ease-in-out infinite;
+}
+@keyframes aur-fx-candle {
+	0%, 100% { opacity: 1; }
+	12% { opacity: 0.88; }
+	19% { opacity: 0.97; }
+	34% { opacity: 0.84; }
+	47% { opacity: 1; }
+	63% { opacity: 0.9; }
+	71% { opacity: 0.96; }
+	86% { opacity: 0.86; }
 }
 .aur-root[data-fx="lounge"] .aur-fx-b {
 	display: block;
@@ -2453,6 +2552,63 @@
 	animation: aur-fx-rise 60s linear infinite;
 }
 @keyframes aur-fx-rise { to { transform: translateY(-320px); } }
+.aur-root[data-fx="lounge"] .aur-fx-c {
+	display: block;
+	inset: -25%;
+	background:
+		radial-gradient(30% 18% at 30% 60%, rgba(255, 225, 190, 0.1), transparent 70%),
+		radial-gradient(26% 14% at 68% 40%, rgba(255, 215, 175, 0.08), transparent 70%),
+		radial-gradient(40% 20% at 50% 78%, rgba(255, 230, 200, 0.07), transparent 70%);
+	opacity: 0.8;
+	transition: opacity 3s ease;
+	animation: aur-fx-smoke 45s ease-in-out infinite alternate;
+}
+.aur-root[data-fx="lounge"][data-gap="on"] .aur-fx-c { opacity: 1; }
+.aur-root[data-fx="lounge"][data-lb="a"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-a 3s ease-out; }
+.aur-root[data-fx="lounge"][data-lb="b"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-b 3s ease-out; }
+@keyframes aur-fx-smoke {
+	from { transform: translate3d(-6%, 3%, 0) scale(1); }
+	to { transform: translate3d(7%, -4%, 0) scale(1.15); }
+}
+@keyframes aur-fx-stir-a { from { opacity: 1; } }
+@keyframes aur-fx-stir-b { from { opacity: 1; } }
+/* cream text, warm glow */
+.aur-root[data-look="lounge"][data-color="white"] { --aur-hi: #f7e8cf; }
+.aur-root[data-look="lounge"] { --aur-glow-tint: color-mix(in oklab, #ffb070 55%, #fff); }
+/* the tonearm (Vinyl layout): a pivot on the right, the arm swinging onto the record */
+@media (min-width: 900px) and (min-height: 540px) {
+	.aur-root[data-look="lounge"][data-view="vinyl"] .aur-art-wrap::before,
+	.aur-root[data-look="lounge"][data-view="vinyl"] .aur-art-wrap::after {
+		content: "";
+		position: absolute;
+		z-index: 2;
+		pointer-events: none;
+	}
+	.aur-root[data-look="lounge"][data-view="vinyl"] .aur-art-wrap::before {
+		right: -5%;
+		top: -5%;
+		width: 14%;
+		height: 14%;
+		border-radius: 50%;
+		background: radial-gradient(circle at 40% 35%, #f3eee4, #9c968c 45%, #4a4640 72%, #2a2826);
+		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+	}
+	.aur-root[data-look="lounge"][data-view="vinyl"] .aur-art-wrap::after {
+		left: 95%;
+		top: 2%;
+		width: 6%;
+		height: 62%;
+		border-radius: 3px;
+		background:
+			linear-gradient(#2c2c31, #3d3d44) bottom / 100% 11% no-repeat,
+			linear-gradient(90deg, transparent 38%, #8a857c 38%, #f1ece2 50%, #8a857c 62%, transparent 62%) top / 100% 90% no-repeat;
+		filter: drop-shadow(-6px 10px 8px rgba(0, 0, 0, 0.5));
+		transform-origin: 50% 0;
+		transform: rotate(18deg);
+		transition: transform 1.4s var(--aur-ease);
+	}
+	.aur-root[data-look="lounge"][data-view="vinyl"][data-playing="false"] .aur-art-wrap::after { transform: rotate(-5deg); }
+}
 
 /* Retro: an amber CRT terminal. Rounded tube corners in a black bezel, flickering scanlines,
    a phosphor tint, and a slow rolling refresh bar. Text glows like phosphor; each new line
