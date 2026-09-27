@@ -370,7 +370,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -813,6 +813,9 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			ui.remaining.textContent = `-${fmtTime(dur - pos)}`;
 			ui.bar.setAttribute("aria-valuemax", String(Math.round(dur / 1000)));
 			updateUpNext(pos, dur);
+			// Song progress for theme ambience (Sunset's sun sets, Midnight's moon rises).
+			// Set on the ambience layer only, once a second, so nothing else restyles.
+			ui.fx.style.setProperty("--aur-song", p.toFixed(3));
 		}
 		const playing = isPlaying();
 		if (playing !== state.playing) {

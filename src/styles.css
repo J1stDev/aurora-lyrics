@@ -2915,29 +2915,94 @@
 .aur-root[data-look="zen"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-settle 1.8s var(--aur-ease); }
 @keyframes aur-fx-settle { from { opacity: 0.35; filter: blur(5px); } }
 
-/* Sunset: a low warm sun and its glow on the horizon, dusk above. */
+/* Sunset: golden hour over the sea, lasting exactly one song. The sun starts above the
+   horizon and sinks below it as the song plays (--aur-song, 0..1, set once a second on
+   .aur-fx), while the sky slowly deepens toward dusk and the sun's glittering path on the
+   water fades. The sun glows a little on every new line and brighter through breaks. The
+   lyrics get a warm golden glow. */
+.aur-root[data-fx="sunset"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, rgba(60, 20, 90, 0.3), rgba(160, 50, 90, 0.18) 45%, rgba(255, 120, 60, 0.26) 71%, rgba(255, 150, 80, 0.3) 72%, rgba(40, 15, 45, 0.3) 73%);
+}
+.aur-root[data-fx="sunset"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, #0b1030, rgba(20, 20, 60, 0.6) 70%, rgba(10, 10, 30, 0.5));
+	opacity: calc(var(--aur-song, 0) * 0.5);
+	transition: opacity 1s linear;
+}
+/* glow around the sun, sinking with it */
 .aur-root[data-fx="sunset"] .aur-fx-a {
 	display: block;
 	left: -10%;
 	right: -10%;
-	bottom: -30%;
-	height: 75%;
-	background: radial-gradient(50% 60% at 50% 100%, rgba(255, 150, 70, 0.42), rgba(255, 80, 120, 0.18) 45%, transparent 75%);
+	top: 30%;
+	height: 84%;
+	background: radial-gradient(50% 50% at 50% 50%, rgba(255, 150, 70, 0.38), rgba(255, 80, 120, 0.16) 45%, transparent 75%);
+	translate: 0 calc(var(--aur-song, 0) * 14vh);
+	opacity: 0.85;
+	transition: translate 1s linear, opacity 3s ease;
 	animation: aur-fx-breathe 16s ease-in-out infinite;
 }
+.aur-root[data-fx="sunset"][data-gap="on"] .aur-fx-a { opacity: 1; }
+/* the sun, clipped at the horizon */
 .aur-root[data-fx="sunset"] .aur-fx-b {
 	display: block;
-	left: 50%;
-	bottom: -14vmin;
-	width: 42vmin;
-	height: 42vmin;
-	margin-left: -21vmin;
-	border-radius: 50%;
-	background: radial-gradient(circle, rgba(255, 214, 160, 0.5), rgba(255, 140, 80, 0.16) 55%, transparent 70%);
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 72%;
+	overflow: hidden;
 }
-.aur-root[data-fx="sunset"] .aur-fx-c { display: block; inset: 0; background: linear-gradient(to bottom, rgba(90, 20, 60, 0.25), transparent 50%); }
+.aur-root[data-fx="sunset"] .aur-fx-b::before {
+	content: "";
+	position: absolute;
+	left: 50%;
+	bottom: -8vmin;
+	width: 34vmin;
+	height: 34vmin;
+	margin-left: -17vmin;
+	border-radius: 50%;
+	background: radial-gradient(circle, #ffd9a0 0 30%, #ffb45e 48%, #ff8a4c 64%, rgba(255, 100, 80, 0) 71%);
+	opacity: 0.6;
+	translate: 0 calc(var(--aur-song, 0) * 26vmin);
+	transition: translate 1s linear;
+}
+.aur-root[data-fx="sunset"][data-bganim="on"][data-lb="a"] .aur-fx-b::before { animation: aur-fx-sunglow-a 2.2s ease-out; }
+.aur-root[data-fx="sunset"][data-bganim="on"][data-lb="b"] .aur-fx-b::before { animation: aur-fx-sunglow-b 2.2s ease-out; }
+@keyframes aur-fx-sunglow-a { from { opacity: 0.8; scale: 1.05; } }
+@keyframes aur-fx-sunglow-b { from { opacity: 0.8; scale: 1.05; } }
+/* the sea, with the sun's glittering path on it */
+.aur-root[data-fx="sunset"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	top: 72%;
+	bottom: 0;
+	background: linear-gradient(rgba(60, 25, 60, 0.35), rgba(15, 8, 25, 0.5));
+}
+.aur-root[data-fx="sunset"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(to bottom, transparent 0 7px, rgba(255, 190, 110, 0.55) 7px 9px, transparent 9px 13px, rgba(255, 150, 90, 0.35) 13px 14px);
+	-webkit-mask-image: radial-gradient(22% 120% at 50% 0%, #000 20%, transparent 100%);
+	mask-image: radial-gradient(22% 120% at 50% 0%, #000 20%, transparent 100%);
+	opacity: calc(0.9 - var(--aur-song, 0) * 0.75);
+	transition: opacity 1s linear;
+	animation: aur-fx-glitter 1.8s steps(4) infinite;
+}
+@keyframes aur-fx-glitter { to { background-position: 0 14px; } }
+/* warm golden glow on the lyrics */
+.aur-root[data-look="sunset"] { --aur-glow-tint: color-mix(in oklab, #ffb46b 60%, #fff); }
 
-/* Midnight: two layers of twinkling stars and a faint moon glow. */
+/* Midnight: a clear night that lasts one song. A crescent moon rises across the sky as the
+   song plays, haloed and crossed by slow clouds; two layers of stars twinkle (one flares a
+   little on every new line), and now and then a shooting star streaks past (more often
+   through instrumental breaks). The lyrics get a cool moonlit glow. */
 .aur-root[data-fx="midnight"] :is(.aur-fx-a, .aur-fx-b) {
 	display: block;
 	inset: 0;
@@ -2953,8 +3018,70 @@
 	animation: aur-fx-twinkle 5s ease-in-out infinite alternate;
 }
 .aur-root[data-fx="midnight"] .aur-fx-b { background-size: 260px 260px; background-position: 90px 130px; animation-duration: 7s; animation-delay: -3s; }
+.aur-root[data-fx="midnight"][data-bganim="on"][data-lb="a"] .aur-fx-b { animation: aur-fx-twinkle 7s ease-in-out -3s infinite alternate, aur-fx-starflare-a 1.6s ease-out; }
+.aur-root[data-fx="midnight"][data-bganim="on"][data-lb="b"] .aur-fx-b { animation: aur-fx-twinkle 7s ease-in-out -3s infinite alternate, aur-fx-starflare-b 1.6s ease-out; }
 @keyframes aur-fx-twinkle { from { opacity: 0.4; } to { opacity: 0.95; } }
-.aur-root[data-fx="midnight"] .aur-fx-c { display: block; inset: 0; background: radial-gradient(circle at 86% 12%, rgba(200, 220, 255, 0.18), transparent 26%); }
+@keyframes aur-fx-starflare-a { from { opacity: 1; } }
+@keyframes aur-fx-starflare-b { from { opacity: 1; } }
+/* the moon: a crescent that rises over the song */
+.aur-root[data-fx="midnight"] .aur-fx-c {
+	display: block;
+	right: 7%;
+	top: 3%;
+	width: 8vmin;
+	height: 8vmin;
+	border-radius: 50%;
+	box-shadow: inset -1.9vmin 1.1vmin 0 0 #eef2ff;
+	filter: drop-shadow(0 0 1.6vmin rgba(200, 220, 255, 0.55));
+	rotate: -18deg;
+	translate: 0 calc((1 - var(--aur-song, 0)) * 12vh);
+	transition: translate 1s linear;
+}
+.aur-root[data-fx="midnight"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	inset: -260%;
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(200, 220, 255, 0.16), transparent 60%);
+}
+/* slow clouds drifting across, in front of the moon */
+.aur-root[data-fx="midnight"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 30%;
+	left: -60%;
+	right: -60%;
+	background:
+		radial-gradient(18% 7% at 30% 28%, rgba(16, 22, 48, 0.55), transparent 70%),
+		radial-gradient(14% 5% at 38% 31%, rgba(16, 22, 48, 0.45), transparent 70%),
+		radial-gradient(20% 6% at 72% 18%, rgba(16, 22, 48, 0.5), transparent 70%);
+	animation: aur-fx-clouds 140s linear infinite alternate;
+}
+@keyframes aur-fx-clouds { from { transform: translate3d(-18%, 0, 0); } to { transform: translate3d(18%, 0, 0); } }
+/* shooting star */
+.aur-root[data-fx="midnight"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	left: 72%;
+	top: 8%;
+	width: 180px;
+	height: 2px;
+	border-radius: 2px;
+	background: linear-gradient(90deg, #fff, rgba(200, 220, 255, 0.5) 30%, transparent);
+	rotate: -28deg;
+	transform-origin: 0 50%;
+	opacity: 0;
+	animation: aur-fx-meteor 13s ease-in infinite;
+}
+.aur-root[data-fx="midnight"][data-gap="on"] .aur-fx::before { animation-duration: 5s; }
+@keyframes aur-fx-meteor {
+	0%, 90% { opacity: 0; transform: translateX(0) scaleX(0.3); }
+	92% { opacity: 1; }
+	100% { opacity: 0; transform: translateX(-40vw) scaleX(1); }
+}
+/* cool moonlit lyrics */
+.aur-root[data-look="midnight"] { --aur-glow-tint: color-mix(in oklab, #b9ccff 60%, #fff); }
 
 /* ============================================================== player-bar button
    A small liquid-glass tile like the logo: frosted, with a bright top edge. While the lyrics
