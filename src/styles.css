@@ -2437,3 +2437,70 @@
 		0 0 14px color-mix(in oklab, var(--aur-pb-c) 55%, transparent),
 		0 2px 8px rgba(0, 0, 0, 0.35);
 }
+
+/* ============================================================== custom background
+   The user's own image or video (Look → Background → Custom), cover-fitted, optionally
+   blurred (scaled up slightly while blurred so the soft edges stay off-screen). The usual
+   darkening and theme ambience still sit on top. */
+.aur-bg-custom { position: absolute; inset: 0; display: none; overflow: hidden; }
+.aur-root[data-bg="custom"] .aur-bg-custom { display: block; }
+.aur-bg-custom > img,
+.aur-bg-custom > video {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	filter: blur(var(--aur-cblur, 0px));
+	transform: scale(calc(1 + var(--aur-cblur, 0px) / 400px));
+	opacity: 0;
+	transition: opacity 0.8s ease;
+}
+.aur-bg-custom > .is-on { opacity: 1; }
+
+/* the file picker row in settings */
+.aur-media { display: flex; flex-direction: column; gap: 10px; }
+.aur-media-name { font-size: 13px; color: rgba(255, 255, 255, 0.65); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.aur-media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ============================================================== mini lyrics styles
+   (Interface → Mini lyrics style). Glass is the default look defined above. */
+.aur-float[data-next="off"] .aur-float-next { display: none; }
+
+/* Compact: one slim pill, no cover, just the line. */
+.aur-float[data-style="compact"] { width: auto; max-width: min(460px, calc(100vw - 16px)); min-height: 42px; padding: 8px 18px; border-radius: 99px; }
+.aur-float[data-style="compact"] .aur-float-art { display: none; }
+.aur-float[data-style="compact"] .aur-float-cur { font-size: 15px; -webkit-line-clamp: 1; }
+.aur-float[data-style="compact"] .aur-float-next { display: none; }
+
+/* Bar: a wide karaoke bar, centred text, bigger type. */
+.aur-float[data-style="bar"] { width: min(920px, calc(100vw - 16px)); min-height: 76px; padding: 12px 28px; border-radius: 14px; text-align: center; background: linear-gradient(180deg, rgba(20, 20, 26, 0.9), rgba(8, 8, 12, 0.92)); }
+.aur-float[data-style="bar"] .aur-float-art { display: none; }
+.aur-float[data-style="bar"] .aur-float-cur { font-size: 24px; }
+.aur-float[data-style="bar"] .aur-float-text::after {
+	content: "";
+	display: block;
+	height: 2px;
+	margin: 8px auto 0;
+	width: 40%;
+	border-radius: 2px;
+	background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--float-c) 40%, #fff), transparent);
+	opacity: 0.6;
+}
+
+/* Floating: no box at all, just shadowed text over whatever is behind. */
+.aur-float[data-style="bare"] { background: none; border-color: transparent; box-shadow: none; backdrop-filter: none; }
+.aur-float[data-style="bare"] .aur-float-art { display: none; }
+.aur-float[data-style="bare"] .aur-float-cur { font-size: 22px; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.9); }
+.aur-float[data-style="bare"] .aur-float-next { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); color: rgba(255, 255, 255, 0.7); }
+.aur-float[data-style="bare"] .aur-float-w { filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85)); }
+.aur-float[data-style="bare"]:hover { background: rgba(0, 0, 0, 0.25); }
+
+/* Neon: dark glass with a glowing rim in the album colour. */
+.aur-float[data-style="neon"] {
+	background: rgba(10, 8, 18, 0.88);
+	border: 1px solid color-mix(in oklab, var(--float-c) 40%, #ff4fd8);
+	box-shadow: 0 0 22px color-mix(in oklab, var(--float-c) 35%, rgba(255, 79, 216, 0.45)), inset 0 0 18px color-mix(in oklab, var(--float-c) 20%, rgba(255, 79, 216, 0.15));
+}
+.aur-float[data-style="neon"] .aur-float-w.sung,
+.aur-float[data-style="neon"] .aur-float-cur:not(:has(.aur-float-w)) { color: #fff; text-shadow: 0 0 10px rgba(255, 120, 230, 0.7); }

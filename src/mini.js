@@ -105,7 +105,14 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 	settings.subscribe((key) => {
 		if (key === "miniLyrics" || key === "*") refresh();
 		if (key === "duetColors" || key === "*") el.dataset.duet = settings.get("duetColors") ? "on" : "off";
+		if (["miniStyle", "miniNext", "*"].includes(key)) styleMini();
 	});
+	function styleMini() {
+		el.dataset.style = settings.get("miniStyle");
+		el.dataset.next = settings.get("miniNext") ? "on" : "off";
+		if (!el.hidden) place(); // the size changes with the style
+	}
+	styleMini();
 	el.dataset.duet = settings.get("duetColors") ? "on" : "off";
 	setTimeout(refresh); // after main.js has finished wiring (isOverlayOpen needs the overlay)
 

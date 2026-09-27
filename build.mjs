@@ -39,6 +39,7 @@ const ORDER = [
 	"icons.js",
 	"styles.js", // virtual, generated from styles.css
 	"view.js",
+	"media.js",
 	"panel.js",
 	"share.js",
 	"tabs.js",

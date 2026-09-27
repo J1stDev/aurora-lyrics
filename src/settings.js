@@ -1,6 +1,6 @@
 // Settings schema, defaults, validation and persistence.
 // The schema also drives the settings panel UI (see panel.js):
-//   type: "range" | "select" | "toggle" | "color" | "providers"
+//   type: "range" | "select" | "toggle" | "color" | "media" | "providers"
 //   ui (select only): "segmented" | "cards" | "fonts" | undefined (dropdown)
 
 import { EXT_ID, clamp } from "./util.js";
@@ -148,7 +148,9 @@ export const SCHEMA = [
 	{ key: "unsyncedAutoScroll", section: "Motion", label: "Auto-scroll unsynced lyrics", type: "toggle", default: true },
 	{ key: "reducedMotion", section: "Motion", label: "Reduced motion", type: "select", ui: "segmented", options: [["system", "System"], ["on", "On"], ["off", "Off"]], default: "system" },
 	// Background
-	{ key: "bgStyle", section: "Background", label: "Style", type: "select", ui: "segmented", options: [["album", "Album art"], ["gradient", "Gradient"], ["solid", "Solid"]], default: "album" },
+	{ key: "bgStyle", section: "Background", label: "Style", type: "select", ui: "segmented", options: [["album", "Album art"], ["gradient", "Gradient"], ["solid", "Solid"], ["custom", "Custom"]], default: "album" },
+	{ key: "customBg", section: "Background", label: "Custom image or video", type: "media", default: null },
+	{ key: "customBlur", section: "Background", label: "Custom background blur", type: "range", min: 0, max: 40, step: 1, unit: "px", default: 0 },
 	{ key: "bgAnimate", section: "Background", label: "Animated background", type: "toggle", default: true },
 	{ key: "bgOpacity", section: "Background", label: "Darkening", type: "range", min: 0, max: 0.9, step: 0.05, unit: "", default: 0.45 },
 	{ key: "blur", section: "Background", label: "Blur", type: "range", min: 20, max: 160, step: 5, unit: "px", default: 90 },
@@ -158,6 +160,8 @@ export const SCHEMA = [
 	{ key: "showTransport", section: "Interface", label: "Playback controls & progress", type: "toggle", default: true },
 	{ key: "tabsButton", section: "Interface", label: "Guitar tabs button (Songsterr)", type: "toggle", default: true },
 	{ key: "queuePeek", section: "Interface", label: "Show the next track near the end of a song", type: "toggle", default: true },
+	{ key: "miniStyle", section: "Interface", label: "Mini lyrics style", type: "select", ui: "segmented", options: [["glass", "Glass"], ["compact", "Compact"], ["bar", "Bar"], ["bare", "Floating"], ["neon", "Neon"]], default: "glass" },
+	{ key: "miniNext", section: "Interface", label: "Mini lyrics: show the next line", type: "toggle", default: true },
 	{ key: "miniLyrics", section: "Interface", label: "Mini lyrics over Spotify while fullscreen is closed (Alt+M)", type: "toggle", default: false },
 	{ key: "npvCard", section: "Interface", label: "Replace Spotify's lyrics card in the Now Playing panel", type: "toggle", default: true },
 	{ key: "showTrackInfo", section: "Interface", label: "Track info", type: "toggle", default: true },
@@ -260,6 +264,10 @@ function validate(entry, value) {
 			return entry.options.some(([v]) => v === value) ? value : entry.default;
 		case "providers":
 			return validateProviders(value);
+		case "media":
+			return value && typeof value === "object" && (value.kind === "image" || value.kind === "video") && typeof value.name === "string"
+				? { kind: value.kind, name: value.name, size: Number(value.size) || 0 }
+				: null;
 		case "color":
 			return value === "album" || /^#[0-9a-f]{6}$/i.test(String(value)) ? String(value).toLowerCase() : entry.default;
 		default:

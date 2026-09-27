@@ -13,6 +13,7 @@ import { createPanel, ensureFont } from "./panel.js";
 import { createShareSheet } from "./share.js";
 import { findTabs, songsterrSearchUrl } from "./tabs.js";
 import { ICONS } from "./icons.js";
+import { loadBackground } from "./media.js";
 
 const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.css
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
@@ -77,6 +78,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			"div",
 			{ class: "aur-bg", "aria-hidden": "true" },
 			bgStack,
+			h("div", { class: "aur-bg-custom" }),
 			h("div", { class: "aur-bg-gradient" }),
 			h("div", { class: "aur-bg-shade" }),
 			// Theme ambience (scanlines, spotlights, stars…); each theme styles these layers.
@@ -368,7 +370,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -391,6 +393,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		st.setProperty("--aur-gap", `${all.lineSpacing}em`);
 		st.setProperty("--aur-fw", all.fontWeight);
 		st.setProperty("--aur-shade", String(all.bgOpacity));
+		st.setProperty("--aur-cblur", `${all.customBlur}px`);
+		if (["customBg", "bgStyle", "*"].includes(key)) updateCustomBg(all);
 		if (all.accent === "album") st.removeProperty("--aur-user-accent");
 		else st.setProperty("--aur-user-accent", all.accent);
 
@@ -408,7 +412,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			tabs: all.tabsButton ? "on" : "off",
 			fx: all.ambience ? all.themeFx || "none" : "none",
 			depth: all.depthBlur ? "on" : "off",
-			bg: all.bgStyle,
+			bg: all.bgStyle === "custom" && !all.customBg ? "album" : all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
 			words: all.wordSync ? "on" : "off",
 			motion: reduced ? "reduced" : "full",
@@ -458,6 +462,50 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	// 256px image and scaling it is far cheaper than blurring a full-window image,
 	// which is what makes the slow rotation affordable.
 	// ---------------------------------------------------------------------------
+	// Custom background (image or video from IndexedDB). A video plays only while the overlay
+	// is open and music is playing.
+	let customUrl = null;
+	let customToken = 0;
+	async function updateCustomBg(all) {
+		const token = ++customToken;
+		const holder = ui.bgCustom;
+		const want = all.bgStyle === "custom" && all.customBg;
+		if (!want) {
+			holder.replaceChildren();
+			if (customUrl) URL.revokeObjectURL(customUrl);
+			customUrl = null;
+			return;
+		}
+		let blob = null;
+		try {
+			blob = await loadBackground();
+		} catch (e) {
+			console.warn("[aurora-lyrics] custom background unavailable", e);
+		}
+		if (token !== customToken) return;
+		if (!blob) return toast("Custom background file is missing — choose it again in Look → Background");
+		if (customUrl) URL.revokeObjectURL(customUrl);
+		customUrl = URL.createObjectURL(blob);
+		const media =
+			all.customBg.kind === "video"
+				? h("video", { src: customUrl, muted: true, loop: true, playsInline: true, autoplay: false, preload: "auto" })
+				: h("img", { src: customUrl, alt: "", decoding: "async" });
+		const show = () => media.classList.add("is-on");
+		if (media.tagName === "VIDEO") {
+			media.muted = true;
+			media.addEventListener("loadeddata", show, { once: true });
+			media.addEventListener("canplay", syncCustomVideo); // it may become playable after the last check
+		} else media.decode ? media.decode().then(show, show) : (media.onload = show);
+		holder.replaceChildren(media);
+		syncCustomVideo();
+	}
+	function syncCustomVideo() {
+		const video = ui?.bgCustom.querySelector("video");
+		if (!video) return;
+		if (state.open && isPlaying() && ui.root.dataset.motion !== "reduced") video.play().catch(() => {});
+		else video.pause();
+	}
+
 	function sizeBackground() {
 		if (!ui) return;
 		const { clientWidth: w, clientHeight: hgt } = ui.root;
@@ -902,6 +950,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			ui.view.playEnter();
 		}
 		kick();
+		syncCustomVideo();
 		onOpenChange?.(true);
 	}
 
@@ -917,6 +966,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		state.closeTimer = setTimeout(() => (ui.root.hidden = true), CLOSE_MS);
 		kick(); // cancels pending frames because state.open is false
 		state.lastFocus?.focus?.({ preventScroll: true });
+		syncCustomVideo();
 		onOpenChange?.(false);
 	}
 
@@ -1048,12 +1098,13 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			if (state.open) loadLyrics();
 			else state.stale = true;
 		},
-		onPlayPause: kick,
+		onPlayPause: () => (kick(), syncCustomVideo()),
 		testSources,
 		onProgress() {
 			// ~1/s while playing and on seeks. Cheap, and makes seeks show up immediately
 			// even if animation frames are being throttled.
 			if (state.open) kick();
+			syncCustomVideo(); // also corrects a background video that missed a play/pause change
 		},
 	};
 }

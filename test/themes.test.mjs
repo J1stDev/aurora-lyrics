@@ -68,3 +68,14 @@ test("theme ambience follows the last theme picked and survives tweaks", async (
 	assert.equal(settings.get("glow"), "radiant");
 	assert.equal(settings.get("themeFx"), "retro");
 });
+
+test("custom background and mini style settings validate", async () => {
+	const { settings } = await freshSettings({ customBg: { kind: "video", name: "loop.mp4", size: 1234, extra: "x" }, bgStyle: "custom", miniStyle: "bar" });
+	assert.deepEqual(settings.get("customBg"), { kind: "video", name: "loop.mp4", size: 1234 });
+	assert.equal(settings.get("bgStyle"), "custom");
+	assert.equal(settings.get("miniStyle"), "bar");
+	settings.set("customBg", { kind: "pdf", name: "x" });
+	assert.equal(settings.get("customBg"), null);
+	settings.set("miniStyle", "nope");
+	assert.equal(settings.get("miniStyle"), "glass");
+});

@@ -81,12 +81,13 @@ With the mouse:
 - **Themes** (*Look → Theme*): Aurora, Neon, Minimal, Karaoke, Cinema, Lounge, Retro (amber terminal), Synthwave, Concert, Zen, Sunset and Midnight, applied in one click. Your own settings are kept as *Custom*, so you can always go back. Each theme also brings its own **ambience**: aurora ribbons, CRT scanlines (Retro), a neon grid and sun (Synthwave), stage spotlights (Concert), letterbox bars (Cinema), twinkling stars (Midnight) and more. Turn it off with *Look → Theme → Theme ambience*.
 - **Accent colour**: taken from the album cover, or pick your own.
 - **Album gradient** text (*Look → Text → Colour*): each line runs from one album colour to another.
-- Eight fonts (including Mono and Condensed), four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient or solid).
+- Eight fonts (including Mono and Condensed), four weights, text size, spacing, alignment, glow strength, and background style (album art, gradient, solid, or **your own image or video**: *Look → Background → Custom*, with optional blur; a video plays along with the music).
 
 ### Mini lyrics
 
 Press **Alt+M** for a small floating bar with the current line and the next one. It stays on screen while you use the rest of Spotify.
 
+- Five styles (*General → Interface → Mini lyrics style*): Glass, Compact (a slim pill), Bar (a wide karaoke bar), Floating (just text, no box) and Neon.
 - Drag it anywhere; it remembers where you left it.
 - Click the text to go back to full screen.
 - Hover it for the **pop-out** button, which turns it into a separate always-on-top window (if your Spotify version supports it).
@@ -197,7 +198,8 @@ src/
   view.js        LyricsView: renders lines, active-line/word tracking, layouts
   panel.js       settings drawer (generated from the schema) + lyrics import editor
   npv.js         lyrics card in Spotify's Now Playing panel
-  mini.js        mini lyrics pill (drag, Alt+M, Document Picture-in-Picture pop-out)
+  mini.js        mini lyrics pill (drag, Alt+M, styles, Document Picture-in-Picture pop-out)
+  media.js       custom background image / video, stored in IndexedDB
   share.js       share sheet + canvas renderer for lyric images
   tabs.js        Songsterr lookup (public song search → tab link, parts, difficulty)
   translate.js   line-by-line translation (batched, aligned, cached)

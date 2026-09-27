@@ -6,10 +6,13 @@
 import { h } from "./util.js";
 import { SCHEMA, FONTS, PROVIDER_INFO, THEMES, DEFAULTS, settings } from "./settings.js";
 import { ICONS, STYLE_ART, ARROWS } from "./icons.js";
+import { saveBackground, removeBackground } from "./media.js";
 
 const MAX_IMPORT_BYTES = 512 * 1024;
 const SEGMENT_ICONS = { left: ICONS.alignLeft, center: ICONS.alignCenter, right: ICONS.alignRight };
 const ACCENT_SWATCHES = ["#ff5fa2", "#ff7a45", "#ffc93d", "#3ddc84", "#2ec5ff", "#7aa2ff", "#b388ff", "#ffffff"];
+
+let panelToast = () => {}; // set by createPanel (controls are built before it has a context)
 
 const loadedFonts = new Set();
 /** Load a Google web font the first time it is needed (no-op for local stacks). */
@@ -115,6 +118,55 @@ function buildControl(entry) {
 		return { row: h("div", { class: "aur-row aur-row-stack" }, labelEl(), el), sync };
 	}
 
+	if (entry.type === "media") {
+		// Custom background: pick an image or video (stored in IndexedDB), or remove it.
+		const name = h("span", { class: "aur-media-name" });
+		const input = h("input", {
+			type: "file",
+			accept: "image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm",
+			hidden: true,
+			onchange: async (e) => {
+				const file = e.target.files?.[0];
+				e.target.value = "";
+				if (!file) return;
+				try {
+					panelToast("Saving background…");
+					const desc = await saveBackground(file);
+					settings.setMany({ customBg: desc, bgStyle: "custom" });
+					panelToast(`Background set: ${desc.name}`);
+				} catch (err) {
+					panelToast(err?.message || "Couldn't use that file");
+				}
+			},
+		});
+		const removeBtn = h(
+			"button",
+			{
+				class: "aur-btn aur-btn-ghost",
+				onclick: async () => {
+					await removeBackground().catch(() => {});
+					settings.setMany({ customBg: null, ...(settings.get("bgStyle") === "custom" ? { bgStyle: "album" } : {}) });
+					panelToast("Custom background removed");
+				},
+			},
+			"Remove",
+		);
+		const sync = (v) => {
+			name.textContent = v ? `${v.kind === "video" ? "Video" : "Image"} · ${v.name}` : "None chosen";
+			removeBtn.disabled = !v;
+		};
+		sync(value);
+		return {
+			row: h(
+				"div",
+				{ class: "aur-row aur-row-stack" },
+				labelEl(),
+				h("div", { class: "aur-media" }, name, h("div", { class: "aur-media-actions" }, h("button", { class: "aur-btn", html: `${ICONS.upload()}<span>Choose image or video</span>`, onclick: () => input.click() }), removeBtn), input),
+			),
+			sync,
+		};
+	}
+
 	if (entry.type === "toggle") {
 		const input = h("input", { type: "checkbox", id, class: "aur-switch", checked: !!value, onchange: (e) => settings.set(entry.key, e.target.checked) });
 		return { row: h("label", { class: "aur-row aur-row-toggle", for: id }, h("span", null, entry.label), input), sync: (v) => (input.checked = !!v) };
@@ -193,6 +245,7 @@ function buildControl(entry) {
  * }} ctx
  */
 export function createPanel(ctx) {
+	panelToast = ctx.toast;
 	const syncers = new Map();
 
 	// --- Pages ----------------------------------------------------------------
