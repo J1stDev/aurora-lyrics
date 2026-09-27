@@ -31,7 +31,7 @@ const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
 const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip"]);
 // Themes that draw the current line's progress (--aur-lp, written every frame, which restyles
 // the whole line, so only when something uses it).
-const LINE_PROGRESS_LOOKS = new Set(["minimal", "karaoke"]);
+const LINE_PROGRESS_LOOKS = new Set(["minimal"]);
 const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {
@@ -604,6 +604,9 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (track?.image) ui.cover.src = track.image;
 		ui.cover.hidden = !track?.image;
 		ui.sideTitle.textContent = track?.title || "";
+		// For the karaoke title card (drawn by CSS from these attributes during the intro).
+		ui.stage.dataset.title = track?.title || "";
+		ui.stage.dataset.artist = track?.artist || "";
 		ui.sideArtist.replaceChildren(...artistNodes());
 		ui.sideAlbum.replaceChildren(...(track?.album ? [albumNode()] : []));
 		updateSideArt(track?.image);

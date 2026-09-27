@@ -28,6 +28,7 @@ const LONG_WORD_MS = 900; // words held at least this long get a letter-by-lette
 // Word animations that work on single letters, so every word is split into letters.
 const SPLIT_WORD_ANIMS = new Set(["letters", "typewriter"]);
 const WORD_LEAD_MS = 40; // highlight words slightly early to cover render latency
+const SOON_MS = 3500; // "a line is coming": the last stretch of a break (karaoke countdown)
 
 export class LyricsView {
 	/**
@@ -114,7 +115,9 @@ export class LyricsView {
 	resetContent() {
 		this.stopBrowsing(true);
 		this.lyrics = null;
-		this.stage.closest(".aur-root")?.removeAttribute("data-gap");
+		const root = (this.rootEl ||= this.stage.closest(".aur-root"));
+		for (const a of ["data-gap", "data-intro", "data-soon"]) root?.removeAttribute(a);
+		this.soon = null;
 		this.list.replaceChildren();
 		this.lineEls = [];
 		this.wordEls = [];
@@ -202,9 +205,14 @@ export class LyricsView {
 		};
 
 		const frag = document.createDocumentFragment();
+		// Karaoke rows: sung lines alternate between two rows, and the first line after an
+		// instrumental break starts on the top row again. A break takes the row of the line
+		// after it (its countdown sits above that line).
+		let row = 0;
 		lyrics.lines.forEach((line, i) => {
 			let el;
 			let words = null;
+			if (line.gap) row = 0;
 			if (line.gap) {
 				// Instrumental break: three dots that fill up over the gap's duration.
 				el = h("div", { class: "aur-line is-gap", "aria-hidden": "true" }, h("span", { class: "aur-dots" }, h("i"), h("i"), h("i")));
@@ -254,6 +262,8 @@ export class LyricsView {
 					this.onShare(i);
 				});
 			}
+			el.dataset.row = String(row);
+			if (!line.gap) row ^= 1;
 			this.lineEls.push(el);
 			this.wordEls.push(words);
 			frag.append(el);
@@ -321,12 +331,17 @@ export class LyricsView {
 
 		const idx = findLineIndex(lyrics.lines, pos);
 		if (idx !== this.active) this.activate(idx);
-		if (idx < 0) return;
+		if (idx < 0) return this.setSoon(lyrics.lines[0]?.time - pos);
 
 		const line = lyrics.lines[idx];
 		if (line.gap) {
 			const p = clamp((pos - line.time) / Math.max(1, line.end - line.time), 0, 1);
-			this.lineEls[idx].style.setProperty("--aur-gp", p.toFixed(3));
+			const el = this.lineEls[idx];
+			el.style.setProperty("--aur-gp", p.toFixed(3));
+			// Countdown over the break's last few seconds (0 → 1 as the next line arrives).
+			const left = line.end - pos;
+			el.style.setProperty("--aur-cd", clamp(1 - left / SOON_MS, 0, 1).toFixed(3));
+			this.setSoon(left);
 		} else {
 			// Line progress (to the end of its last word when it has word timing), for themes:
 			// "is-sung" once it's through, and --aur-lp every frame only when a theme draws it
@@ -339,6 +354,15 @@ export class LyricsView {
 			if (sung !== el.classList.contains("is-sung")) el.classList.toggle("is-sung", sung);
 			if (this.wordEls[idx] && this.wordSync) this.updateWords(idx, pos);
 		}
+	}
+
+	/** data-soon on the root: "on" in the last few seconds of a break (or of the intro). */
+	setSoon(left) {
+		const soon = !(left > SOON_MS);
+		if (soon === this.soon) return;
+		this.soon = soon;
+		const root = (this.rootEl ||= this.stage.closest(".aur-root"));
+		if (root) root.dataset.soon = soon ? "on" : "off";
 	}
 
 	/** Move the "active" markers from the old index to the new one. */
@@ -367,9 +391,11 @@ export class LyricsView {
 		// Line beat for theme ambience: data-lb flips a/b on every new line (so CSS can restart
 		// a one-shot animation by switching between two identical keyframes), and data-gap
 		// marks instrumental breaks.
-		const root = this.stage.closest(".aur-root");
+		const root = (this.rootEl ||= this.stage.closest(".aur-root"));
 		if (root) {
 			const gap = idx < 0 || !!this.lyrics.lines[idx]?.gap;
+			// The intro: before the first sung line (karaoke shows a title card).
+			root.dataset.intro = idx < 0 || (idx === 0 && this.lyrics.lines[0]?.gap) ? "on" : "off";
 			if (!gap) root.dataset.lb = root.dataset.lb === "a" ? "b" : "a";
 			// Normal progression (the next line, or the one after a break), not a seek.
 			if (!gap && idx > prev && idx - prev <= 2) this.onLine?.(idx);
