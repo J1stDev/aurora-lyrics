@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseTTML, parseClock, parseYrc, fromMusixmatch, alignWordsToText, isNeteaseCredit } from "../src/formats.js";
-import { estimateWords, parseLRC } from "../src/lrc.js";
+import { estimateWords, parseLRC, syllables } from "../src/lrc.js";
 import { pickNeteaseSong, mxmMatches } from "../src/sources.js";
 import { sameSong, artistMatches } from "../src/util.js";
 import { DEFAULTS, PROVIDER_INFO } from "../src/settings.js";
@@ -127,6 +127,48 @@ test("estimateWords spreads a line's time across its words", () => {
 	assert.equal(mainLines(cjk)[0].words.length, 4);
 });
 
+test("syllables: rough counts across scripts", () => {
+	assert.equal(syllables("love"), 1);
+	assert.equal(syllables("moved"), 1);
+	assert.equal(syllables("wanted"), 2);
+	assert.equal(syllables("beautiful,"), 3);
+	assert.equal(syllables("little"), 2);
+	assert.equal(syllables("corazón"), 3);
+	assert.equal(syllables("любовь"), 2);
+	assert.equal(syllables("사랑해"), 3);
+	assert.equal(syllables("きょう"), 2);
+	assert.equal(syllables("hmm"), 1);
+});
+
+test("estimateWords: syllable weighting, song pace, breath after commas, held last word", () => {
+	// Tight lines set a fast pace; a long line (instrumental tail) must not crawl to its end.
+	const lrc = [
+		"[00:01.00]I can see it in your eyes tonight", // 9 syllables in 2.5 s
+		"[00:03.50]Every word you say is a lie", // 8 in 2.5 s
+		"[00:06.00]Running out of time to find you", // 8 in 2.5 s
+		"[00:08.50]Hold on, strength", // 3 syllables, 11.5 s slot
+		"[00:20.00]end",
+	].join("\n");
+	const l = mainLines(estimateWords(parseLRC(lrc, { duration: 30000 })));
+	const [a, , , d] = l;
+	// Longer words get more time than one-syllable ones.
+	const eyes = a.words.find((w) => w.text.startsWith("eyes"));
+	const tonight = a.words.find((w) => w.text.startsWith("tonight"));
+	assert.ok(tonight.end - tonight.time > eyes.end - eyes.time);
+	// Short line in a long slot finishes within a couple of seconds.
+	assert.ok(d.words.at(-1).end - d.time < 3000, `sung over ${d.words.at(-1).end - d.time} ms`);
+	// A breath after "on," leaves a gap before the next word.
+	assert.ok(d.words[2].time > d.words[1].end);
+	// Words stay in order and inside their line.
+	for (const line of l) {
+		for (let i = 0; i < line.words.length; i++) {
+			const w = line.words[i];
+			assert.ok(w.end >= w.time && w.time >= line.time && w.end <= line.end);
+			if (i) assert.ok(w.time >= line.words[i - 1].end);
+		}
+	}
+});
+
 test("settings: provider defaults cover every provider once", () => {
 	assert.deepEqual(
 		DEFAULTS.providers.map((p) => p.id),
@@ -210,4 +252,13 @@ test("settings: a newly added provider is inserted at its default rank", async (
 	const ids = settings.get("providers").map((p) => p.id);
 	assert.equal(ids[0], "paxsenix", "Apple Music goes first, as in the defaults");
 	assert.ok(ids.indexOf("unison") < ids.indexOf("lrclib"), "user's own order kept");
+});
+
+test("estimateWords keeps a one-word line whole", () => {
+	const l = mainLines(estimateWords(parseLRC("[00:01.00]Hello\n[00:02.00]世界\n[00:04.00]x", { duration: 6000 })));
+	assert.equal(l[0].words.length, 1);
+	assert.equal(l[1].words.length, 2);
+	assert.equal(syllables("Hercules"), 3);
+	assert.equal(syllables("places"), 2);
+	assert.equal(syllables("times"), 1);
 });

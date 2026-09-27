@@ -1002,30 +1002,82 @@ function finalizeSynced(lines, meta = {}, duration) {
 	return { synced: list.some((l) => !l.gap), hasWords, meta, lines: list };
 }
 
+const VOWEL_RUN = /[aeiouyàáâãäåæèéêëìíîïòóôõöøœùúûüýÿāēīōūăąęěőűαεηιουωάέήίόύώаеёиоуыэюяіїє]+/giu;
+const SYLLABLE_CHAR = /[ぁ-ゖァ-ヺ一-鿿㐀-䶿가-힯]/gu;
+const CJK = /[ぁ-ヺ㐀-䶿一-鿿]/u;
+const SMALL_KANA =/[ぁぃぅぇぉゃゅょっゎァィゥェォャュョッヮ]/gu;
+// A comma, full stop, dash etc. at the end of a word: the singer usually breathes there.
+const PAUSE_AFTER = /[,.;:!?…—–、。，！？]["'”’)\]]*\s*$/u;
+
+/**
+ * Rough syllable count for one word: each CJK/kana/Hangul character is a syllable, other
+ * scripts count vowel groups, with English silent endings ("love", "moved") dropped.
+ */
+function syllables(word) {
+	const w = word.toLowerCase().replace(/[^\p{L}\p{N}']/gu, "");
+	if (!w) return 0;
+	const block = (w.match(SYLLABLE_CHAR) || []).length - (w.match(SMALL_KANA) || []).length;
+	const rest = w.replace(SYLLABLE_CHAR, "");
+	let n = (rest.match(VOWEL_RUN) || []).length;
+	if (/^[a-z']+$/.test(rest) && n > 1) {
+		if (/[^aeiouyl]e$|[^aeiouyslcgzxh]es$|[^aeiouytd]ed$/.test(rest)) n--;
+	}
+	n += (rest.match(/\d/g) || []).length; // "99" is sung as several syllables
+	return Math.max(block + n, 1);
+}
+
+/**
+ * Typical time per syllable for this song, from the tighter lines (a line's slot often
+ * includes an instrumental tail, so the fast end of the distribution is closest to the
+ * actual singing pace). Rap lands near 150 ms, ballads 400+.
+ */
+function syllableRate(items) {
+	const rates = items.filter((it) => it.syl >= 3).map((it) => (it.l.end - it.l.time) / it.syl);
+	if (rates.length < 3) return 300;
+	rates.sort((a, b) => a - b);
+	return Math.min(Math.max(rates[Math.floor(rates.length * 0.3)], 130), 650);
+}
+
 /**
  * Give line-synced lyrics approximate word timing so word animations work everywhere.
- * Each line's sung time (capped, since a line often stays up through an instrumental tail)
- * is split across its words in proportion to their length. Returns a new Lyrics object
- * flagged `estimated: true`; lines that already have word timing are left alone.
+ * Words get time by syllable count, at the song's own singing pace, with a short breath
+ * after punctuation and the last word of each line held a little longer. A line that
+ * stays up through an instrumental tail finishes early instead of crawling to its end.
+ * Returns a new Lyrics object flagged `estimated: true`; lines that already have word
+ * timing are left alone.
  */
 function estimateWords(lyrics) {
 	if (!lyrics?.synced || lyrics.hasWords) return lyrics;
-	const lines = lyrics.lines.map((l) => {
-		if (l.gap || l.words || !l.text) return l;
-		// Split into words; scripts without spaces (CJK) are split per character.
-		const tokens = /\s/.test(l.text) ? l.text.match(/\S+\s*/g) : Array.from(l.text);
-		const weights = tokens.map((t) => t.trim().length + 1);
-		const total = weights.reduce((a, b) => a + b, 0);
-		const span = Math.min(l.end - l.time, 450 * tokens.length + 600) * 0.92;
+	const items = [];
+	for (const l of lyrics.lines) {
+		if (l.gap || l.words || !l.text) continue;
+		// Split into words; Chinese/Japanese written without spaces is split per character.
+		const text = l.text.trim();
+		const tokens = /\s/.test(text) ? l.text.match(/\S+\s*/g) : CJK.test(text) ? Array.from(l.text) : [l.text];
+		const syl = tokens.map((t) => syllables(t) || 0.5);
+		items.push({ l, tokens, syl: syl.reduce((a, b) => a + b, 0), sylEach: syl });
+	}
+	const rate = syllableRate(items);
+	const byLine = new Map();
+	for (const { l, tokens, sylEach } of items) {
+		const last = tokens.length - 1;
+		const pause = tokens.map((t, i) => (i < last && PAUSE_AFTER.test(t) ? 0.6 : 0));
+		const hold = last > 0 ? 1 : 0.5; // the last word is usually drawn out
+		const units = sylEach.reduce((a, b) => a + b, 0) + pause.reduce((a, b) => a + b, 0) + hold;
+		const avail = l.end - l.time;
+		// Sing at the song's pace, a little slower when there is room, never past the line.
+		const span = Math.min(units * rate * 1.1, avail * 0.94);
+		const unit = span / units;
 		let t = l.time;
 		const words = tokens.map((text, i) => {
-			const d = (span * weights[i]) / total;
+			const d = unit * (sylEach[i] + (i === last ? hold : 0));
 			const w = { time: Math.round(t), end: Math.round(t + d), text };
-			t += d;
+			t += d + unit * pause[i];
 			return w;
 		});
-		return { ...l, words };
-	});
+		byLine.set(l, words);
+	}
+	const lines = lyrics.lines.map((l) => (byLine.has(l) ? { ...l, words: byLine.get(l) } : l));
 	return { ...lyrics, lines, hasWords: true, estimated: true };
 }
 
