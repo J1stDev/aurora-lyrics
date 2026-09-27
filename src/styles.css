@@ -2165,7 +2165,11 @@
    is transform / opacity and pauses with the animated background (reduced motion stops it). */
 .aur-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .aur-fx > i { position: absolute; display: none; }
-.aur-root[data-bganim="off"] .aur-fx > i { animation-play-state: paused; }
+.aur-root[data-bganim="off"] .aur-fx > i,
+.aur-root[data-bganim="off"] .aur-fx > i::before,
+.aur-root[data-bganim="off"] .aur-fx > i::after,
+.aur-root[data-bganim="off"] .aur-fx::before,
+.aur-root[data-bganim="off"] .aur-fx::after { animation-play-state: paused; }
 @keyframes aur-fx-pulse { 50% { opacity: 0.6; } }
 @keyframes aur-fx-breathe { 50% { transform: scale(1.12); opacity: 0.7; } }
 @keyframes aur-fx-sway { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
@@ -2201,8 +2205,8 @@
 	animation: aur-fx-arc 34s ease-in-out infinite alternate;
 }
 .aur-root[data-fx="aurora"][data-gap="on"] .aur-fx-a { opacity: 0.42; }
-.aur-root[data-fx="aurora"][data-lb="a"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-a 2.6s ease-out; }
-.aur-root[data-fx="aurora"][data-lb="b"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-b 2.6s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-a 2.6s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-arc 34s ease-in-out infinite alternate, aur-fx-flare-b 2.6s ease-out; }
 @keyframes aur-fx-arc {
 	from { transform: translate3d(-9%, 2%, 0); }
 	to { transform: translate3d(9%, -3%, 0); }
@@ -2267,8 +2271,8 @@
 	opacity: 0.6;
 	animation: aur-fx-ignite 1.9s linear 0.25s both, aur-fx-stutter 17s linear 3s infinite reverse;
 }
-.aur-root[data-fx="neon"][data-lb="a"] .aur-fx-a { animation: aur-fx-ignite 1.6s linear both, aur-fx-stutter 11s linear 1.6s infinite, aur-fx-buzz-a 0.32s steps(1); }
-.aur-root[data-fx="neon"][data-lb="b"] .aur-fx-a { animation: aur-fx-ignite 1.6s linear both, aur-fx-stutter 11s linear 1.6s infinite, aur-fx-buzz-b 0.32s steps(1); }
+.aur-root[data-fx="neon"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-ignite 1.6s linear both, aur-fx-stutter 11s linear 1.6s infinite, aur-fx-buzz-a 0.32s steps(1); }
+.aur-root[data-fx="neon"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-ignite 1.6s linear both, aur-fx-stutter 11s linear 1.6s infinite, aur-fx-buzz-b 0.32s steps(1); }
 @keyframes aur-fx-ignite {
 	0%, 8%, 16%, 30%, 46% { opacity: 0.05; }
 	5%, 12%, 24%, 40% { opacity: 0.7; }
@@ -2356,8 +2360,8 @@
 	opacity: 0.8;
 	animation: aur-fx-sway 10s ease-in-out infinite alternate;
 }
-.aur-root[data-fx="karaoke"][data-lb="a"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-a 1.2s ease-out; }
-.aur-root[data-fx="karaoke"][data-lb="b"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-b 1.2s ease-out; }
+.aur-root[data-fx="karaoke"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-a 1.2s ease-out; }
+.aur-root[data-fx="karaoke"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-sway 10s ease-in-out infinite alternate, aur-fx-flash-b 1.2s ease-out; }
 @keyframes aur-fx-flash-a { from { opacity: 1; } }
 @keyframes aur-fx-flash-b { from { opacity: 1; } }
 .aur-root[data-fx="karaoke"] .aur-fx-b { display: block; left: 0; right: 0; bottom: 0; height: 40%; background: radial-gradient(55% 70% at 50% 100%, color-mix(in oklab, var(--aur-accent) 32%, transparent), transparent 75%); }
@@ -2564,8 +2568,8 @@
 	animation: aur-fx-smoke 45s ease-in-out infinite alternate;
 }
 .aur-root[data-fx="lounge"][data-gap="on"] .aur-fx-c { opacity: 1; }
-.aur-root[data-fx="lounge"][data-lb="a"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-a 3s ease-out; }
-.aur-root[data-fx="lounge"][data-lb="b"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-b 3s ease-out; }
+.aur-root[data-fx="lounge"][data-bganim="on"][data-lb="a"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-a 3s ease-out; }
+.aur-root[data-fx="lounge"][data-bganim="on"][data-lb="b"] .aur-fx-c { animation: aur-fx-smoke 45s ease-in-out infinite alternate, aur-fx-stir-b 3s ease-out; }
 @keyframes aur-fx-smoke {
 	from { transform: translate3d(-6%, 3%, 0) scale(1); }
 	to { transform: translate3d(7%, -4%, 0) scale(1.15); }
@@ -2718,8 +2722,8 @@
 	mask-image: linear-gradient(#000 52%, transparent 52%), repeating-linear-gradient(#000 0 2.2vmin, transparent 2.2vmin 3.2vmin);
 	animation: aur-fx-stripes 4s linear infinite;
 }
-.aur-root[data-fx="synthwave"][data-lb="a"] .aur-fx-a { animation: aur-fx-stripes 4s linear infinite, aur-fx-sunbeat-a 0.9s var(--aur-ease); }
-.aur-root[data-fx="synthwave"][data-lb="b"] .aur-fx-a { animation: aur-fx-stripes 4s linear infinite, aur-fx-sunbeat-b 0.9s var(--aur-ease); }
+.aur-root[data-fx="synthwave"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-fx-stripes 4s linear infinite, aur-fx-sunbeat-a 0.9s var(--aur-ease); }
+.aur-root[data-fx="synthwave"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-fx-stripes 4s linear infinite, aur-fx-sunbeat-b 0.9s var(--aur-ease); }
 @keyframes aur-fx-stripes { to { -webkit-mask-position: 0 0, 0 3.2vmin; mask-position: 0 0, 0 3.2vmin; } }
 @keyframes aur-fx-sunbeat-a { from { transform: scale(1.07); opacity: 0.5; } }
 @keyframes aur-fx-sunbeat-b { from { transform: scale(1.07); opacity: 0.5; } }
@@ -2769,35 +2773,147 @@
 .aur-root[data-look="synthwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main { text-shadow: 0.05em 0.05em 0 rgba(34, 211, 238, 0.55); }
 .aur-root[data-look="synthwave"][data-words="on"] .aur-stage .aur-line.is-active .aur-w { text-shadow: 0.05em 0.05em 0 color-mix(in srgb, rgba(34, 211, 238, 0.6) calc(var(--aur-wp) * 100%), transparent); }
 
-/* Concert: two stage beams sweeping from the rig, and warm haze over the crowd. */
+/* Concert: a live show. Two stage beams tinted with the album's colour sweep from the rig
+   (faster, as a light show, through instrumental breaks), haze glows over a crowd silhouette
+   dotted with swaying phone lights, the stage strobes on every new line, and a LIVE badge
+   pulses in the corner. The lyrics are set in big capitals. */
 .aur-root[data-fx="concert"] :is(.aur-fx-a, .aur-fx-b) {
+	--beam: color-mix(in oklab, var(--aur-accent) 35%, #fff4d6);
 	display: block;
 	top: -20%;
 	width: 60%;
 	height: 150%;
-	background: conic-gradient(from 160deg at 20% 0%, transparent 0deg, rgba(255, 255, 255, 0.08) 8deg, rgba(255, 244, 214, 0.15) 12deg, rgba(255, 255, 255, 0.08) 16deg, transparent 24deg);
+	background: conic-gradient(from 160deg at 20% 0%, transparent 0deg, color-mix(in oklab, var(--beam) 8%, transparent) 8deg, color-mix(in oklab, var(--beam) 17%, transparent) 12deg, color-mix(in oklab, var(--beam) 8%, transparent) 16deg, transparent 24deg);
 	transform-origin: 20% 0%;
 	animation: aur-fx-beam 11s ease-in-out infinite alternate;
 }
 .aur-root[data-fx="concert"] .aur-fx-a { left: -8%; }
-.aur-root[data-fx="concert"] .aur-fx-b { right: -8%; transform: scaleX(-1); animation-name: aur-fx-beam-r; animation-duration: 13s; }
+.aur-root[data-fx="concert"] .aur-fx-b { --beam: color-mix(in oklab, var(--aur-c1) 45%, #d6e8ff); right: -8%; transform: scaleX(-1); animation-name: aur-fx-beam-r; animation-duration: 13s; }
+.aur-root[data-fx="concert"][data-gap="on"] .aur-fx-a { animation-duration: 2.6s; }
+.aur-root[data-fx="concert"][data-gap="on"] .aur-fx-b { animation-duration: 3.1s; }
 @keyframes aur-fx-beam { from { transform: rotate(-14deg); } to { transform: rotate(10deg); } }
 @keyframes aur-fx-beam-r { from { transform: scaleX(-1) rotate(-12deg); } to { transform: scaleX(-1) rotate(12deg); } }
-.aur-root[data-fx="concert"] .aur-fx-c {
-	display: block;
+/* haze over the crowd */
+.aur-root[data-fx="concert"] .aur-fx::before {
+	content: "";
+	position: absolute;
 	inset: 0;
-	background: radial-gradient(ellipse at 50% 115%, color-mix(in oklab, var(--aur-accent) 28%, transparent), transparent 60%);
+	background: radial-gradient(ellipse at 50% 115%, color-mix(in oklab, var(--aur-accent) 30%, transparent), transparent 60%);
+	opacity: 0.8;
+	transition: opacity 2s ease;
 	animation: aur-fx-pulse 6s ease-in-out infinite;
 }
+.aur-root[data-fx="concert"][data-gap="on"] .aur-fx::before { opacity: 1; }
+/* the crowd: two rows of heads and shoulders */
+.aur-root[data-fx="concert"] .aur-fx-c {
+	display: block;
+	left: -40px;
+	right: -40px;
+	bottom: 0;
+	height: 120px;
+	background:
+		radial-gradient(circle 15px at 30px 34px, #08080c 95%, transparent) 0 100% / 62px 86px repeat-x,
+		radial-gradient(30px 28px at 30px 84px, #08080c 95%, transparent) 0 100% / 62px 86px repeat-x,
+		radial-gradient(circle 12px at 22px 28px, #121019 95%, transparent) 17px calc(100% - 24px) / 50px 70px repeat-x,
+		radial-gradient(24px 22px at 22px 68px, #121019 95%, transparent) 17px calc(100% - 24px) / 50px 70px repeat-x;
+	opacity: 0.92;
+	animation: aur-fx-crowd 1.9s ease-in-out infinite alternate;
+}
+@keyframes aur-fx-crowd { to { transform: translateY(3px); } }
+/* phone lights held up in the crowd */
+.aur-root[data-fx="concert"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: -30px;
+	height: 60px;
+	background:
+		radial-gradient(3px 4px at 9% 40%, #fff, transparent), radial-gradient(9px 9px at 9% 40%, rgba(255, 255, 255, 0.25), transparent),
+		radial-gradient(3px 4px at 27% 25%, #fff, transparent), radial-gradient(9px 9px at 27% 25%, rgba(255, 255, 255, 0.25), transparent),
+		radial-gradient(3px 4px at 46% 55%, #fff, transparent), radial-gradient(9px 9px at 46% 55%, rgba(255, 255, 255, 0.25), transparent),
+		radial-gradient(3px 4px at 63% 30%, #fff, transparent), radial-gradient(9px 9px at 63% 30%, rgba(255, 255, 255, 0.25), transparent),
+		radial-gradient(3px 4px at 81% 48%, #fff, transparent), radial-gradient(9px 9px at 81% 48%, rgba(255, 255, 255, 0.25), transparent),
+		radial-gradient(3px 4px at 94% 22%, #fff, transparent), radial-gradient(9px 9px at 94% 22%, rgba(255, 255, 255, 0.25), transparent);
+	animation: aur-fx-phones 4s ease-in-out infinite alternate;
+}
+@keyframes aur-fx-phones { from { transform: translateX(-10px) rotate(-1deg); } to { transform: translateX(10px) rotate(1deg); } }
+/* strobe on every new line */
+.aur-root[data-fx="concert"] .aur-bg-shade::after { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.aur-root[data-fx="concert"][data-bganim="on"][data-lb="a"] .aur-bg-shade::after { animation: aur-fx-strobe-a 0.45s ease-out; }
+.aur-root[data-fx="concert"][data-bganim="on"][data-lb="b"] .aur-bg-shade::after { animation: aur-fx-strobe-b 0.45s ease-out; }
+@keyframes aur-fx-strobe-a { from { opacity: 0.1; } }
+@keyframes aur-fx-strobe-b { from { opacity: 0.1; } }
+/* LIVE badge */
+.aur-root[data-fx="concert"] .aur-fx::after {
+	content: "LIVE";
+	position: absolute;
+	top: 32px;
+	right: 150px;
+	padding: 6px 11px 6px 24px;
+	border-radius: 99px;
+	font: 800 11px/1 var(--aur-ui-font);
+	letter-spacing: 0.2em;
+	color: #fff;
+	background: radial-gradient(circle 4px at 12px 50%, #ff3b3b 90%, transparent), rgba(0, 0, 0, 0.35);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+	animation: aur-fx-live 1.6s ease-in-out infinite;
+}
+@keyframes aur-fx-live { 50% { opacity: 0.65; } }
+/* big capitals */
+.aur-root[data-look="concert"] .aur-stage .aur-line { text-transform: uppercase; letter-spacing: 0.01em; }
+.aur-root[data-look="concert"] .aur-stage .aur-tr { text-transform: none; letter-spacing: normal; }
 
-/* Zen: one soft pool of light, breathing very slowly; almost no grain. */
+/* Zen: a still pond. One soft pool of light breathes slowly (brighter through instrumental
+   breaks), every new line drops a ripple that spreads out from the centre, and a few soft motes
+   drift down. The lyrics are a pale sage, spaced a little wider, and each line settles into
+   focus. */
 .aur-root[data-fx="zen"] .aur-fx-a {
 	display: block;
 	inset: -20%;
 	background: radial-gradient(40% 40% at 50% 45%, color-mix(in oklab, var(--aur-accent) 20%, transparent), transparent 70%);
+	opacity: 0.8;
+	transition: opacity 3s ease;
 	animation: aur-fx-breathe 14s ease-in-out infinite;
 }
+.aur-root[data-fx="zen"][data-gap="on"] .aur-fx-a { opacity: 1; }
+.aur-root[data-fx="zen"] .aur-fx-b {
+	display: block;
+	left: 50%;
+	top: 45%;
+	width: 70vmin;
+	height: 70vmin;
+	margin: -35vmin 0 0 -35vmin;
+	border-radius: 50%;
+	background:
+		radial-gradient(circle, transparent 60%, color-mix(in oklab, var(--aur-accent) 24%, transparent) 66%, transparent 71%),
+		radial-gradient(circle, transparent 41%, color-mix(in oklab, var(--aur-accent) 14%, transparent) 46%, transparent 51%);
+	opacity: 0;
+}
+.aur-root[data-fx="zen"][data-bganim="on"][data-lb="a"] .aur-fx-b { animation: aur-fx-ripple-a 5s cubic-bezier(0.2, 0.6, 0.3, 1); }
+.aur-root[data-fx="zen"][data-bganim="on"][data-lb="b"] .aur-fx-b { animation: aur-fx-ripple-b 5s cubic-bezier(0.2, 0.6, 0.3, 1); }
+@keyframes aur-fx-ripple-a { from { transform: scale(0.25); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes aur-fx-ripple-b { from { transform: scale(0.25); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+.aur-root[data-fx="zen"] .aur-fx-c {
+	display: block;
+	inset: -400px 0 0 -100px;
+	background-image:
+		radial-gradient(3px 3px at 60px 80px, color-mix(in oklab, var(--aur-accent) 50%, #fff), transparent),
+		radial-gradient(2px 2px at 250px 190px, rgba(255, 255, 255, 0.7), transparent),
+		radial-gradient(2.5px 2.5px at 150px 330px, color-mix(in oklab, var(--aur-accent) 40%, #fff), transparent),
+		radial-gradient(2px 2px at 40px 210px, rgba(255, 255, 255, 0.6), transparent),
+		radial-gradient(3px 3px at 230px 60px, color-mix(in oklab, var(--aur-accent) 45%, #fff), transparent);
+	background-size: 400px 400px, 400px 400px, 400px 400px, 290px 330px, 290px 330px;
+	opacity: 0.35;
+	animation: aur-fx-motes 80s linear infinite;
+}
+@keyframes aur-fx-motes { to { transform: translate3d(100px, 400px, 0); } }
 .aur-root[data-fx="zen"] .aur-bg-grain { opacity: 0.05; }
+/* pale sage lyrics, settling into focus */
+.aur-root[data-look="zen"][data-color="white"] { --aur-hi: color-mix(in oklab, var(--aur-accent) 16%, #fff); }
+.aur-root[data-look="zen"] .aur-stage .aur-line { letter-spacing: 0.015em; }
+.aur-root[data-look="zen"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-settle 1.8s var(--aur-ease); }
+@keyframes aur-fx-settle { from { opacity: 0.35; filter: blur(5px); } }
 
 /* Sunset: a low warm sun and its glow on the horizon, dusk above. */
 .aur-root[data-fx="sunset"] .aur-fx-a {
