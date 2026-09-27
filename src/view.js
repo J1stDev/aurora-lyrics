@@ -38,6 +38,7 @@ export class LyricsView {
 		this.stage = stage;
 		this.onSeek = opts.onSeek;
 		this.onShare = opts.onShare;
+		this.onLine = opts.onLine; // a sung line was reached in normal playback (stats)
 		this.list = h("div", { class: "aur-lines" });
 		this.message = h("div", { class: "aur-message", role: "status" });
 		stage.append(this.list, this.message);
@@ -370,6 +371,8 @@ export class LyricsView {
 		if (root) {
 			const gap = idx < 0 || !!this.lyrics.lines[idx]?.gap;
 			if (!gap) root.dataset.lb = root.dataset.lb === "a" ? "b" : "a";
+			// Normal progression (the next line, or the one after a break), not a seek.
+			if (!gap && idx > prev && idx - prev <= 2) this.onLine?.(idx);
 			root.dataset.gap = gap ? "on" : "off";
 		}
 

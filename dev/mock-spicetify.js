@@ -274,6 +274,20 @@
 			const c = { mock1: ["#ff7a59", "#5b2a86", "#ffc4a8"], mock2: ["#00c2ff", "#1b1464", "#a8e6ff"], mock3: ["#2ecc71", "#0b3d2e", "#b4f5cc"], mock4: ["#f5c451", "#7a3e00", "#ffe7a8"], mock5: ["#ff5fa2", "#2a1450", "#ffc2dc"] }[uri.split(":")[2]];
 			return { VIBRANT: c[0], DARK_VIBRANT: c[1], LIGHT_VIBRANT: c[2] };
 		},
+		// Audio analysis (beat grid): a steady 120 BPM for every mock track, one loud section.
+		getAudioData: async () => {
+			const beat = 0.5;
+			const n = 240;
+			return {
+				track: { tempo: 120 },
+				beats: Array.from({ length: n }, (_, i) => ({ start: i * beat, duration: beat, confidence: 0.9 })),
+				bars: Array.from({ length: n / 4 }, (_, i) => ({ start: i * 4 * beat, duration: 4 * beat, confidence: 0.9 })),
+				sections: [
+					{ start: 0, loudness: -18 },
+					{ start: 20, loudness: -6 },
+				],
+			};
+		},
 	};
 
 	// Transport controls for the preview page.

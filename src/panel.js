@@ -4,6 +4,7 @@
 //  - This track: paste / import .lrc or .txt lyrics for the current track.
 
 import { h } from "./util.js";
+import { fmtDuration } from "./stats.js";
 import { SCHEMA, FONTS, PROVIDER_INFO, THEMES, DEFAULTS, settings } from "./settings.js";
 import { ICONS, STYLE_ART, ARROWS } from "./icons.js";
 import { saveBackground, removeBackground } from "./media.js";
@@ -256,6 +257,7 @@ export function createPanel(ctx) {
 		{ id: "motion", label: "Motion", icon: ICONS.navMotion, title: "Motion", sub: "Line and word animation", sections: ["Motion", "Words"] },
 		{ id: "sources", label: "Sources", icon: ICONS.navSources, title: "Sources", sub: "Where lyrics come from, translation", sections: ["Sources", "Translation"] },
 		{ id: "general", label: "General", icon: ICONS.navGeneral, title: "General", sub: "Sync, controls and shortcuts", sections: ["Sync", "Interface"] },
+		{ id: "stats", label: "Stats", icon: ICONS.navStats, title: "Your stats", sub: "Time with the lyrics open, on this computer" },
 	];
 
 	const sections = new Map();
@@ -507,6 +509,80 @@ export function createPanel(ctx) {
 		removeBtn.disabled = !info.localText;
 	}
 
+	// --- Stats tab -------------------------------------------------------------
+	const statsBody = h("div", { class: "aur-tab-body aur-stats", "data-tab": "stats", hidden: true });
+	let resetArmed = 0;
+	function refreshStats() {
+		const st = ctx.getStats();
+		const themeLabel = (id) => THEMES.find((t) => t.id === id)?.label || "Custom";
+		const tile = (value, label) => h("div", { class: "aur-stat" }, h("div", { class: "aur-stat-value" }, value), h("div", { class: "aur-stat-label" }, label));
+		const max = Math.max(...st.lastDays.map((d) => d.ms), 1);
+		const weekday = (t) => new Date(t).toLocaleDateString(undefined, { weekday: "narrow" });
+		const list = (items, render) => (items.length ? h("ol", { class: "aur-stat-list" }, items.map(render)) : h("p", { class: "aur-hint" }, "Nothing yet. Open the lyrics while a song plays."));
+		const resetBtn = h(
+			"button",
+			{
+				class: "aur-btn aur-btn-ghost",
+				onclick: () => {
+					// Two clicks: the first one arms it for a few seconds.
+					if (Date.now() - resetArmed > 4000) {
+						resetArmed = Date.now();
+						resetBtn.textContent = "Click again to reset";
+						return;
+					}
+					resetArmed = 0;
+					ctx.resetStats();
+					ctx.toast("Stats reset");
+					refreshStats();
+				},
+			},
+			"Reset stats",
+		);
+		statsBody.replaceChildren(
+			h(
+				"div",
+				{ class: "aur-stat-tiles" },
+				tile(fmtDuration(st.totalMs), "with lyrics"),
+				tile(String(st.songCount), st.songCount === 1 ? "song" : "songs"),
+				tile(st.lines.toLocaleString(), "lines sung"),
+				tile(String(st.streak), st.streak === 1 ? "day streak" : "days streak"),
+			),
+			h(
+				"div",
+				{ class: "aur-section" },
+				h("h3", null, "Last 14 days", h("span", { class: "aur-stat-today" }, `Today ${fmtDuration(st.todayMs)}`)),
+				h(
+					"div",
+					{ class: "aur-stat-chart", role: "img", "aria-label": "Time with lyrics per day, last 14 days" },
+					st.lastDays.map((d, i) =>
+						h(
+							"div",
+							{ class: `aur-stat-day${i === st.lastDays.length - 1 ? " is-today" : ""}`, title: `${new Date(d.date).toLocaleDateString()}: ${fmtDuration(d.ms)}` },
+							h("span", { class: "aur-stat-bar", style: `--v:${(d.ms / max).toFixed(3)}` }),
+							h("span", { class: "aur-stat-dow" }, weekday(d.date)),
+						),
+					),
+				),
+			),
+			h(
+				"div",
+				{ class: "aur-section" },
+				h("h3", null, "Top songs"),
+				list(st.topSongs, (x) =>
+					h("li", null, h("div", { class: "aur-stat-name" }, h("b", null, x.title || "Unknown"), h("span", null, x.artist || "")), h("div", { class: "aur-stat-num" }, fmtDuration(x.ms), h("span", null, `${x.plays} ${x.plays === 1 ? "play" : "plays"} · ${x.lines} lines`))),
+				),
+			),
+			h(
+				"div",
+				{ class: "aur-section" },
+				h("h3", null, "Top artists"),
+				list(st.topArtists, (x) => h("li", null, h("div", { class: "aur-stat-name" }, h("b", null, x.name), h("span", null, `${x.songs} ${x.songs === 1 ? "song" : "songs"}`)), h("div", { class: "aur-stat-num" }, fmtDuration(x.ms)))),
+			),
+			st.favTheme ? h("p", { class: "aur-hint" }, `Favourite theme: ${themeLabel(st.favTheme.id)} (${fmtDuration(st.favTheme.ms)}). Counting since ${new Date(st.since).toLocaleDateString()}.`) : null,
+			h("div", { class: "aur-panel-actions" }, resetBtn),
+		);
+	}
+
 	// --- Shell: rail + header (title, search, close) + pages --------------------
 	const nowPlaying = h("div", { class: "aur-np" });
 	function setNowPlaying(track, sourceLabel) {
@@ -549,7 +625,7 @@ export function createPanel(ctx) {
 				h("button", { class: "aur-icon-btn aur-panel-close", title: "Close (Esc)", "aria-label": "Close settings", html: ICONS.close(), onclick: () => close() }),
 				h("label", { class: "aur-search-wrap" }, h("span", { class: "aur-search-icon", html: ICONS.search() }), search),
 			),
-			h("div", { class: "aur-panel-scroll" }, trackBody, settingsBodies, noResults),
+			h("div", { class: "aur-panel-scroll" }, trackBody, statsBody, settingsBodies, noResults),
 		),
 	);
 	// Keep typing in the panel from triggering Spotify / overlay shortcuts.
@@ -569,7 +645,7 @@ export function createPanel(ctx) {
 	let lastSettingsPage = "look";
 	function show(tab) {
 		current = tab;
-		if (tab !== "track") lastSettingsPage = tab;
+		if (tab !== "track" && tab !== "stats") lastSettingsPage = tab;
 		el.dataset.tab = tab;
 		const page = PAGES.find((pg) => pg.id === tab);
 		titleEl.textContent = page.title;
@@ -580,10 +656,12 @@ export function createPanel(ctx) {
 			if (on) rail.style.setProperty("--i", String(i));
 		});
 		trackBody.hidden = tab !== "track";
+		statsBody.hidden = tab !== "stats";
 		for (const [id, body] of Object.entries(bodies)) body.hidden = id !== tab;
 		noResults.hidden = true;
 		el.querySelector(".aur-panel-scroll").scrollTop = 0;
 		if (tab === "track") refreshTrack();
+		if (tab === "stats") refreshStats();
 	}
 
 	/** Filter rows on every settings page; empty query returns to the current page. */
@@ -599,6 +677,7 @@ export function createPanel(ctx) {
 		subEl.textContent = `Results for “${search.value.trim()}”`;
 		for (const btn of railButtons.values()) btn.setAttribute("aria-selected", "false");
 		trackBody.hidden = true;
+		statsBody.hidden = true;
 		let any = false;
 		for (const body of settingsBodies) {
 			body.hidden = false;
@@ -636,7 +715,7 @@ export function createPanel(ctx) {
 		close,
 		/** toggle("settings" | "track" | page id): close if that page is already showing. */
 		toggle(tab) {
-			const want = tab === "settings" ? (current === "track" ? lastSettingsPage : current) : tab;
+			const want = tab === "settings" ? (current === "track" || current === "stats" ? lastSettingsPage : current) : tab;
 			if (el.classList.contains("is-open") && (!tab || want === current)) close();
 			else open(want);
 		},

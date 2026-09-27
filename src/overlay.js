@@ -1,7 +1,7 @@
 // The overlay controller: builds the full-screen UI once (lazily), owns the playback loop,
 // loads lyrics on track changes, and applies settings live.
 
-import { h, clamp, nextFrame, setText } from "./util.js";
+import { h, clamp, nextFrame, setText, EXT_ID } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO } from "./settings.js";
 import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
@@ -14,8 +14,15 @@ import { createShareSheet } from "./share.js";
 import { findTabs, songsterrSearchUrl } from "./tabs.js";
 import { ICONS } from "./icons.js";
 import { loadBackground } from "./media.js";
+import { loadBeats, beatIndexAt } from "./beats.js";
+import { validStats, addTime, addLine, pruneStats, summarize } from "./stats.js";
+import { store } from "./storage.js";
 
 const CLOSE_MS = 420; // must match the overlay fade-out transition in styles.css
+const BEAT_LEAD_MS = 40; // flip beat markers slightly early, like the word highlight
+const BEAT_FRESH_MS = 180; // only react to a beat that just happened (not after a seek)
+const STATS_KEY = `${EXT_ID}:stats`;
+const STATS_SAVE_MS = 15000;
 const OPEN_MS = 750; // the overlay's fade/scale-in (styles.css), after which Spotify's page is hidden
 const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap heavy blur)
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
@@ -290,6 +297,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				}
 				return loadLyrics({ only: id });
 			},
+			getStats: () => summarize(statsObj(), Date.now()),
+			resetStats: () => {
+				statsData = validStats(null, Date.now());
+				store.setJSON(STATS_KEY, statsData);
+			},
 			clearCache: () => {
 				const n = lyricsCache.size();
 				lyricsCache.clear();
@@ -323,6 +335,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const view = new LyricsView(stage, {
 			onShare: (i) => openShare(i),
+			onLine: () => state.open && isPlaying() && !document.hidden && state.track && addLine(statsObj(), state.track.uri),
 			onSeek: (t) => {
 				// Seek so that the *effective* (offset-adjusted) position lands on the line.
 				seek(t - settings.get("offset") + 20);
@@ -374,7 +387,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -444,6 +457,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (RELAYOUT_KEYS.has(key)) nextFrame(() => view.relayout());
 		if (SOURCE_KEYS.has(key) && state.open) loadLyrics();
 		if (key === "estimateWords" && state.lyrics) displayLyrics();
+		if (["beatSync", "ambience", "*"].includes(key)) syncBeats();
 		ui.trBtn.classList.toggle("is-on", !!all.translate);
 		if (key === "translate" || key === "translateTo") {
 			state.trNotice = "";
@@ -654,6 +668,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const track = getCurrentTrack();
 		state.track = track;
+		syncBeats();
 		if (!only) {
 			state.lyrics = null;
 			state.source = null;
@@ -910,6 +925,88 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		return pos;
 	}
 
+	// ---------------------------------------------------------------------------
+	// Beat sync: Spotify's beat grid for the song drives data-bt / data-bar (flipping a/b on
+	// every beat / bar, so CSS can restart one-shot animations) and --aur-beat (one beat, for
+	// tempo-matched loops) on the background, where the theme ambience lives.
+	// ---------------------------------------------------------------------------
+	function syncBeats() {
+		if (!ui) return;
+		const uri = getCurrentTrack()?.uri || null;
+		const want = state.open && uri && settings.get("beatSync") && settings.get("ambience");
+		if (!want) {
+			state.beatUri = null;
+			return setBeats(null);
+		}
+		if (state.beatUri === uri) return;
+		state.beatUri = uri;
+		setBeats(null);
+		loadBeats(uri).then((grid) => state.beatUri === uri && setBeats(grid));
+	}
+	function setBeats(grid) {
+		state.beats = grid;
+		state.beatIdx = state.barIdx = state.secIdx = -1;
+		state.secTimes = grid ? grid.sections.map((x) => x.time) : null;
+		const bg = ui.bg;
+		if (grid) {
+			bg.dataset.beats = "on";
+			bg.style.setProperty("--aur-beat", `${Math.round(60000 / grid.tempo)}ms`);
+		} else {
+			for (const k of ["beats", "bt", "bar"]) delete bg.dataset[k];
+			bg.style.removeProperty("--aur-beat");
+			ui.fx.style.removeProperty("--aur-energy");
+		}
+	}
+	function updateBeats(pos) {
+		const g = state.beats;
+		if (!g || !isPlaying()) return;
+		const p = pos + BEAT_LEAD_MS;
+		const step = (times, idxKey, attr) => {
+			const i = beatIndexAt(times, p);
+			if (i === state[idxKey]) return;
+			state[idxKey] = i;
+			if (i >= 0 && p - times[i] < BEAT_FRESH_MS) ui.bg.dataset[attr] = ui.bg.dataset[attr] === "a" ? "b" : "a";
+		};
+		step(g.beats, "beatIdx", "bt");
+		step(g.bars, "barIdx", "bar");
+		if (state.secTimes?.length) {
+			const si = beatIndexAt(state.secTimes, p);
+			if (si !== state.secIdx) {
+				state.secIdx = si;
+				ui.fx.style.setProperty("--aur-energy", (g.sections[Math.max(0, si)]?.energy ?? 0.6).toFixed(2));
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Stats: time with the lyrics open while playing (counted in the playback loop, saved every
+	// 15 s and on close), plus lines sung (LyricsView's onLine).
+	// ---------------------------------------------------------------------------
+	let statsData = null;
+	function statsObj() {
+		return (statsData ||= validStats(store.getJSON(STATS_KEY), Date.now()));
+	}
+	function saveStats() {
+		if (!statsData) return;
+		state.statsSavedAt = performance.now();
+		store.setJSON(STATS_KEY, pruneStats(statsData));
+	}
+	function statsTick() {
+		const now = performance.now();
+		const counting = state.open && isPlaying() && !document.hidden && state.track?.uri;
+		if (counting && state.statsAt) state.statsPending = (state.statsPending || 0) + Math.min(now - state.statsAt, 2000);
+		state.statsAt = counting ? now : 0;
+		if (state.statsPending >= 1000 || (!counting && state.statsPending > 0)) {
+			const track = state.track;
+			if (track?.uri) {
+				addTime(statsObj(), { ms: Math.round(state.statsPending), now: Date.now(), track, theme: settings.get("themeFx"), fresh: state.statsUri !== track.uri });
+				state.statsUri = track.uri;
+			}
+			state.statsPending = 0;
+			if (now - (state.statsSavedAt || 0) > STATS_SAVE_MS) saveStats();
+		}
+	}
+
 	function tick() {
 		// Whichever of rAF / fallback timer fired first, cancel the other.
 		if (state.raf) cancelAnimationFrame(state.raf);
@@ -917,7 +1014,10 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		state.raf = 0;
 		state.timer = 0;
 		if (!state.open) return;
-		ui.view.update(smoothPosition() + settings.get("offset"), state.track?.duration || getDuration());
+		const pos = smoothPosition();
+		ui.view.update(pos + settings.get("offset"), state.track?.duration || getDuration());
+		updateBeats(pos);
+		statsTick();
 		renderProgress();
 		schedule();
 	}
@@ -957,6 +1057,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		state.coverTimer = setTimeout(() => state.open && document.documentElement.classList.add("aur-covered"), OPEN_MS);
 		ui.root.focus({ preventScroll: true });
 		wake();
+		syncBeats();
 		if (state.stale || state.track?.uri !== getCurrentTrack()?.uri) loadLyrics();
 		else {
 			ui.view.relayout();
@@ -976,6 +1077,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		ui.view.stopBrowsing(true);
 		clearTimeout(state.coverTimer);
 		document.documentElement.classList.remove("aur-covered");
+		statsTick();
+		saveStats();
 		ui.root.classList.remove("is-open");
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 		state.closeTimer = setTimeout(() => (ui.root.hidden = true), CLOSE_MS);
@@ -1101,6 +1204,10 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		true,
 	);
 
+	// Keep stats when Spotify closes or goes to the background.
+	globalThis.addEventListener?.("pagehide", () => (statsTick(), saveStats()));
+	document.addEventListener("visibilitychange", () => document.hidden && (statsTick(), saveStats()));
+
 	// ---------------------------------------------------------------------------
 	// Player events (wired by main.js)
 	// ---------------------------------------------------------------------------
@@ -1110,6 +1217,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		toggle: () => (state.open ? close() : open()),
 		isOpen: () => state.open,
 		onSongChange() {
+			state.statsUri = null; // the next counted second is a new play (even of the same song)
 			if (state.open) loadLyrics();
 			else state.stale = true;
 		},

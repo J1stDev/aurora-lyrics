@@ -1451,6 +1451,28 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-key { display: flex; align-items: center; gap: 8px; }
 .aur-key kbd { flex: none; min-width: 24px; padding: 2px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12); font: 600 11px/1.4 var(--aur-ui-font); color: #fff; text-align: center; }
 
+/* ---- Stats page */
+.aur-stat-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 6px 0 4px; }
+.aur-stat { padding: 14px 12px 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05); }
+.aur-stat-value { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aur-stat-label { margin-top: 4px; font-size: 11.5px; color: rgba(255, 255, 255, 0.5); }
+.aur-stat-today { float: right; letter-spacing: 0.02em; text-transform: none; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+.aur-stat-chart { display: grid; grid-template-columns: repeat(14, 1fr); gap: 6px; align-items: end; height: 120px; padding: 14px 14px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05); }
+.aur-stat-day { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; }
+.aur-stat-bar { width: 100%; max-width: 18px; height: max(3px, calc(var(--v, 0) * (100% - 20px))); border-radius: 5px; background: rgba(255, 255, 255, 0.22); }
+.aur-stat-day.is-today .aur-stat-bar { background: linear-gradient(to top, color-mix(in oklab, var(--aur-accent) 70%, #fff), color-mix(in oklab, var(--aur-accent) 30%, #fff)); }
+.aur-stat-dow { font-size: 10.5px; color: rgba(255, 255, 255, 0.4); }
+.aur-stat-list { margin: 0; padding: 2px 14px; list-style: none; counter-reset: aur-rank; border-radius: 14px; background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.05); }
+.aur-stat-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; counter-increment: aur-rank; }
+.aur-stat-list li + li { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.aur-stat-list li::before { content: counter(aur-rank); width: 16px; flex: none; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.35); text-align: center; }
+.aur-stat-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.aur-stat-name b, .aur-stat-name span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aur-stat-name b { font-size: 13.5px; font-weight: 600; color: #fff; }
+.aur-stat-name span, .aur-stat-num span { font-size: 11.5px; color: rgba(255, 255, 255, 0.45); }
+.aur-stat-num { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.85); font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) { .aur-stat-tiles { grid-template-columns: repeat(2, 1fr); } }
+
 .aur-track-info { display: flex; align-items: center; gap: 14px; margin: 14px 0; }
 .aur-track-art { width: 60px; height: 60px; flex: none; border-radius: 8px; object-fit: cover; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
 .aur-track-text { min-width: 0; }
@@ -3094,6 +3116,59 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 }
 /* cool moonlit lyrics */
 .aur-root[data-look="midnight"] { --aur-glow-tint: color-mix(in oklab, #b9ccff 60%, #fff); }
+
+/* ============================================================== beat sync
+   With Spotify's beat grid for the song (overlay.js, Theme: "Time ambience to the beat"), .aur-bg
+   carries data-bt / data-bar, flipping a/b on every beat / bar, and --aur-beat (one beat). Themes
+   react on bars for big moves and on beats for small ones; tempo-matched loops use --aur-beat.
+   Without beat data none of this applies and themes react to lyric lines only. */
+@keyframes aur-fx-hop-a { 35% { transform: translateY(-5px); } }
+@keyframes aur-fx-hop-b { 35% { transform: translateY(-5px); } }
+@keyframes aur-fx-swell-a { from { transform: scale(1.1); } }
+@keyframes aur-fx-swell-b { from { transform: scale(1.1); } }
+@keyframes aur-fx-blip-a { 0% { opacity: 0.75; } 100% { opacity: 0.55; } }
+@keyframes aur-fx-blip-b { 0% { opacity: 0.75; } 100% { opacity: 0.55; } }
+/* Aurora: the stars glint on each bar */
+.aur-root[data-fx="aurora"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-c { animation: aur-fx-twinkle 6s ease-in-out infinite alternate, aur-fx-flash-a 1.1s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-c { animation: aur-fx-twinkle 6s ease-in-out infinite alternate, aur-fx-flash-b 1.1s ease-out; }
+/* Neon: the wet floor pulses on the beat, the inner tube buzzes on the bar */
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-c { animation: aur-fx-pulse 5s ease-in-out infinite, aur-fx-flash-a 0.35s ease-out; }
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-c { animation: aur-fx-pulse 5s ease-in-out infinite, aur-fx-flash-b 0.35s ease-out; }
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-b { animation: aur-fx-ignite 1.9s linear 0.25s both, aur-fx-stutter 17s linear 3s infinite reverse, aur-fx-buzz-a 0.32s steps(1); }
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-b { animation: aur-fx-ignite 1.9s linear 0.25s both, aur-fx-stutter 17s linear 3s infinite reverse, aur-fx-buzz-b 0.32s steps(1); }
+/* Karaoke: the mirror-ball sparkles glint on the beat, the stage floor swells on the bar */
+.aur-root[data-fx="karaoke"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-c { animation: aur-fx-ball 38s linear infinite, aur-fx-flash-a 0.3s ease-out; }
+.aur-root[data-fx="karaoke"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-c { animation: aur-fx-ball 38s linear infinite, aur-fx-flash-b 0.3s ease-out; }
+.aur-root[data-fx="karaoke"] .aur-fx-b { transform-origin: 50% 100%; }
+.aur-root[data-fx="karaoke"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-b { animation: aur-fx-swell-a 0.7s ease-out; }
+.aur-root[data-fx="karaoke"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-b { animation: aur-fx-swell-b 0.7s ease-out; }
+/* Retro: the scanlines blip on the beat */
+.aur-root[data-fx="retro"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-a { animation: aur-fx-blip-a 0.12s steps(1); }
+.aur-root[data-fx="retro"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-a { animation: aur-fx-blip-b 0.12s steps(1); }
+/* Synthwave: the grid rolls one line every two beats (every beat through breaks); the
+   horizon flashes on the bar */
+.aur-root[data-fx="synthwave"] .aur-bg[data-beats="on"] .aur-fx-b { animation-duration: calc(var(--aur-beat) * 2); }
+.aur-root[data-fx="synthwave"][data-gap="on"] .aur-bg[data-beats="on"] .aur-fx-b { animation-duration: var(--aur-beat); }
+.aur-root[data-fx="synthwave"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-c { animation: aur-fx-flash-a 0.5s ease-out; }
+.aur-root[data-fx="synthwave"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-c { animation: aur-fx-flash-b 0.5s ease-out; }
+/* Concert: the crowd jumps on every beat, the beams sweep over four bars (one bar through
+   breaks), the haze flares on the bar, and the beams burn brighter in loud sections */
+.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-c { animation: aur-fx-hop-a calc(var(--aur-beat) * 0.7) ease-out; }
+.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-c { animation: aur-fx-hop-b calc(var(--aur-beat) * 0.7) ease-out; }
+.aur-root[data-fx="concert"] .aur-bg[data-beats="on"] :is(.aur-fx-a, .aur-fx-b) { animation-duration: calc(var(--aur-beat) * 16); opacity: calc(0.5 + 0.5 * var(--aur-energy, 0.8)); transition: opacity 2s ease; }
+.aur-root[data-fx="concert"][data-gap="on"] .aur-bg[data-beats="on"] :is(.aur-fx-a, .aur-fx-b) { animation-duration: calc(var(--aur-beat) * 4); }
+.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-fx-pulse 6s ease-in-out infinite, aur-fx-flash-a 0.6s ease-out; }
+.aur-root[data-fx="concert"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx::before { animation: aur-fx-pulse 6s ease-in-out infinite, aur-fx-flash-b 0.6s ease-out; }
+/* Gothic: the candles flare on the bar */
+.aur-root[data-fx="gothic"] .aur-fx::before { transform-origin: 50% 100%; }
+.aur-root[data-fx="gothic"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-fx-flame 3.4s steps(27) infinite, aur-fx-swell-a 1s ease-out; }
+.aur-root[data-fx="gothic"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx::before { animation: aur-fx-flame 3.4s steps(27) infinite, aur-fx-swell-b 1s ease-out; }
+/* Sunset: the sun's path on the water glitters on the bar */
+.aur-root[data-fx="sunset"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-c::before { animation: aur-fx-glitter 1.8s steps(4) infinite, aur-fx-flash-a 0.8s ease-out; }
+.aur-root[data-fx="sunset"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-c::before { animation: aur-fx-glitter 1.8s steps(4) infinite, aur-fx-flash-b 0.8s ease-out; }
+/* Midnight: the near stars glint on the bar */
+.aur-root[data-fx="midnight"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-a { animation: aur-fx-twinkle 5s ease-in-out infinite alternate, aur-fx-flash-a 1s ease-out; }
+.aur-root[data-fx="midnight"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-a { animation: aur-fx-twinkle 5s ease-in-out infinite alternate, aur-fx-flash-b 1s ease-out; }
 
 /* ============================================================== player-bar button
    A small liquid-glass tile like the logo: frosted, with a bright top edge. While the lyrics
