@@ -1,0 +1,94 @@
+/* Rain: a night window (generated vector art, see tools/themes/gen-scenes.py). Blurred city
+   lights glow behind the glass; beaded drops cling to it, larger ones run down leaving trails,
+   and rain streaks fall past outside in two depths. Now and then lightning lights the whole
+   window (more often through instrumental breaks). The dark window frame closes in the edges.
+   The lights brighten on every new line (and flash on every bar with beat data). The lyrics
+   are misted-glass white and clear from a blur as if wiped. */
+.aur-root[data-fx="rain"] .aur-fx {
+	background: linear-gradient(to bottom, rgba(10, 16, 30, 0.86), rgba(14, 22, 40, 0.8) 60%, rgba(20, 26, 44, 0.72));
+}
+/* the window: reflections, condensation and a frame */
+.aur-root[data-fx="rain"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.035) 34%, transparent 40%, transparent 62%, rgba(255, 255, 255, 0.025) 66%, transparent 70%),
+		radial-gradient(120% 90% at 50% 100%, rgba(150, 170, 200, 0.16), transparent 60%),
+		radial-gradient(130% 110% at 50% 45%, transparent 55%, rgba(2, 4, 10, 0.6));
+	box-shadow: inset 0 0 0 1.3vmin rgba(4, 6, 12, 0.92), inset 0 0 0 1.5vmin rgba(120, 140, 170, 0.18);
+}
+/* the city lights behind the glass */
+.aur-root[data-fx="rain"] .aur-fx-a {
+	display: block;
+	inset: 0;
+	background: {{RAIN_BOKEH}} center / cover no-repeat;
+	opacity: 0.75;
+	transition: opacity 2s ease;
+	animation: aur-rn-glow 9s steps(54) infinite alternate;
+}
+.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-a { opacity: 0.95; }
+.aur-root[data-fx="rain"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-rn-glow 9s steps(54) infinite alternate, aur-fx-flash-a 1.6s ease-out; }
+.aur-root[data-fx="rain"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-rn-glow 9s steps(54) infinite alternate, aur-fx-flash-b 1.6s ease-out; }
+@keyframes aur-rn-glow { from { opacity: 0.6; } to { opacity: 0.9; } }
+/* drops on the glass; the big ones run down */
+.aur-root[data-fx="rain"] .aur-fx-b {
+	display: block;
+	inset: 0;
+	background: {{RAIN_DROPS}} center / cover no-repeat;
+}
+.aur-root[data-fx="rain"] .aur-fx-b::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: -100%;
+	height: 200%;
+	background: {{RAIN_RUNS}} 0 0 / 100% 50% repeat-y;
+	animation: aur-rn-run 26s steps(390) infinite linear;
+}
+@keyframes aur-rn-run { to { transform: translateY(50%); } }
+/* rain falling outside, in two depths: each layer is one tile taller than the screen and moves
+   by exactly one tile, so the loop joins up */
+.aur-root[data-fx="rain"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	top: -1000px;
+	height: calc(100% + 1000px);
+	background: {{RAIN_STREAKS}} 0 0 / 1000px 1000px repeat;
+	animation: aur-rn-fall 0.9s steps(14) infinite linear;
+}
+@keyframes aur-rn-fall { to { transform: translateY(1000px); } }
+.aur-root[data-fx="rain"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{RAIN_STREAKS_B}} 0 0 / 700px 700px repeat;
+	animation: aur-rn-fall-far 1.3s steps(14) infinite linear;
+}
+@keyframes aur-rn-fall-far { to { transform: translateY(700px); } }
+/* lightning */
+.aur-root[data-fx="rain"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(90% 70% at 50% 20%, rgba(210, 225, 255, 0.85), rgba(150, 175, 230, 0.4) 60%, transparent);
+	opacity: 0;
+	animation: aur-rn-flash 27s linear infinite;
+}
+.aur-root[data-fx="rain"][data-gap="on"] .aur-fx::after { animation-duration: 14s; }
+@keyframes aur-rn-flash {
+	0%, 95% { opacity: 0; }
+	95.4% { opacity: 0.5; }
+	96% { opacity: 0.08; }
+	96.6% { opacity: 0.78; }
+	100% { opacity: 0; }
+}
+.aur-root[data-fx="rain"] .aur-bg-grain { opacity: 0.03; }
+
+/* misted-glass lyrics that clear from a blur */
+.aur-root[data-look="rain"] { --aur-glow-tint: #8fb4e6; }
+.aur-root[data-look="rain"][data-color="white"] { --aur-hi: #e8f1ff; }
+.aur-root[data-look="rain"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-rn-wipe 1.5s var(--aur-ease); }
+@keyframes aur-rn-wipe { from { opacity: 0.3; filter: blur(7px); } }

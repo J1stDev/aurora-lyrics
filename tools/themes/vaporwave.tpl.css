@@ -1,0 +1,97 @@
+/* Vaporwave: a pastel dusk from a dream of the 90s (generated vector art, see
+   tools/themes/gen-scenes.py). A gradient sky from violet to pink over a checkerboard floor, a
+   big pastel sun wrapped in a wireframe globe, a marble column, a wireframe pyramid, a cube
+   and a ring floating and bobbing, palm trees in silhouette and glinting sparkles. A pink band
+   of light sweeps across the floor. The sun swells on every new line (and on every bar with
+   beat data). The lyrics are wide-set, with a pink and cyan misregistration. */
+.aur-root[data-fx="vaporwave"] .aur-fx {
+	background: linear-gradient(to bottom, rgba(38, 12, 92, 0.9) 0%, rgba(96, 42, 160, 0.8) 28%, rgba(255, 110, 200, 0.68) 55%, rgba(255, 190, 228, 0.82) 62%, rgba(20, 6, 50, 0.92) 62.2%, rgba(20, 6, 50, 0.92) 100%);
+}
+/* the sun, half sunk behind the floor */
+.aur-root[data-fx="vaporwave"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	left: 50%;
+	top: 62%;
+	width: 46vmin;
+	height: 46vmin;
+	margin: -30vmin 0 0 -23vmin;
+	background: {{VW_SUN}} center / 100% 100% no-repeat;
+	opacity: 0.88;
+	transition: opacity 3s ease;
+}
+.aur-root[data-fx="vaporwave"][data-gap="on"] .aur-fx::before { opacity: 1; }
+.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="a"] .aur-fx::before { animation: aur-fx-swell-a 1.6s ease-out; }
+.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="b"] .aur-fx::before { animation: aur-fx-swell-b 1.6s ease-out; }
+/* the checkerboard floor, with a band of light sweeping over it */
+.aur-root[data-fx="vaporwave"] .aur-fx-a {
+	display: block;
+	left: 0;
+	right: 0;
+	top: 62%;
+	bottom: 0;
+	background: {{VW_FLOOR}} 0 0 / 100% 100% no-repeat;
+}
+.aur-root[data-fx="vaporwave"] .aur-fx-a::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 14%;
+	background: linear-gradient(to bottom, transparent, rgba(255, 170, 235, 0.32) 50%, transparent);
+	transform: translateY(-100%);
+	animation: aur-vw-scan 9s steps(135) infinite;
+}
+@keyframes aur-vw-scan { to { transform: translateY(700%); } }
+/* the floating objects, bobbing */
+.aur-root[data-fx="vaporwave"] .aur-fx-b {
+	display: block;
+	inset: 0;
+	background: {{VW_OBJECTS}} center / cover no-repeat;
+	animation: aur-vw-bob 9s steps(135) infinite alternate;
+}
+@keyframes aur-vw-bob {
+	from { transform: translate3d(0, 1%, 0) rotate(-0.5deg); }
+	to { transform: translate3d(0, -1.6%, 0) rotate(0.6deg); }
+}
+/* palms in silhouette, swaying */
+.aur-root[data-fx="vaporwave"] .aur-fx-c {
+	display: block;
+	inset: 0;
+	background: {{VW_PALMS}} center bottom / cover no-repeat;
+	transform-origin: 50% 100%;
+	animation: aur-vw-sway 11s steps(165) infinite alternate;
+}
+@keyframes aur-vw-sway { from { transform: skewX(-0.8deg); } to { transform: skewX(0.9deg); } }
+/* sparkles */
+.aur-root[data-fx="vaporwave"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{VW_SPARKLES}} center / cover no-repeat;
+	opacity: 0.55;
+	animation: aur-vw-twinkle 4s steps(24) infinite alternate;
+}
+@keyframes aur-vw-twinkle { to { opacity: 1; } }
+.aur-root[data-fx="vaporwave"] .aur-bg-grain { opacity: 0.02; }
+
+/* wide-set lyrics with a pink and cyan misregistration, over a violet halo */
+.aur-root[data-look="vaporwave"] { --aur-glow-tint: #ff8ee0; }
+.aur-root[data-look="vaporwave"][data-color="white"] { --aur-hi: #fff2fc; }
+.aur-root[data-look="vaporwave"] .aur-stage {
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 10%), #000 62%, transparent 82%);
+	mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 10%), #000 62%, transparent 82%);
+}
+.aur-root[data-look="vaporwave"] .aur-stage .aur-line { letter-spacing: 0.05em; }
+.aur-root[data-look="vaporwave"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
+.aur-root[data-look="vaporwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main {
+	text-shadow: 0.045em 0 0 rgba(255, 80, 200, 0.7), -0.045em 0 0 rgba(0, 229, 255, 0.6), 0 0.04em 0.5em rgba(60, 10, 110, 0.6);
+}
+.aur-root[data-look="vaporwave"][data-words="on"]:is([data-wordanim="glow"], [data-wordanim="pop"], [data-wordanim="bounce"], [data-wordanim="focus"]) .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	text-shadow:
+		calc(var(--e) * 0.045em) 0 0 color-mix(in srgb, #ff50c8 calc(var(--e) * 70%), transparent),
+		calc(var(--e) * -0.045em) 0 0 color-mix(in srgb, #00e5ff calc(var(--e) * 60%), transparent),
+		0 0.04em 0.5em rgba(60, 10, 110, 0.55);
+}
+.aur-root[data-look="vaporwave"] .aur-dots i { background: color-mix(in oklab, var(--aur-accent) 70%, #fff); box-shadow: 0 0 0.3em var(--aur-accent); }

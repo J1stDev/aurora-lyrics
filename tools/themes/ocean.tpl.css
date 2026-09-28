@@ -1,0 +1,116 @@
+/* Ocean: a dive that lasts one song (generated vector art, see tools/themes/gen-scenes.py).
+   You look up through blue water: rippling surface light at the top, two sets of light shafts
+   swaying at different speeds, bubbles rising in two sizes, a school of fish crossing now and
+   then, and kelp forests on a sandy bed swaying in the current. The water darkens as the song
+   plays (--aur-song, set once a second on .aur-fx). Shafts flare on every new line and shine
+   through instrumental breaks (and flash on every bar with beat data). The lyrics are pale
+   aqua and rise into place like bubbles. */
+.aur-root[data-fx="ocean"] .aur-fx {
+	background: linear-gradient(to bottom, rgba(24, 130, 180, 0.62), rgba(10, 72, 124, 0.72) 35%, rgba(4, 38, 84, 0.82) 70%, rgba(2, 16, 44, 0.9));
+}
+/* a school of fish crossing */
+.aur-root[data-fx="ocean"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	left: -60vw;
+	top: 34%;
+	width: 56vw;
+	height: 26%;
+	background: {{OC_FISH}} center / 100% 100% no-repeat;
+	animation: aur-oc-school 110s steps(1650) infinite;
+}
+@keyframes aur-oc-school { to { translate: 200vw 0; } }
+/* light shafts from the surface */
+.aur-root[data-fx="ocean"] .aur-fx-a {
+	display: block;
+	left: -10%;
+	right: -10%;
+	top: -6%;
+	height: 106%;
+	background: {{OC_BEAMS_A}} center top / 100% 100% no-repeat;
+	transform-origin: 50% 0;
+	opacity: 0.5;
+	transition: opacity 3s ease;
+	animation: aur-oc-sway 22s steps(330) infinite alternate;
+}
+.aur-root[data-fx="ocean"][data-gap="on"] .aur-fx-a { opacity: 0.85; }
+.aur-root[data-fx="ocean"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-oc-sway 22s steps(330) infinite alternate, aur-fx-flash-a 2.2s ease-out; }
+.aur-root[data-fx="ocean"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-oc-sway 22s steps(330) infinite alternate, aur-fx-flash-b 2.2s ease-out; }
+@keyframes aur-oc-sway {
+	from { transform: rotate(-2.6deg) translate3d(-2%, 0, 0); }
+	to { transform: rotate(2.6deg) translate3d(2%, 0, 0); }
+}
+.aur-root[data-fx="ocean"] .aur-fx-a::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{OC_BEAMS_B}} center top / 100% 100% no-repeat;
+	opacity: 0.8;
+	animation: aur-oc-sway 31s steps(465) infinite alternate-reverse;
+}
+/* the rippling surface, drifting sideways */
+.aur-root[data-fx="ocean"] .aur-fx-a::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 200%;
+	height: 18%;
+	background: {{OC_SURFACE}} 0 0 / 50% 100% repeat-x;
+	animation: aur-oc-waves 40s steps(600) infinite linear;
+}
+@keyframes aur-oc-waves { to { transform: translateX(-50%); } }
+/* kelp forests and the sandy bed: near ones sway more than the far ones */
+.aur-root[data-fx="ocean"] .aur-fx-b {
+	display: block;
+	inset: 0;
+	background: {{OC_KELP_NEAR}} center bottom / 100% 100% no-repeat;
+	transform-origin: 50% 100%;
+	animation: aur-oc-kelp 7s steps(105) infinite alternate;
+}
+.aur-root[data-fx="ocean"] .aur-fx-b::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{OC_KELP_FAR}} center bottom / 100% 100% no-repeat;
+	transform-origin: 50% 100%;
+	opacity: 0.75;
+	animation: aur-oc-kelp 11s steps(165) infinite alternate-reverse;
+}
+@keyframes aur-oc-kelp { from { transform: skewX(-2.4deg); } to { transform: skewX(2.6deg); } }
+/* bubbles rising in two sizes: the layer is one tile taller than the screen and moves by
+   exactly one tile, so the loop joins up */
+.aur-root[data-fx="ocean"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: calc(100% + 900px);
+	background: {{OC_BUBBLES}} 0 0 / 700px 900px repeat;
+	animation: aur-oc-rise-tile 45s steps(675) infinite linear;
+}
+@keyframes aur-oc-rise-tile { to { transform: translateY(-900px); } }
+.aur-root[data-fx="ocean"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{OC_BUBBLES_S}} 0 0 / 500px 700px repeat;
+	animation: aur-oc-rise-small 20s steps(300) infinite linear;
+}
+@keyframes aur-oc-rise-small { to { transform: translateY(-700px); } }
+/* deeper as the song plays */
+.aur-root[data-fx="ocean"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, #001028, #000818);
+	opacity: calc(var(--aur-song, 0) * 0.42);
+	transition: opacity 1s linear;
+}
+.aur-root[data-fx="ocean"] .aur-bg-grain { opacity: 0.02; }
+
+/* pale aqua lyrics, rising into place like bubbles */
+.aur-root[data-look="ocean"] { --aur-glow-tint: #7fe0ff; }
+.aur-root[data-look="ocean"][data-color="white"] { --aur-hi: #e6fbff; }
+.aur-root[data-look="ocean"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-oc-line 1.6s var(--aur-ease); }
+@keyframes aur-oc-line { from { opacity: 0.3; transform: translateY(0.3em); } }
