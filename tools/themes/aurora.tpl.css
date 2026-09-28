@@ -1,0 +1,83 @@
+/* Aurora: the northern lights over a quiet night. Two curtains of light (generated vector art,
+   see tools/themes/gen-aurora.py): rays of every width hang from a folded lower edge, bright green
+   low, turning teal, then violet and magenta as they fade upwards, with a soft glow behind them.
+   The near curtain sways slowly as if in the solar wind (its rays lean, it stretches and settles)
+   and a second ray pattern crossfades over it so the rays pulse and shift; a fainter curtain sways
+   higher up. Stars above, a faint green airglow on the horizon and the silhouette of distant hills
+   with spruce tips for scale. The curtain flares on every new line and the stars glint on every
+   bar (with beat data); it all burns brighter through instrumental breaks.
+   The images are drawn once; motion is stepped transforms and opacity only. */
+.aur-root[data-fx="aurora"] .aur-fx {
+	background:
+		radial-gradient(70% 26% at 50% 100%, rgba(60, 255, 170, 0.16), rgba(40, 200, 170, 0.05) 55%, transparent 80%),
+		linear-gradient(to bottom, rgba(2, 5, 14, 0.9), rgba(3, 8, 20, 0.84) 40%, rgba(4, 10, 24, 0.76) 70%, rgba(4, 10, 24, 0.66) 100%);
+}
+.aur-root[data-fx="aurora"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		{{STARS}};
+	-webkit-mask-image: linear-gradient(#000 35%, transparent 80%);
+	mask-image: linear-gradient(#000 35%, transparent 80%);
+	opacity: 0.8;
+	animation: aur-au-twinkle 8s steps(48) infinite alternate;
+}
+@keyframes aur-au-twinkle { from { opacity: 0.55; } to { opacity: 0.9; } }
+/* the near curtain, swaying; a second ray pattern shimmers over it */
+.aur-root[data-fx="aurora"] .aur-fx-a {
+	display: block;
+	left: -8%;
+	right: -8%;
+	top: -4%;
+	height: 92%;
+	background: {{CURTAIN_A}} center / 100% 100% no-repeat;
+	transform-origin: 50% 80%;
+	opacity: 0.9;
+	transition: opacity 3s ease;
+	animation: aur-au-sway 30s steps(900) infinite alternate;
+}
+.aur-root[data-fx="aurora"][data-gap="on"] .aur-fx-a { opacity: 1; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-au-sway 30s steps(900) infinite alternate, aur-au-flare-a 2.6s ease-out; }
+.aur-root[data-fx="aurora"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-au-sway 30s steps(900) infinite alternate, aur-au-flare-b 2.6s ease-out; }
+@keyframes aur-au-sway {
+	0% { transform: translate3d(-2.5%, 0, 0) skewX(-5deg) scaleY(0.96); }
+	50% { transform: translate3d(0.5%, -1%, 0) skewX(1deg) scaleY(1.04); }
+	100% { transform: translate3d(3%, 0.5%, 0) skewX(5deg) scaleY(0.98); }
+}
+@keyframes aur-au-flare-a { from { opacity: 1; } }
+@keyframes aur-au-flare-b { from { opacity: 1; } }
+.aur-root[data-fx="aurora"] .aur-fx-a::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: {{CURTAIN_A2}} center / 100% 100% no-repeat;
+	opacity: 0;
+	animation: aur-au-shimmer 6.5s steps(78) infinite alternate;
+}
+@keyframes aur-au-shimmer { to { opacity: 0.85; } }
+/* the far curtain, higher and fainter, swaying the other way */
+.aur-root[data-fx="aurora"] .aur-fx-b {
+	display: block;
+	left: -10%;
+	right: -10%;
+	top: -8%;
+	height: 70%;
+	background: {{CURTAIN_B}} center / 100% 100% no-repeat;
+	transform-origin: 50% 60%;
+	opacity: 0.55;
+	transition: opacity 3s ease;
+	animation: aur-au-sway 41s steps(1230) infinite alternate-reverse;
+}
+.aur-root[data-fx="aurora"][data-gap="on"] .aur-fx-b { opacity: 0.68; }
+/* distant hills with spruce tips on the horizon */
+.aur-root[data-fx="aurora"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 13vh;
+	background: {{HORIZON}} center bottom / 100% 100% no-repeat;
+	opacity: 0.92;
+}
+
