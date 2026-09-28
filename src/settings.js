@@ -337,7 +337,8 @@ export const settings = {
 	/** Apply a theme; "custom" restores the look saved when a theme first replaced it. */
 	applyTheme(id) {
 		if (id === "custom") {
-			if (current.customLook) this.setMany({ ...current.customLook, themeFx: current.customLook.themeFx || "none" });
+			// Your own look has no theme ambience, so switch it off.
+			if (current.customLook) this.setMany({ ...current.customLook, themeFx: current.customLook.themeFx || "none", ambience: false });
 			return;
 		}
 		const theme = THEMES.find((t) => t.id === id);
