@@ -326,6 +326,11 @@ export const settings = {
 			changed.push(key);
 		}
 		if (!changed.length) return;
+		// Tweaking a theme's look turns it into a custom one, and a custom look has no theme ambience.
+		if (!("ambience" in values) && next.ambience && changed.some((k) => LOOK_KEYS.includes(k)) && matchTheme(current) && !matchTheme(next)) {
+			next.ambience = false;
+			changed.push("ambience");
+		}
 		current = next;
 		store.setJSON(SETTINGS_KEY, current);
 		for (const key of changed) for (const fn of listeners) fn(key, current[key], current);

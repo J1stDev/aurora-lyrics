@@ -60,7 +60,7 @@ test("theme ambience follows the last theme picked and survives tweaks", async (
 	settings.applyTheme("retro");
 	assert.equal(settings.get("themeFx"), "retro");
 	settings.set("fontSize", 70); // not part of the look
-	settings.set("glow", "radiant"); // part of the look: now Custom, ambience stays
+	settings.set("glow", "radiant"); // part of the look: now Custom, ambience layer id is kept
 	assert.equal(settings.currentTheme(), null);
 	assert.equal(settings.get("themeFx"), "retro");
 	settings.applyTheme("zen");
@@ -78,4 +78,20 @@ test("custom background and mini style settings validate", async () => {
 	assert.equal(settings.get("customBg"), null);
 	settings.set("miniStyle", "nope");
 	assert.equal(settings.get("miniStyle"), "glass");
+});
+
+test("tweaking a theme's look into a custom one turns ambience off, once", async () => {
+	const { settings } = await freshSettings();
+	assert.equal(settings.get("ambience"), true);
+	settings.set("fontSize", 70); // not part of the look
+	assert.equal(settings.get("ambience"), true);
+	settings.set("glow", "radiant"); // Aurora becomes a custom look
+	assert.equal(settings.currentTheme(), null);
+	assert.equal(settings.get("ambience"), false);
+	settings.set("ambience", true); // the user turns it back on: further tweaks leave it alone
+	settings.set("font", "mono");
+	assert.equal(settings.get("ambience"), true);
+	settings.applyTheme("zen"); // picking a theme brings its ambience back
+	assert.equal(settings.get("ambience"), true);
+	assert.equal(settings.currentTheme(), "zen");
 });
