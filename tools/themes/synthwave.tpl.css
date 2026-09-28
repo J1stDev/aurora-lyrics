@@ -1,0 +1,161 @@
+/* Synthwave: an outrun sunset. A graded dusk sky with stars, a big striped sun (its slats
+   widen toward the horizon) glowing behind two ranges of neon-rimmed mountains, and a
+   perspective grid rolling toward you, drawn in 2D with true perspective spacing: the
+   vertical lines are rays from the vanishing point (static), the horizontal ones follow
+   y = H / (1 + k·r) and move by one animated phase, so nothing large is repainted or
+   rasterised in 3D. The grid rolls in tempo when Spotify has beat data (see beat sync), and
+   haze on the horizon flares on every bar. The lyrics are 80s chrome on a forward lean. */
+@property --sw-ph { syntax: "<number>"; inherits: false; initial-value: 0; }
+.aur-root[data-fx="synthwave"] {
+	--sw-horizon: 74%; /* from the top of the screen */
+	--sw-d: min(46vmin, 60vw); /* sun diameter */
+}
+/* the sky (above the horizon) and the dark floor (below it) */
+.aur-root[data-fx="synthwave"] .aur-fx {
+	background: linear-gradient(
+		to bottom,
+		rgba(5, 3, 20, 0.9) 0%,
+		rgba(20, 8, 52, 0.84) 30%,
+		rgba(70, 14, 92, 0.76) 52%,
+		rgba(170, 34, 118, 0.7) 66%,
+		rgba(255, 96, 128, 0.72) calc(var(--sw-horizon) - 0.4%),
+		rgba(12, 4, 30, 0.97) var(--sw-horizon),
+		rgba(6, 2, 18, 0.98) 100%
+	);
+}
+.aur-root[data-fx="synthwave"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 30% 0;
+	background:
+		{{STARS}};
+	-webkit-mask-image: linear-gradient(#000 40%, transparent 85%);
+	mask-image: linear-gradient(#000 40%, transparent 85%);
+	animation: aur-sw-twinkle 7s steps(42) infinite alternate;
+}
+@keyframes aur-sw-twinkle { from { opacity: 0.55; } to { opacity: 0.95; } }
+/* the sun: a disc clipped at the horizon, slats widening toward the bottom */
+.aur-root[data-fx="synthwave"] .aur-fx-a {
+	display: block;
+	left: 50%;
+	width: var(--sw-d);
+	height: calc(var(--sw-d) * 0.7);
+	margin-left: calc(var(--sw-d) / -2);
+	top: calc(var(--sw-horizon) - var(--sw-d) * 0.7);
+	overflow: hidden;
+}
+.aur-root[data-fx="synthwave"] .aur-fx-a::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	aspect-ratio: 1;
+	border-radius: 50%;
+	background: linear-gradient(to bottom, #fff4b0 0%, #ffd86b 20%, #ffa04f 40%, #ff5a86 60%, #d92fc6 80%);
+	-webkit-mask-image: linear-gradient(to bottom, #000 0 44%, transparent 44% 46%, #000 46% 52%, transparent 52% 55%, #000 55% 60%, transparent 60% 64%, #000 64% 68%, transparent 68% 73%);
+	mask-image: linear-gradient(to bottom, #000 0 44%, transparent 44% 46%, #000 46% 52%, transparent 52% 55%, #000 55% 60%, transparent 60% 64%, #000 64% 68%, transparent 68% 73%);
+	opacity: 0.86;
+}
+/* the floor: perspective verticals, the sun's reflection, then the moving horizontals */
+.aur-root[data-fx="synthwave"] .aur-fx-b {
+	--sw-line: color-mix(in oklab, var(--aur-accent) 78%, #fff);
+	--sw-line-soft: color-mix(in oklab, var(--aur-accent) 30%, transparent);
+	display: block;
+	left: 0;
+	right: 0;
+	top: var(--sw-horizon);
+	bottom: 0;
+	background:
+		radial-gradient(22% 120% at 50% 0%, rgba(255, 130, 170, 0.22), transparent 70%),
+		{{VERTICALS}};
+	-webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), #000 45%);
+	mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), #000 45%);
+	opacity: 0.85;
+}
+.aur-root[data-fx="synthwave"] .aur-fx-b::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		{{HORIZONTALS}};
+	animation: aur-sw-grid 1.3s steps(40) infinite;
+}
+.aur-root[data-fx="synthwave"][data-gap="on"] .aur-fx-b::before { animation-duration: 0.65s; }
+@keyframes aur-sw-grid { to { --sw-ph: 1; } }
+/* mountains: a hazy far range and dark near ranges either side of the sun, rim-lit in neon
+   (the drop-shadows on this layer draw the rims; it never animates, so they're drawn once) */
+.aur-root[data-fx="synthwave"] .aur-fx-c {
+	display: block;
+	left: 0;
+	right: 0;
+	top: var(--sw-horizon);
+	height: 1.5px;
+	background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--aur-accent) 50%, #fff) 20%, #fff 50%, color-mix(in oklab, var(--aur-accent) 50%, #fff) 80%, transparent);
+	filter: drop-shadow(0 -1px 0 color-mix(in oklab, var(--aur-accent) 55%, #fff)) drop-shadow(0 0 5px color-mix(in oklab, var(--aur-accent) 55%, transparent));
+}
+.aur-root[data-fx="synthwave"] .aur-fx-c::before,
+.aur-root[data-fx="synthwave"] .aur-fx-c::after {
+	content: "";
+	position: absolute;
+	left: -1%;
+	right: -1%;
+	bottom: 100%;
+}
+.aur-root[data-fx="synthwave"] .aur-fx-c::before {
+	height: 15vh;
+	background: linear-gradient(to bottom, #3a1a6c, #1e0c40 70%, #170932);
+	clip-path: {{RIDGE_BACK}};
+}
+.aur-root[data-fx="synthwave"] .aur-fx-c::after {
+	height: 9vh;
+	background: linear-gradient(to bottom, #1a0a34, #09040f);
+	clip-path: {{RIDGE_FRONT}};
+}
+/* the sun's bloom and the haze on the horizon, over everything else */
+.aur-root[data-fx="synthwave"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(circle at 50% calc(var(--sw-horizon) - var(--sw-d) * 0.2), rgba(255, 130, 150, 0.2), rgba(255, 70, 170, 0.07) calc(var(--sw-d) * 0.62), transparent calc(var(--sw-d) * 1.05)),
+		linear-gradient(to bottom, transparent calc(var(--sw-horizon) - 8%), rgba(255, 80, 170, 0.14) calc(var(--sw-horizon) - 1%), rgba(255, 150, 200, 0.3) var(--sw-horizon), rgba(140, 40, 170, 0.14) calc(var(--sw-horizon) + 2.5%), transparent calc(var(--sw-horizon) + 10%));
+	opacity: 0.85;
+	transition: opacity 2s ease;
+}
+.aur-root[data-fx="synthwave"][data-gap="on"] .aur-fx::after { opacity: 1; }
+.aur-root[data-fx="synthwave"] .aur-bg-grain { opacity: 0.025; }
+
+/* 80s chrome lettering. Sung text is chrome (sky above a dark horizon line, sunset below),
+   with a magenta extrusion under it and a soft glow; text still to come is a muted lilac.
+   Everything leans forward like an outrun logo. */
+.aur-root[data-look="synthwave"] {
+	--sw-chrome: linear-gradient(180deg, #f6fbff 0%, #cfe8ff 24%, #7fbcff 46%, #231650 50%, #3b1d6e 52%, #ff5fb4 58%, #ffb46e 80%, #fff0d8 100%);
+	--sw-todo: #8f80c9;
+}
+.aur-root[data-look="synthwave"][data-color="white"] { --aur-hi: #d8cdff; }
+/* keep the words in the sky: lines fade out well before the horizon and the sun */
+.aur-root[data-look="synthwave"] .aur-stage {
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 12%), #000 50%, transparent 66%);
+	mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 12%), #000 50%, transparent 66%);
+}
+.aur-root[data-look="synthwave"] .aur-stage .aur-main { transform: skewX(-8deg); }
+.aur-root[data-look="synthwave"][data-words="on"]:is([data-wordanim="fill"], [data-wordanim="rise"], [data-wordanim="karaoke"], [data-wordanim="letters"]) .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--edge: 0.35em;
+	color: transparent;
+	background-image: linear-gradient(90deg, transparent calc(var(--p) * (100% + var(--edge)) - var(--edge)), var(--sw-todo) calc(var(--p) * (100% + var(--edge)))), var(--sw-chrome);
+	-webkit-background-clip: text;
+	background-clip: text;
+	filter: drop-shadow(0 0.05em 0 color-mix(in srgb, #ff2d95 calc(var(--e) * 85%), transparent)) drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-accent) calc(var(--e) * 40%), transparent));
+}
+.aur-root[data-look="synthwave"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
+.aur-root[data-look="synthwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main {
+	color: transparent;
+	background-image: var(--sw-chrome);
+	-webkit-background-clip: text;
+	background-clip: text;
+	text-shadow: none;
+	filter: drop-shadow(0 0.05em 0 rgba(255, 45, 149, 0.85)) drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-accent) 40%, transparent));
+}
+.aur-root[data-look="synthwave"] .aur-dots i { background: color-mix(in oklab, var(--aur-accent) 70%, #fff); box-shadow: 0 0 0.3em var(--aur-accent); }
+
