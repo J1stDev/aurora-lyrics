@@ -97,6 +97,7 @@
 	width: 0;
 	height: 0;
 }
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 13) { display: none; } /* the layer has 24 children, Rain uses 12 */
 /* the wet trail is as long as the distance the drop has covered (it scales from the start point
    in step with the drop), the drop itself is a lens */
 .aur-root[data-fx="rain"] .aur-fx-e > i::before {

@@ -100,8 +100,9 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				h("i", { class: "aur-fx-b" }),
 				h("i", { class: "aur-fx-c" }),
 				h("i", { class: "aur-fx-d" }),
-				// The last layer holds a dozen children for themes that need separate moving parts (Rain's running drops).
-				h("i", { class: "aur-fx-e" }, Array.from({ length: 12 }, () => h("i"))),
+				// The last layer holds two dozen children for themes that need separate moving parts
+				// (Rain's running drops, Karaoke's equaliser bars); a theme uses as many as it needs.
+				h("i", { class: "aur-fx-e" }, Array.from({ length: 24 }, () => h("i"))),
 			),
 			h("div", { class: "aur-bg-grain" }),
 		);

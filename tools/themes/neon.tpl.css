@@ -1,0 +1,160 @@
+/* Neon: a brick wall lit by neon signs (generated art, see tools/themes/gen-stage.py). A dark
+   brick wall in a back alley; a ring, a lightning bolt and a few stars, each a glass tube with a
+   hot white core inside a coloured halo, light the wall around them. The colours come from the
+   album (the accent, and a colour across the wheel from it). The signs strike when the lyrics open,
+   and now and then one stutters like a tired transformer; the wall's glow flashes on the beat
+   (with beat data) and haze drifts through the light. The cover hangs on the wall in its own tube
+   frame. The lyrics are neon too: lines that aren't being sung are unlit glass (an outline), and
+   the line being sung lights up word by word. */
+.aur-root:is([data-look="neon"], [data-fx="neon"]) {
+	--neon-a: oklch(from var(--aur-accent) 0.74 max(c, 0.22) h);
+	--neon-b: oklch(from var(--aur-accent) 0.8 max(c, 0.18) calc(h + 150));
+	--neon: var(--neon-a);
+	--unlit: color-mix(in oklab, color-mix(in oklab, var(--neon) 82%, #fff) 66%, transparent); /* glass that isn't lit: a pale outline */
+}
+.aur-root[data-look="neon"] { --aur-glow-tint: var(--neon-a); }
+
+/* --- the wall -------------------------------------------------------------------------- */
+.aur-root[data-fx="neon"] .aur-fx {
+	background:
+		radial-gradient(70% 55% at 6% 108%, color-mix(in oklab, var(--neon-a) 15%, transparent), transparent 70%),
+		radial-gradient(120% 110% at 50% 45%, transparent 38%, rgba(2, 1, 8, 0.74)),
+		radial-gradient(46% 50% at 66% 52%, rgba(3, 2, 8, 0.5), transparent 100%),
+		{{NEON_BRICKS}} 0 0 / 320px 192px repeat;
+	background-color: #0a0810;
+}
+/* the light the signs throw on the wall */
+.aur-root[data-fx="neon"] .aur-fx::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(28vmin 24vmin at calc(100% - 13vmin) 8vmin, color-mix(in oklab, var(--neon-a) 44%, transparent), transparent 100%),
+		radial-gradient(24vmin 22vmin at calc(100% - 5vw - 14vmin) calc(100% - 13vh - 14vmin), color-mix(in oklab, var(--neon-b) 40%, transparent), transparent 100%),
+		radial-gradient(18vmin 16vmin at calc(44vw + 11vmin) calc(2vh + 11vmin), color-mix(in oklab, var(--neon-a) 30%, transparent), transparent 100%);
+	opacity: 0.8;
+}
+.aur-root[data-fx="neon"][data-gap="on"] .aur-fx::before { opacity: 1; transition: opacity 2s ease; }
+/* haze drifting through the light */
+.aur-root[data-fx="neon"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0 -20%;
+	background:
+		radial-gradient(38% 30% at 22% 68%, color-mix(in oklab, var(--neon-a) 12%, transparent), transparent 70%),
+		radial-gradient(34% 28% at 74% 40%, color-mix(in oklab, var(--neon-b) 10%, transparent), transparent 70%),
+		radial-gradient(30% 24% at 50% 92%, rgba(255, 255, 255, 0.05), transparent 70%);
+	animation: aur-nn-haze 70s steps(700) infinite alternate;
+}
+@keyframes aur-nn-haze { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+
+/* --- the signs: a glass tube (the mask is the tube, the colour comes from CSS) around a hot core.
+   The glow is a filter on the layer, so it follows the tube; the layer strikes once (opacity)
+   and its tubes stutter on their own. */
+.aur-root[data-fx="neon"] :is(.aur-fx-a, .aur-fx-b, .aur-fx-c) {
+	display: block;
+	opacity: 0;
+	filter: drop-shadow(0 0 0.4vmin var(--sign)) drop-shadow(0 0 2vmin color-mix(in oklab, var(--sign) 75%, transparent)) drop-shadow(0 0 5.5vmin color-mix(in oklab, var(--sign) 45%, transparent));
+}
+.aur-root[data-fx="neon"] :is(.aur-fx-a, .aur-fx-b, .aur-fx-c)::before,
+.aur-root[data-fx="neon"] :is(.aur-fx-a, .aur-fx-b, .aur-fx-c)::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	-webkit-mask: var(--tube) center / 100% 100% no-repeat;
+	mask: var(--tube) center / 100% 100% no-repeat;
+	background: var(--sign);
+}
+.aur-root[data-fx="neon"] :is(.aur-fx-a, .aur-fx-b, .aur-fx-c)::after {
+	-webkit-mask-image: var(--core);
+	mask-image: var(--core);
+	background: color-mix(in oklab, var(--sign) 22%, #fff);
+}
+.aur-root[data-fx="neon"] .aur-fx-a { --sign: var(--neon-a); --tube: {{NEON_RING_TUBE}}; --core: {{NEON_RING_CORE}}; right: -10vmin; top: -15vmin; width: 46vmin; height: 46vmin; }
+.aur-root[data-fx="neon"] .aur-fx-b { --sign: var(--neon-b); --tube: {{NEON_BOLT_TUBE}}; --core: {{NEON_BOLT_CORE}}; right: 5vw; bottom: 13vh; width: 28vmin; height: 28vmin; }
+.aur-root[data-fx="neon"] .aur-fx-c { --sign: var(--neon-a); --tube: {{NEON_STARS_TUBE}}; --core: {{NEON_STARS_CORE}}; left: 44vw; top: 2vh; width: 22vmin; height: 22vmin; }
+/* they strike when the lyrics open, then hold */
+.aur-root.is-open[data-fx="neon"] .aur-fx-a { animation: aur-nn-strike-a 2.2s steps(1) 0.3s both; }
+.aur-root.is-open[data-fx="neon"] .aur-fx-b { animation: aur-nn-strike-b 2.6s steps(1) 0.9s both; }
+.aur-root.is-open[data-fx="neon"] .aur-fx-c { animation: aur-nn-strike-c 1.8s steps(1) 1.5s both; }
+@keyframes aur-nn-strike-a { 0% { opacity: 0.05; } 6% { opacity: 0.9; } 9% { opacity: 0.08; } 16% { opacity: 0.85; } 19% { opacity: 0.3; } 27% { opacity: 1; } 31% { opacity: 0.5; } 40%, 100% { opacity: 1; } }
+@keyframes aur-nn-strike-b { 0% { opacity: 0.05; } 4% { opacity: 0.7; } 8% { opacity: 0.1; } 13% { opacity: 0.95; } 15% { opacity: 0.2; } 22% { opacity: 0.8; } 24% { opacity: 0.15; } 30%, 100% { opacity: 1; } }
+@keyframes aur-nn-strike-c { 0% { opacity: 0.05; } 10% { opacity: 0.8; } 14% { opacity: 0.2; } 30%, 100% { opacity: 1; } }
+/* and now and then one stutters: the ring rarely, the bolt often, the stars twinkle */
+.aur-root.is-open[data-fx="neon"] .aur-fx-a::before, .aur-root.is-open[data-fx="neon"] .aur-fx-a::after { animation: aur-nn-stutter-a 29s steps(1) 5s infinite; }
+.aur-root.is-open[data-fx="neon"] .aur-fx-b::before, .aur-root.is-open[data-fx="neon"] .aur-fx-b::after { animation: aur-nn-stutter-b 11s steps(1) 4s infinite; }
+.aur-root.is-open[data-fx="neon"] .aur-fx-c::before, .aur-root.is-open[data-fx="neon"] .aur-fx-c::after { animation: aur-nn-twinkle 4.4s steps(1) infinite; }
+@keyframes aur-nn-stutter-a { 0%, 100% { opacity: 1; } 40% { opacity: 0.35; } 40.4% { opacity: 1; } 41.4% { opacity: 0.2; } 41.9% { opacity: 1; } 42.8% { opacity: 0.55; } 43.2% { opacity: 1; } }
+@keyframes aur-nn-stutter-b { 0%, 100% { opacity: 1; } 30% { opacity: 0.25; } 30.5% { opacity: 1; } 31.6% { opacity: 0.1; } 32.2% { opacity: 0.9; } 62% { opacity: 0.5; } 62.6% { opacity: 1; } 84% { opacity: 0.2; } 84.4% { opacity: 1; } }
+@keyframes aur-nn-twinkle { 0%, 100% { opacity: 1; } 22% { opacity: 0.55; } 26% { opacity: 1; } 61% { opacity: 0.7; } 66% { opacity: 1; } 83% { opacity: 0.4; } 86% { opacity: 1; } }
+/* the wall's glow flashes on every beat; on every new line the signs flare */
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx::before { animation: aur-fx-flash-a 0.34s ease-out; }
+.aur-root[data-fx="neon"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx::before { animation: aur-fx-flash-b 0.34s ease-out; }
+
+/* the floor: the signs' light on wet asphalt */
+.aur-root[data-fx="neon"] .aur-fx-d {
+	display: block;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 26vh;
+	background:
+		radial-gradient(40% 90% at 78% 110%, color-mix(in oklab, var(--neon-a) 26%, transparent), transparent 72%),
+		radial-gradient(34% 80% at 16% 110%, color-mix(in oklab, var(--neon-b) 24%, transparent), transparent 72%),
+		repeating-linear-gradient(to bottom, transparent 0 6px, rgba(0, 0, 0, 0.28) 6px 8px);
+	-webkit-mask-image: linear-gradient(to top, #000, transparent);
+	mask-image: linear-gradient(to top, #000, transparent);
+	opacity: 0.85;
+	animation: aur-fx-pulse 6s ease-in-out infinite;
+}
+
+/* --- the cover, hung on the wall in a tube frame (a thin dark plate, a tube, its glow) --- */
+.aur-root[data-look="neon"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap { border-radius: 6px; }
+.aur-root[data-look="neon"] .aur-art-wrap,
+.aur-root[data-look="neon"][data-playing="false"] .aur-art-wrap {
+	box-shadow:
+		0 0 0 max(5px, 1vmin) rgba(6, 4, 12, 0.92),
+		0 0 0 calc(max(5px, 1vmin) + max(2px, 0.4vmin)) color-mix(in oklab, var(--neon-a) 30%, #fff),
+		0 0 1.4vmin calc(max(5px, 1vmin) + max(2px, 0.4vmin)) color-mix(in oklab, var(--neon-a) 88%, transparent),
+		0 0 5vmin calc(max(5px, 1vmin) + 0.6vmin) color-mix(in oklab, var(--neon-a) 40%, transparent),
+		0 4vmin 8vmin rgba(0, 0, 0, 0.6);
+}
+
+/* --- the lyrics --------------------------------------------------------------------------- */
+/* unlit glass: every line that isn't being sung is an outline */
+.aur-root[data-look="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) :is(.aur-main, .aur-w, .aur-c) {
+	color: color-mix(in oklab, var(--neon) 6%, transparent);
+	-webkit-text-stroke: 0.03em var(--unlit);
+	text-shadow: none;
+}
+/* the line being sung, word by word: a word strikes as it's reached, then stays lit */
+.aur-root[data-look="neon"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 5, 1);
+	color: color-mix(in oklab, color-mix(in oklab, var(--neon) 20%, #fff) calc(var(--lit) * 100%), color-mix(in oklab, var(--neon) 8%, transparent));
+	-webkit-text-stroke: 0.03em color-mix(in oklab, var(--neon) calc(var(--lit) * 100%), var(--unlit));
+	paint-order: stroke fill;
+	transform: none;
+	filter:
+		drop-shadow(0 0 0.03em color-mix(in srgb, #fff calc(60% * var(--lit)), transparent))
+		drop-shadow(0 0 0.12em color-mix(in oklab, var(--neon) calc(85% * var(--lit)), transparent))
+		drop-shadow(0 0 0.34em color-mix(in oklab, var(--neon) calc(70% * var(--lit)), transparent));
+}
+.aur-root[data-look="neon"][data-words="on"] .aur-stage .is-active .aur-w.now { animation: aur-neon-on 0.5s linear; }
+/* a line without word timing lights all at once, flickering on like a tube striking */
+.aur-root[data-look="neon"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-look="neon"][data-words="off"] .aur-stage .is-active .aur-main {
+	color: color-mix(in oklab, var(--neon) 20%, #fff);
+	-webkit-text-stroke: 0.014em var(--neon);
+	paint-order: stroke fill;
+	text-shadow:
+		0 0 0.04em rgba(255, 255, 255, 0.7),
+		0 0 0.14em color-mix(in oklab, var(--neon) 90%, transparent),
+		0 0 0.36em color-mix(in oklab, var(--neon) 75%, transparent),
+		0 0 0.9em color-mix(in oklab, var(--neon) 45%, transparent);
+}
+.aur-root[data-look="neon"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.has-words) .aur-main { animation: aur-nn-line 0.55s linear; }
+@keyframes aur-nn-line {
+	0%, 18%, 38% { opacity: 0.25; }
+	10%, 28%, 100% { opacity: 1; }
+}
+.aur-root[data-look="neon"] .aur-dots i { background: color-mix(in oklab, var(--neon) 30%, #fff); box-shadow: 0 0 0.3em var(--neon), 0 0 0.8em color-mix(in oklab, var(--neon) 60%, transparent); }

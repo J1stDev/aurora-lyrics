@@ -23,6 +23,7 @@ export const FONTS = {
 	condensed: { label: "Condensed", web: "Oswald:wght@500;600;700", stack: '"Oswald", "Bahnschrift SemiCondensed", "Arial Narrow", sans-serif' },
 	serif: { label: "Serif", web: "Playfair+Display:wght@500;700;800;900", stack: '"Playfair Display", "Iowan Old Style", "Palatino Linotype", Georgia, serif' },
 	gothic: { label: "Gothic", web: "Grenze+Gotisch:wght@500;700;800;900", stack: '"Grenze Gotisch", "Old English Text MT", "Palatino Linotype", Georgia, serif' },
+	neon: { label: "Neon tube", web: "Tilt+Neon", stack: '"Tilt Neon", "Outfit", "Segoe UI Variable Display", system-ui, sans-serif' },
 };
 
 /**
@@ -198,9 +199,9 @@ export const SCHEMA = [
 export const LOOK_KEYS = ["view", "font", "fontWeight", "textAlign", "textColor", "glow", "accent", "animation", "wordAnim", "depthBlur", "bgStyle", "bgOpacity"];
 export const THEMES = [
 	{ id: "aurora", label: "Aurora", hint: "The default look", swatch: ["#6d3bd1", "#1b2a6b"], values: {} },
-	{ id: "neon", label: "Neon", hint: "Radiant, vivid", swatch: ["#ff2fb3", "#2a0a5e"], values: { font: "outfit", fontWeight: "900", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.35 } },
+	{ id: "neon", label: "Neon", hint: "Brick wall, glass tubes", swatch: ["#ff2fb3", "#14101c"], values: { font: "neon", fontWeight: "700", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "neon", depthBlur: false, bgStyle: "gradient", bgOpacity: 0.35 } },
 	{ id: "minimal", label: "Minimal", hint: "Quiet and clean", swatch: ["#26262b", "#0d0d10"], values: { view: "lyrics", font: "system", fontWeight: "700", glow: "off", animation: "slide", depthBlur: false, bgStyle: "solid" } },
-	{ id: "karaoke", label: "Karaoke", hint: "Two-row KTV captions", swatch: ["#ff3d8b", "#0c1542"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", accent: "#ff3d8b", glow: "off", animation: "fade", wordAnim: "karaoke", bgOpacity: 0.5 } },
+	{ id: "karaoke", label: "Karaoke", hint: "KTV stage, bouncing ball", swatch: ["#ff3d8b", "#1a0b44"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", accent: "#ff3d8b", glow: "off", animation: "fade", wordAnim: "karaoke", bgStyle: "gradient", bgOpacity: 0.5 } },
 	{ id: "gothic", label: "Gothic", hint: "Candlelit blackletter", swatch: ["#9e1030", "#0d0709"], values: { view: "lyrics", font: "gothic", fontWeight: "700", textAlign: "center", accent: "#c21f3f", animation: "fade", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.62 } },
 	{ id: "blackmetal", label: "Black Metal", hint: "Frozen forest under the moon", swatch: ["#cfd9e2", "#07090c"], values: { view: "lyrics", font: "gothic", fontWeight: "700", textAlign: "center", accent: "#aebfcd", animation: "fade", wordAnim: "focus", bgOpacity: 0.6 } },
 	{ id: "lounge", label: "Lounge", hint: "Spinning vinyl", swatch: ["#c0703a", "#2b1408"], values: { view: "vinyl", font: "serif", fontWeight: "700", animation: "flow", wordAnim: "letters" } },
