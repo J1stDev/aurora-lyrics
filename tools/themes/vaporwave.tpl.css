@@ -1,97 +1,303 @@
-/* Vaporwave: a pastel dusk from a dream of the 90s (generated vector art, see
-   tools/themes/gen-scenes.py). A gradient sky from violet to pink over a checkerboard floor, a
-   big pastel sun wrapped in a wireframe globe, a marble column, a wireframe pyramid, a cube
-   and a ring floating and bobbing, palm trees in silhouette and glinting sparkles. A pink band
-   of light sweeps across the floor. The sun swells on every new line (and on every bar with
-   beat data). The lyrics are wide-set, with a pink and cyan misregistration. */
-.aur-root[data-fx="vaporwave"] .aur-fx {
-	background: linear-gradient(to bottom, rgba(38, 12, 92, 0.9) 0%, rgba(96, 42, 160, 0.8) 28%, rgba(255, 110, 200, 0.68) 55%, rgba(255, 190, 228, 0.82) 62%, rgba(20, 6, 50, 0.92) 62.2%, rgba(20, 6, 50, 0.92) 100%);
+/* Vaporwave: a pastel dream (generated art and rules, see tools/themes/gen-dream.py). A sky from
+   indigo through violet and pink to a peach horizon; a ringed planet; two layers of cumulus
+   drifting at different speeds; palms on the horizon; and a checkerboard floor that rolls toward
+   you in tempo (a row every two beats when Spotify has beat data). A small spectrum window in the
+   corner dances to the music and stars glint in the sky. Over it all, a VHS tape: scanlines,
+   grain and, now and then, a tracking glitch sweeping down the screen. The cover hangs in an old
+   OS window. The lyrics are wide-set, with a pink and cyan misregistration that shudders on every
+   new line. */
+.aur-root[data-fx="vaporwave"] {
+	--vw-h: 64%; /* the horizon, from the top */
+	--vw-wr: 3vw; /* the spectrum window: its right margin, top, width and height */
+	--vw-wt: calc(var(--aur-safe-top) + 3vh);
+	--vw-ww: min(27vmin, 300px);
+	--vw-wh: calc(var(--vw-ww) * 0.62);
+	--vw-wb: max(15px, 3.4vmin); /* the height of a title bar */
 }
-/* the sun, half sunk behind the floor */
+
+/* --- the sky ---------------------------------------------------------------------------- */
+.aur-root[data-fx="vaporwave"] .aur-fx {
+	background:
+		radial-gradient(70% 28% at 50% var(--vw-h), rgba(255, 220, 190, 0.55), transparent 72%),
+		linear-gradient(to bottom, rgba(26, 14, 77, 0.94) 0%, rgba(61, 31, 140, 0.92) 24%, rgba(142, 63, 196, 0.9) 44%, rgba(255, 110, 196, 0.9) 58%, rgba(255, 183, 202, 0.92) var(--vw-h), #241063 var(--vw-h));
+}
+/* the planet, bobbing slowly; it swells on every new line */
 .aur-root[data-fx="vaporwave"] .aur-fx::before {
 	content: "";
 	position: absolute;
-	left: 50%;
-	top: 62%;
-	width: 46vmin;
-	height: 46vmin;
-	margin: -30vmin 0 0 -23vmin;
-	background: {{VW_SUN}} center / 100% 100% no-repeat;
-	opacity: 0.88;
-	transition: opacity 3s ease;
+	left: 46%;
+	top: 6%;
+	width: 26vmin;
+	height: 17.5vmin;
+	background: {{VW_PLANET}} center / contain no-repeat;
+	transform-origin: 50% 60%;
+	animation: aur-vw-bob 9s ease-in-out infinite alternate;
 }
-.aur-root[data-fx="vaporwave"][data-gap="on"] .aur-fx::before { opacity: 1; }
-.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="a"] .aur-fx::before { animation: aur-fx-swell-a 1.6s ease-out; }
-.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="b"] .aur-fx::before { animation: aur-fx-swell-b 1.6s ease-out; }
-/* the checkerboard floor, with a band of light sweeping over it */
-.aur-root[data-fx="vaporwave"] .aur-fx-a {
-	display: block;
-	left: 0;
-	right: 0;
-	top: 62%;
-	bottom: 0;
-	background: {{VW_FLOOR}} 0 0 / 100% 100% no-repeat;
-}
-.aur-root[data-fx="vaporwave"] .aur-fx-a::before {
-	content: "";
-	position: absolute;
-	left: 0;
-	right: 0;
-	top: 0;
-	height: 14%;
-	background: linear-gradient(to bottom, transparent, rgba(255, 170, 235, 0.32) 50%, transparent);
-	transform: translateY(-100%);
-	animation: aur-vw-scan 9s steps(135) infinite;
-}
-@keyframes aur-vw-scan { to { transform: translateY(700%); } }
-/* the floating objects, bobbing */
-.aur-root[data-fx="vaporwave"] .aur-fx-b {
-	display: block;
-	inset: 0;
-	background: {{VW_OBJECTS}} center / cover no-repeat;
-	animation: aur-vw-bob 9s steps(135) infinite alternate;
-}
-@keyframes aur-vw-bob {
-	from { transform: translate3d(0, 1%, 0) rotate(-0.5deg); }
-	to { transform: translate3d(0, -1.6%, 0) rotate(0.6deg); }
-}
-/* palms in silhouette, swaying */
-.aur-root[data-fx="vaporwave"] .aur-fx-c {
-	display: block;
-	inset: 0;
-	background: {{VW_PALMS}} center bottom / cover no-repeat;
-	transform-origin: 50% 100%;
-	animation: aur-vw-sway 11s steps(165) infinite alternate;
-}
-@keyframes aur-vw-sway { from { transform: skewX(-0.8deg); } to { transform: skewX(0.9deg); } }
-/* sparkles */
+@keyframes aur-vw-bob { from { transform: translateY(-1.2vmin) rotate(-2deg); } to { transform: translateY(1.2vmin) rotate(2deg); } }
+.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="a"] .aur-fx::before { animation: aur-vw-bob 9s ease-in-out infinite alternate, aur-fx-swell-a 1.4s ease-out; }
+.aur-root[data-fx="vaporwave"][data-bganim="on"][data-lb="b"] .aur-fx::before { animation: aur-vw-bob 9s ease-in-out infinite alternate, aur-fx-swell-b 1.4s ease-out; }
+/* the VHS overlay: scanlines, and a vignette that closes in the corners */
 .aur-root[data-fx="vaporwave"] .aur-fx::after {
 	content: "";
 	position: absolute;
 	inset: 0;
-	background: {{VW_SPARKLES}} center / cover no-repeat;
-	opacity: 0.55;
-	animation: aur-vw-twinkle 4s steps(24) infinite alternate;
+	background:
+		repeating-linear-gradient(to bottom, transparent 0 2px, rgba(20, 4, 50, 0.13) 2px 3px),
+		radial-gradient(120% 100% at 50% 50%, transparent 56%, rgba(14, 2, 44, 0.55));
 }
-@keyframes aur-vw-twinkle { to { opacity: 1; } }
-.aur-root[data-fx="vaporwave"] .aur-bg-grain { opacity: 0.02; }
 
-/* wide-set lyrics with a pink and cyan misregistration, over a violet halo */
-.aur-root[data-look="vaporwave"] { --aur-glow-tint: #ff8ee0; }
-.aur-root[data-look="vaporwave"][data-color="white"] { --aur-hi: #fff2fc; }
-.aur-root[data-look="vaporwave"] .aur-stage {
-	-webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 10%), #000 62%, transparent 82%);
-	mask-image: linear-gradient(to bottom, transparent 0, transparent 72px, #000 calc(72px + 10%), #000 62%, transparent 82%);
+/* --- clouds: a tile that wraps, scrolled by exactly one tile ------------------------------- */
+.aur-root[data-fx="vaporwave"] :is(.aur-fx-a, .aur-fx-b) {
+	display: block;
+	left: 0;
+	width: calc(100% + 1600px);
 }
-.aur-root[data-look="vaporwave"] .aur-stage .aur-line { letter-spacing: 0.05em; }
-.aur-root[data-look="vaporwave"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
-.aur-root[data-look="vaporwave"][data-words="off"] .aur-stage .aur-line.is-active .aur-main {
-	text-shadow: 0.045em 0 0 rgba(255, 80, 200, 0.7), -0.045em 0 0 rgba(0, 229, 255, 0.6), 0 0.04em 0.5em rgba(60, 10, 110, 0.6);
+.aur-root[data-fx="vaporwave"] .aur-fx-a {
+	top: 36%;
+	height: 28%;
+	opacity: 0.78;
+	background: {{VW_CLOUDS_FAR}} 0 0 / 1600px 100% repeat-x;
+	animation: aur-vw-drift 320s linear infinite;
 }
-.aur-root[data-look="vaporwave"][data-words="on"]:is([data-wordanim="glow"], [data-wordanim="pop"], [data-wordanim="bounce"], [data-wordanim="focus"]) .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+.aur-root[data-fx="vaporwave"] .aur-fx-b {
+	top: 46%;
+	height: 18%;
+	opacity: 0.92;
+	background: {{VW_CLOUDS_NEAR}} 0 0 / 1600px 100% repeat-x;
+	animation: aur-vw-drift 170s linear infinite;
+}
+@keyframes aur-vw-drift { to { transform: translateX(-1600px); } }
+
+/* --- the floor: a checkerboard plane in perspective, rolling toward you. The plane is tilted 74
+   degrees about the perspective origin, which sits P*cot(74deg) = 0.287 P below the top of this box,
+   so that the plane's vanishing line (the horizon) lands exactly on the box's top edge. ---------- */
+.aur-root[data-fx="vaporwave"] .aur-fx-c {
+	--vw-p: 70vmin;
+	--vw-cell: 4.4vmin;
+	display: block;
+	left: 0;
+	right: 0;
+	top: var(--vw-h);
+	bottom: 0;
+	overflow: hidden;
+	perspective: var(--vw-p);
+	perspective-origin: 50% calc(var(--vw-p) * 0.287);
+}
+.aur-root[data-fx="vaporwave"] .aur-fx-c::before {
+	content: "";
+	position: absolute;
+	left: -300%;
+	right: -300%;
+	top: calc(var(--vw-p) * 0.287 - 1500px);
+	height: 3000px;
+	transform-origin: 50% 1500px;
+	transform: rotateX(74deg);
+	background:
+		linear-gradient(rgba(255, 255, 255, 0.2) 0 2px, transparent 2px) 0 0 / var(--vw-cell) var(--vw-cell),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0 2px, transparent 2px) 0 0 / var(--vw-cell) var(--vw-cell),
+		conic-gradient(rgba(255, 120, 204, 0.62) 25%, rgba(52, 18, 122, 0.94) 0 50%, rgba(255, 120, 204, 0.62) 0 75%, rgba(52, 18, 122, 0.94) 0) 0 0 / calc(var(--vw-cell) * 2) calc(var(--vw-cell) * 2);
+	animation: aur-vw-roll calc(var(--aur-beat, 0.75s) * 4) linear infinite;
+}
+@keyframes aur-vw-roll {
+	from { transform: rotateX(74deg) translateY(0); }
+	to { transform: rotateX(74deg) translateY(8.8vmin); }
+}
+/* the far end of the floor dissolves into the horizon glow */
+.aur-root[data-fx="vaporwave"] .aur-fx-c::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to bottom, rgba(255, 196, 208, 0.98), rgba(255, 150, 206, 0.7) 8%, rgba(150, 70, 200, 0.28) 26%, rgba(60, 20, 130, 0.08) 52%, transparent 75%);
+}
+
+/* --- the spectrum window ------------------------------------------------------------------- */
+.aur-root[data-fx="vaporwave"] .aur-fx-d {
+	display: block;
+	right: var(--vw-wr);
+	top: var(--vw-wt);
+	width: var(--vw-ww);
+	height: var(--vw-wh);
+	background: #d6d2ea;
+	box-shadow: 0 0 0 1px #1a1030, inset 0 0 0 1px #fff, 0.9vmin 0.9vmin 0 rgba(30, 10, 80, 0.45);
+}
+.aur-root[data-fx="vaporwave"] .aur-fx-d::before {
+	content: "ｓｐｅｃｔｒｕｍ．ｅｘｅ";
+	position: absolute;
+	left: 3px;
+	right: 3px;
+	top: 3px;
+	height: var(--vw-wb);
+	display: flex;
+	align-items: center;
+	padding-left: 0.7em;
+	color: #fff;
+	font: 700 calc(var(--vw-wb) * 0.5) / 1 var(--aur-ui-font);
+	letter-spacing: 0.06em;
+	white-space: nowrap;
+	overflow: hidden;
+	background:
+		linear-gradient(#d6d2ea, #d6d2ea) right 0.5em center / calc(var(--vw-wb) * 0.62) calc(var(--vw-wb) * 0.62) no-repeat,
+		linear-gradient(#d6d2ea, #d6d2ea) right calc(0.5em + var(--vw-wb) * 0.8) center / calc(var(--vw-wb) * 0.62) calc(var(--vw-wb) * 0.62) no-repeat,
+		linear-gradient(90deg, #ff71ce, #b967ff 55%, #01cdfe);
+}
+.aur-root[data-fx="vaporwave"] .aur-fx-d::after {
+	content: "";
+	position: absolute;
+	left: 3px;
+	right: 3px;
+	top: calc(6px + var(--vw-wb));
+	bottom: 3px;
+	background:
+		repeating-linear-gradient(to bottom, transparent 0 calc(100% / 6 - 1px), rgba(255, 255, 255, 0.07) calc(100% / 6 - 1px) calc(100% / 6)),
+		#100826;
+	box-shadow: inset 0 0 0 1px #6f6a8c;
+}
+/* --- the last layer: bars (1-12), a tracking glitch (13), stars (14-24), palms and grain -------- */
+.aur-root[data-fx="vaporwave"] .aur-fx-e { display: block; inset: 0; }
+.aur-root[data-fx="vaporwave"] .aur-fx-e > i { position: absolute; display: block; }
+.aur-root[data-fx="vaporwave"] .aur-fx-e > i:nth-child(-n + 12) {
+	--bh: calc(var(--vw-wh) - var(--vw-wb) - 14px);
+	left: calc(100% - var(--vw-wr) - var(--vw-ww) + 3px + 0.9vmin + var(--k) * (var(--vw-ww) - 6px - 1.8vmin) / 12);
+	top: calc(var(--vw-wt) + var(--vw-wh) - 7px - var(--bh));
+	width: calc((var(--vw-ww) - 6px - 1.8vmin) / 12 * 0.66);
+	height: var(--bh);
+	border-radius: 2px 2px 0 0;
+	transform-origin: 50% 100%;
+	background: linear-gradient(to top, #01cdfe, #b967ff 55%, #ff71ce 90%, #fff);
+	box-shadow: 0 0 0.9vmin rgba(255, 113, 206, 0.5);
+}
+{{VW_BARS}}
+{{VW_BAR_FRAMES}}
+/* a tracking glitch: a band of static that sweeps down the screen now and then */
+.aur-root[data-fx="vaporwave"] .aur-fx-e > i:nth-child(13) {
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 7vh;
+	background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.16) 42%, rgba(255, 130, 220, 0.16) 58%, transparent);
+	opacity: 0;
+	animation: aur-vw-track 13s linear infinite;
+}
+@keyframes aur-vw-track {
+	0%, 90% { opacity: 0; transform: translateY(-8vh); }
+	90.1% { opacity: 1; transform: translateY(-8vh); }
+	100% { opacity: 0.9; transform: translateY(104vh); }
+}
+.aur-root[data-fx="vaporwave"][data-gap="on"] .aur-fx-e > i:nth-child(13) { animation-duration: 6.5s; }
+/* stars: a four-point glint that pulses in size and light */
+.aur-root[data-fx="vaporwave"] .aur-fx-e > i:nth-child(n + 14) {
+	left: var(--x);
+	top: var(--y);
+	width: var(--s);
+	height: var(--s);
+	margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+	background: #fff;
+	clip-path: polygon(50% 0, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0 50%, 42% 42%);
+	opacity: 0.9;
+	animation: aur-vw-glint var(--d) ease-in-out var(--dl) infinite;
+}
+{{VW_SPARKLES}}
+@keyframes aur-vw-glint { 0%, 100% { scale: 0.35; opacity: 0.35; } 50% { scale: 1; opacity: 1; } }
+/* palms on the horizon */
+.aur-root[data-fx="vaporwave"] .aur-fx-e::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: calc(var(--vw-h) - 26vh);
+	height: 26vh;
+	background: {{VW_PALMS}} center bottom / 100% 100% no-repeat;
+	transform-origin: 50% 100%;
+	animation: aur-vw-sway 11s ease-in-out infinite alternate;
+}
+@keyframes aur-vw-sway { from { transform: skewX(-0.7deg); } to { transform: skewX(0.8deg); } }
+/* grain: a tile of specks, larger than the screen, jumping about (it is the layer that moves,
+   in whole steps, so nothing is repainted) */
+.aur-root[data-fx="vaporwave"] .aur-fx-e::after {
+	content: "";
+	position: absolute;
+	inset: -240px;
+	background: {{VW_NOISE}} 0 0 / 240px 240px repeat;
+	opacity: 0.16;
+	animation: aur-vw-grain 0.6s steps(1) infinite;
+}
+@keyframes aur-vw-grain {
+	0% { translate: 0 0; }
+	20% { translate: -70px 40px; }
+	40% { translate: 50px -90px; }
+	60% { translate: -30px -20px; }
+	80% { translate: 90px 70px; }
+}
+/* on the bar the horizon flares; every new line the glint of the stars catches */
+.aur-root[data-fx="vaporwave"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-c::after { animation: aur-fx-flash-a 0.8s ease-out; }
+.aur-root[data-fx="vaporwave"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-c::after { animation: aur-fx-flash-b 0.8s ease-out; }
+
+/* --- the cover, hung in an old OS window (Split, Mirrored, Captions and Stage layouts) ----- */
+.aur-root[data-look="vaporwave"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap,
+.aur-root[data-look="vaporwave"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"])[data-playing="false"] .aur-art-wrap {
+	--vw-bar: max(15px, 3.4vmin);
+	border-radius: 0;
+	box-shadow:
+		0 0 0 1px #6f6a8c,
+		0 0 0 6px #d6d2ea,
+		0 0 0 7px #fff,
+		0 0 0 8px #1a1030,
+		1.1vmin 1.1vmin 0 8px rgba(30, 10, 80, 0.5);
+}
+.aur-root[data-look="vaporwave"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap::before {
+	content: "ａｌｂｕｍ．ｂｍｐ";
+	position: absolute;
+	left: -8px;
+	right: -8px;
+	bottom: calc(100% + 8px);
+	height: calc(var(--vw-bar) + 9px);
+	box-sizing: border-box;
+	padding: 3px 3px 0 3px;
+	display: flex;
+	align-items: center;
+	padding-left: calc(0.7em + 3px);
+	color: #fff;
+	font: 700 calc(var(--vw-bar) * 0.5) / 1 var(--aur-ui-font);
+	letter-spacing: 0.06em;
+	white-space: nowrap;
+	overflow: hidden;
+	background:
+		linear-gradient(#d6d2ea, #d6d2ea) right calc(0.5em + 3px) top 50% / calc(var(--vw-bar) * 0.62) calc(var(--vw-bar) * 0.62) no-repeat,
+		linear-gradient(#d6d2ea, #d6d2ea) right calc(0.5em + var(--vw-bar) * 0.8 + 3px) top 50% / calc(var(--vw-bar) * 0.62) calc(var(--vw-bar) * 0.62) no-repeat,
+		linear-gradient(90deg, #ff71ce, #b967ff 55%, #01cdfe) content-box,
+		#d6d2ea;
+	background-clip: border-box, border-box, content-box, border-box;
+	border: 1px solid #1a1030;
+	border-bottom: 0;
+	box-shadow: inset 1px 1px 0 #fff;
+}
+
+/* --- the lyrics --------------------------------------------------------------------------- */
+.aur-root[data-look="vaporwave"] :is(.aur-side-title, .aur-side-artist, .aur-side-album) { text-shadow: 0 0.06em 0.4em rgba(46, 8, 110, 0.85); }
+.aur-root[data-look="vaporwave"] { --aur-glow-tint: #ff8ee0; --vw-ink: #fff4fc; --vw-ghost: rgba(240, 226, 255, 0.55); }
+.aur-root[data-look="vaporwave"][data-color="white"] { --aur-hi: var(--vw-ink); }
+.aur-root[data-look="vaporwave"] .aur-stage .aur-line { letter-spacing: 0.03em; font-size: calc(var(--aur-size) * 0.86); }
+/* lines that aren't being sung: pale lilac glass */
+.aur-root[data-look="vaporwave"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) .aur-main { color: var(--vw-ghost); text-shadow: 0 0.03em 0.32em rgba(46, 8, 110, 0.8), 0 0 0.08em rgba(46, 8, 110, 0.5); }
+/* the line being sung, word by word: each word lights to white as it is reached, its edges
+   misregistered pink to the right and cyan to the left, over a violet halo */
+.aur-root[data-look="vaporwave"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	color: color-mix(in srgb, var(--vw-ink) calc(var(--e) * 100%), var(--vw-ghost));
+	background: none;
 	text-shadow:
-		calc(var(--e) * 0.045em) 0 0 color-mix(in srgb, #ff50c8 calc(var(--e) * 70%), transparent),
-		calc(var(--e) * -0.045em) 0 0 color-mix(in srgb, #00e5ff calc(var(--e) * 60%), transparent),
-		0 0.04em 0.5em rgba(60, 10, 110, 0.55);
+		calc(var(--e) * 0.045em) 0 0 color-mix(in srgb, #ff50c8 calc(var(--e) * 75%), transparent),
+		calc(var(--e) * -0.045em) 0 0 color-mix(in srgb, #00e5ff calc(var(--e) * 65%), transparent),
+		0 0.04em 0.45em rgba(60, 10, 120, 0.6);
+	filter: none;
 }
-.aur-root[data-look="vaporwave"] .aur-dots i { background: color-mix(in oklab, var(--aur-accent) 70%, #fff); box-shadow: 0 0 0.3em var(--aur-accent); }
+.aur-root[data-look="vaporwave"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-look="vaporwave"][data-words="off"] .aur-stage .is-active .aur-main {
+	color: var(--vw-ink);
+	text-shadow: 0.045em 0 0 rgba(255, 80, 200, 0.75), -0.045em 0 0 rgba(0, 229, 255, 0.65), 0 0.04em 0.45em rgba(60, 10, 120, 0.6);
+}
+/* every new line shudders once, as a tape does when the head catches */
+.aur-root[data-look="vaporwave"][data-motion="full"][data-lb="a"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-vw-shudder-a 0.4s steps(1); }
+.aur-root[data-look="vaporwave"][data-motion="full"][data-lb="b"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-vw-shudder-b 0.4s steps(1); }
+@keyframes aur-vw-shudder-a { 0% { translate: 0.05em 0; } 20% { translate: -0.06em -0.01em; } 40% { translate: 0.04em 0.01em; } 60% { translate: -0.02em 0; } 80% { translate: 0.01em 0; } 100% { translate: 0 0; } }
+@keyframes aur-vw-shudder-b { 0% { translate: 0.05em 0; } 20% { translate: -0.06em -0.01em; } 40% { translate: 0.04em 0.01em; } 60% { translate: -0.02em 0; } 80% { translate: 0.01em 0; } 100% { translate: 0 0; } }
+.aur-root[data-look="vaporwave"] .aur-dots i { background: color-mix(in oklab, var(--aur-accent) 60%, #fff); box-shadow: 0 0 0.3em var(--aur-accent), 0.1em 0 0 rgba(0, 229, 255, 0.6); }
