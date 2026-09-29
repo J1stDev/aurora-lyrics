@@ -93,7 +93,16 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			h("div", { class: "aur-bg-gradient" }),
 			h("div", { class: "aur-bg-shade" }),
 			// Theme ambience (scanlines, spotlights, stars…); each theme styles these layers.
-			h("div", { class: "aur-fx" }, h("i", { class: "aur-fx-a" }), h("i", { class: "aur-fx-b" }), h("i", { class: "aur-fx-c" })),
+			h(
+				"div",
+				{ class: "aur-fx" },
+				h("i", { class: "aur-fx-a" }),
+				h("i", { class: "aur-fx-b" }),
+				h("i", { class: "aur-fx-c" }),
+				h("i", { class: "aur-fx-d" }),
+				// The last layer holds a dozen children for themes that need separate moving parts (Rain's running drops).
+				h("i", { class: "aur-fx-e" }, Array.from({ length: 12 }, () => h("i"))),
+			),
 			h("div", { class: "aur-bg-grain" }),
 		);
 

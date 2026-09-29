@@ -1,24 +1,18 @@
-/* Rain: a night window (generated vector art, see tools/themes/gen-scenes.py). Blurred city
-   lights glow behind the glass; beaded drops cling to it, larger ones run down leaving trails,
-   and rain streaks fall past outside in two depths. Now and then lightning lights the whole
-   window (more often through instrumental breaks). The dark window frame closes in the edges.
-   The lights brighten on every new line (and flash on every bar with beat data). The lyrics
-   are misted-glass white and clear from a blur as if wiped. */
+/* Rain: a night window in the rain (generated vector art, see tools/themes/gen-scenes.py).
+   Behind the glass, an out-of-focus city: towers with lit windows and red aircraft lights, big
+   soft discs of street light, and cars passing with their head and tail lights. Rain streaks fall
+   outside in two depths. On the glass itself: fine mist, beads of water (each a small lens with a
+   dark rim, a bright edge and the city light upside down inside) that slowly come and go, and
+   twelve larger drops that crawl down, stall, break free and leave a wet trail behind them.
+   Lightning lights the whole window now and then (more often through instrumental breaks). The
+   city lights brighten on every new line (and flash on every bar with beat data). The lyrics are
+   misted-glass white and clear from a blur, as if wiped. */
 .aur-root[data-fx="rain"] .aur-fx {
-	background: linear-gradient(to bottom, rgba(10, 16, 30, 0.86), rgba(14, 22, 40, 0.8) 60%, rgba(20, 26, 44, 0.72));
-}
-/* the window: reflections, condensation and a frame */
-.aur-root[data-fx="rain"] .aur-fx::before {
-	content: "";
-	position: absolute;
-	inset: 0;
 	background:
-		linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.035) 34%, transparent 40%, transparent 62%, rgba(255, 255, 255, 0.025) 66%, transparent 70%),
-		radial-gradient(120% 90% at 50% 100%, rgba(150, 170, 200, 0.16), transparent 60%),
-		radial-gradient(130% 110% at 50% 45%, transparent 55%, rgba(2, 4, 10, 0.6));
-	box-shadow: inset 0 0 0 1.3vmin rgba(4, 6, 12, 0.92), inset 0 0 0 1.5vmin rgba(120, 140, 170, 0.18);
+		{{RAIN_SKYLINE}} center bottom / cover no-repeat,
+		linear-gradient(to bottom, rgba(8, 13, 26, 0.9), rgba(12, 20, 38, 0.84) 60%, rgba(18, 26, 46, 0.78));
 }
-/* the city lights behind the glass */
+/* the city lights behind the glass, glowing softly */
 .aur-root[data-fx="rain"] .aur-fx-a {
 	display: block;
 	inset: 0;
@@ -31,45 +25,113 @@
 .aur-root[data-fx="rain"][data-bganim="on"][data-lb="a"] .aur-fx-a { animation: aur-rn-glow 9s steps(54) infinite alternate, aur-fx-flash-a 1.6s ease-out; }
 .aur-root[data-fx="rain"][data-bganim="on"][data-lb="b"] .aur-fx-a { animation: aur-rn-glow 9s steps(54) infinite alternate, aur-fx-flash-b 1.6s ease-out; }
 @keyframes aur-rn-glow { from { opacity: 0.6; } to { opacity: 0.9; } }
-/* drops on the glass; the big ones run down */
-.aur-root[data-fx="rain"] .aur-fx-b {
-	display: block;
-	inset: 0;
-	background: {{RAIN_DROPS}} center / cover no-repeat;
-}
-.aur-root[data-fx="rain"] .aur-fx-b::before {
+/* cars on the street: white head lights one way, red tail lights the other */
+.aur-root[data-fx="rain"] .aur-fx-a::before,
+.aur-root[data-fx="rain"] .aur-fx-a::after {
 	content: "";
 	position: absolute;
 	left: 0;
 	right: 0;
-	top: -100%;
-	height: 200%;
-	background: {{RAIN_RUNS}} 0 0 / 100% 50% repeat-y;
-	animation: aur-rn-run 26s steps(390) infinite linear;
+	top: 64%;
+	height: 30%;
 }
-@keyframes aur-rn-run { to { transform: translateY(50%); } }
-/* rain falling outside, in two depths: each layer is one tile taller than the screen and moves
-   by exactly one tile, so the loop joins up */
+.aur-root[data-fx="rain"] .aur-fx-a::before { background: {{RAIN_CARS_W}} 0 0 / 100% 100% no-repeat; animation: aur-rn-cars-r 52s steps(780) infinite linear; }
+.aur-root[data-fx="rain"] .aur-fx-a::after { background: {{RAIN_CARS_R}} 0 0 / 100% 100% no-repeat; animation: aur-rn-cars-l 71s steps(1065) infinite linear; }
+@keyframes aur-rn-cars-r { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes aur-rn-cars-l { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+/* rain falling outside, far and near: each layer is one tile taller than the screen and moves by
+   exactly one tile, so the loop joins up */
+.aur-root[data-fx="rain"] .aur-fx-b {
+	display: block;
+	left: 0;
+	right: 0;
+	top: -730px;
+	height: calc(100% + 730px);
+	background: {{RAIN_STREAKS}} 0 0 / 730px 730px repeat;
+	opacity: 0.85;
+	transition: opacity 2s ease;
+	animation: aur-rn-fall-far 1.3s steps(39) infinite linear;
+}
 .aur-root[data-fx="rain"] .aur-fx-c {
 	display: block;
 	left: 0;
 	right: 0;
 	top: -1000px;
 	height: calc(100% + 1000px);
-	background: {{RAIN_STREAKS}} 0 0 / 1000px 1000px repeat;
-	animation: aur-rn-fall 0.9s steps(14) infinite linear;
+	background: {{RAIN_STREAKS_B}} 0 0 / 1000px 1000px repeat;
+	transition: opacity 2s ease;
+	animation: aur-rn-fall 0.85s steps(26) infinite linear;
 }
+.aur-root[data-fx="rain"][data-gap="on"] :is(.aur-fx-b, .aur-fx-c) { opacity: 1; }
 @keyframes aur-rn-fall { to { transform: translateY(1000px); } }
-.aur-root[data-fx="rain"] .aur-fx-c::before {
+@keyframes aur-rn-fall-far { to { transform: translateY(730px); } }
+/* beads of water on the glass; two sets that slowly trade places, so the glass keeps changing */
+.aur-root[data-fx="rain"] .aur-fx-d {
+	display: block;
+	inset: 0;
+	background: {{RAIN_DROPS_A}} center / cover no-repeat;
+	animation: aur-rn-bead-a 34s steps(170) infinite alternate;
+}
+.aur-root[data-fx="rain"] .aur-fx-d::before {
 	content: "";
 	position: absolute;
 	inset: 0;
-	background: {{RAIN_STREAKS_B}} 0 0 / 700px 700px repeat;
-	animation: aur-rn-fall-far 1.3s steps(14) infinite linear;
+	background: {{RAIN_DROPS_B}} center / cover no-repeat;
+	animation: aur-rn-bead-b 34s steps(170) infinite alternate;
 }
-@keyframes aur-rn-fall-far { to { transform: translateY(700px); } }
-/* lightning */
-.aur-root[data-fx="rain"] .aur-fx::after {
+@keyframes aur-rn-bead-a { from { opacity: 1; } to { opacity: 0.15; } }
+@keyframes aur-rn-bead-b { from { opacity: 0.15; } to { opacity: 1; } }
+/* fine mist, and the running drops */
+.aur-root[data-fx="rain"] .aur-fx-e {
+	display: block;
+	inset: 0;
+	background-image:
+		{{RAIN_MIST}};
+	background-size: {{RAIN_MIST_SIZES}};
+}
+.aur-root[data-fx="rain"] .aur-fx-e > i {
+	position: absolute;
+	display: block;
+	left: var(--x);
+	top: var(--y);
+	width: 0;
+	height: 0;
+}
+/* the wet trail is as long as the distance the drop has covered (it scales from the start point
+   in step with the drop), the drop itself is a lens */
+.aur-root[data-fx="rain"] .aur-fx-e > i::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 0.55vmin;
+	height: var(--dy);
+	margin-left: -0.275vmin;
+	border-radius: 0.2vmin;
+	background: linear-gradient(to bottom, transparent, rgba(190, 215, 250, 0.1) 25%, rgba(214, 230, 255, 0.42));
+	transform-origin: 50% 0;
+	scale: 1 0;
+	opacity: 0;
+	animation: var(--tv) var(--dur) var(--delay) linear infinite;
+}
+.aur-root[data-fx="rain"] .aur-fx-e > i::after {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: var(--s);
+	height: calc(var(--s) * 1.35);
+	margin: calc(var(--s) * -0.68) 0 0 calc(var(--s) * -0.5);
+	background: {{RAIN_HEAD}} center / 100% 100% no-repeat;
+	opacity: 0;
+	animation: var(--hv) var(--dur) var(--delay) linear infinite;
+}
+{{RAIN_RUNNERS}}
+{{RAIN_KEYFRAMES}}
+.aur-root[data-bganim="off"] .aur-fx-e > i::before,
+.aur-root[data-bganim="off"] .aur-fx-e > i::after { animation-play-state: paused; }
+/* lightning: a double flash that lights the whole window */
+.aur-root[data-fx="rain"] .aur-fx-e::after {
 	content: "";
 	position: absolute;
 	inset: 0;
@@ -77,13 +139,24 @@
 	opacity: 0;
 	animation: aur-rn-flash 27s linear infinite;
 }
-.aur-root[data-fx="rain"][data-gap="on"] .aur-fx::after { animation-duration: 14s; }
+.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-e::after { animation-duration: 14s; }
 @keyframes aur-rn-flash {
 	0%, 95% { opacity: 0; }
 	95.4% { opacity: 0.5; }
 	96% { opacity: 0.08; }
 	96.6% { opacity: 0.78; }
 	100% { opacity: 0; }
+}
+/* the window on top: reflections in the glass, condensation at the bottom, a dark frame */
+.aur-root[data-fx="rain"] .aur-fx::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.035) 34%, transparent 40%, transparent 62%, rgba(255, 255, 255, 0.025) 66%, transparent 70%),
+		radial-gradient(120% 90% at 50% 100%, rgba(150, 170, 200, 0.18), transparent 60%),
+		radial-gradient(130% 110% at 50% 45%, transparent 55%, rgba(2, 4, 10, 0.6));
+	box-shadow: inset 0 0 0 1.3vmin rgba(4, 6, 12, 0.92), inset 0 0 0 1.5vmin rgba(120, 140, 170, 0.18);
 }
 .aur-root[data-fx="rain"] .aur-bg-grain { opacity: 0.03; }
 
