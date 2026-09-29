@@ -35,6 +35,7 @@ const ORDER = [
 	"player.js",
 	"beats.js",
 	"stats.js",
+	"rain.js",
 	"net.js",
 	"sources.js",
 	"providers.js",

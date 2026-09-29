@@ -1,12 +1,13 @@
-/* Rain: a night window in the rain (generated vector art, see tools/themes/gen-scenes.py).
-   Behind the glass, an out-of-focus city: towers with lit windows and red aircraft lights, big
-   soft discs of street light, and cars passing with their head and tail lights. Rain streaks fall
-   outside in two depths. On the glass itself: fine mist, beads of water (each a small lens with a
-   dark rim, a bright edge and the city light upside down inside) that slowly come and go, and
-   twelve larger drops that crawl down, stall, break free and leave a wet trail behind them.
-   Lightning lights the whole window now and then (more often through instrumental breaks). The
-   city lights brighten on every new line (and flash on every bar with beat data). The lyrics are
-   misted-glass white and clear from a blur, as if wiped. */
+/* Rain: a night window in the rain. Normally this is drawn by src/rain.js with WebGL: a canvas over
+   this layer (see the end of this block), showing a blurred night city through misted glass, with
+   drops that are real little lenses (the street, sharp and upside down, inside each one), bigger
+   drops that run in fits and starts and wipe a clear trail, beads that come and go, cars passing,
+   lightning, and neon that takes the album's colours. This CSS scene (generated art, see
+   tools/themes/gen-scenes.py) is the fallback when WebGL isn't available: an out-of-focus city with
+   passing cars, rain streaks in two depths, beads of water and twelve larger drops that crawl down
+   the glass leaving trails, lightning, a dark window frame. In both, the lights brighten on every
+   new line (and flash on every bar with beat data), and the lyrics are misted-glass white that
+   clears from a blur, as if wiped. */
 .aur-root[data-fx="rain"] .aur-fx {
 	background:
 		{{RAIN_SKYLINE}} center bottom / cover no-repeat,
@@ -160,6 +161,14 @@
 	box-shadow: inset 0 0 0 1.3vmin rgba(4, 6, 12, 0.92), inset 0 0 0 1.5vmin rgba(120, 140, 170, 0.18);
 }
 .aur-root[data-fx="rain"] .aur-bg-grain { opacity: 0.03; }
+
+/* The WebGL scene (src/rain.js): a canvas over the whole layer. While it runs (data-gl="on") the CSS
+   scene above is not drawn; if WebGL isn't there (data-gl="off") the CSS scene is the theme. */
+.aur-fx > canvas.aur-fx-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.aur-root[data-fx="rain"][data-gl="on"] .aur-fx > canvas.aur-fx-gl { display: block; }
+.aur-root[data-fx="rain"][data-gl="on"] .aur-fx { background: #04060c; }
+.aur-root[data-fx="rain"][data-gl="on"] .aur-fx > i,
+.aur-root[data-fx="rain"][data-gl="on"] .aur-fx::after { display: none; }
 
 /* misted-glass lyrics that clear from a blur */
 .aur-root[data-look="rain"] { --aur-glow-tint: #8fb4e6; }
