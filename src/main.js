@@ -1,10 +1,10 @@
 // Entry point: wait for Spicetify, inject CSS, register buttons and player listeners.
 
 import { EXT_ID, sleep } from "./util.js";
-import { ICONS } from "./icons.js";
 import { createOverlay } from "./overlay.js";
 import { createNowPlayingCard } from "./npv.js";
 import { createMiniLyrics } from "./mini.js";
+import { createLauncher } from "./launcher.js";
 import { CSS } from "./styles.js";
 
 async function waitForSpicetify(timeoutMs = 60000) {
@@ -28,15 +28,12 @@ export async function main() {
 	style.textContent = CSS;
 	document.head.append(style);
 
-	let playbarBtn = null;
-	let playbarEl = null; // the player-bar button element, styled as a liquid-glass tile
-	let topbarEl = null; // same look, larger, in the top bar
+	let launcher = null;
 	let card = null;
 	let mini = null;
 	const overlay = createOverlay({
 		onOpenChange: (open) => {
-			if (playbarBtn) playbarBtn.active = open;
-			for (const b of [playbarEl, topbarEl]) b?.classList.toggle("is-on", open);
+			launcher?.setOpen(open);
 			if (!open) card?.onOverlayClosed();
 			mini?.refresh();
 		},
@@ -61,44 +58,15 @@ export async function main() {
 		console.warn(`[${EXT_ID}] Now Playing card unavailable`, e);
 	}
 
-	// Buttons: each API is optional across Spicetify versions, so register what exists.
-	const label = "Aurora Lyrics (Alt+L)";
+	// The buttons that open the lyrics (top bar, player bar, or a floating one if neither is on screen).
 	try {
-		if (S.Topbar?.Button) {
-			const tb = new S.Topbar.Button(label, ICONS.lyrics(20), () => overlay.toggle());
-			// Liquid-glass tile, sized like Spotify's global-nav buttons; styles in styles.css.
-			const el = tb.element?.matches?.("button") ? tb.element : tb.element?.querySelector?.("button") || tb.element;
-			el?.classList.add("aur-topbar-btn");
-			topbarEl = el || null;
-			tintButtons();
-		}
+		launcher = createLauncher({ label: "Aurora Lyrics (Alt+L)", onToggle: () => overlay.toggle(), getUri: () => S.Player.data?.item?.uri });
+		launcher.retint();
 	} catch (e) {
-		console.warn(`[${EXT_ID}] topbar button unavailable`, e);
-	}
-	try {
-		if (S.Playbar?.Button) {
-			playbarBtn = new S.Playbar.Button(label, ICONS.lyrics(16), () => overlay.toggle(), false, false);
-			const el = playbarBtn.element;
-			playbarEl = el?.matches?.("button") ? el : el?.querySelector?.("button") || el || null;
-			playbarEl?.classList.add("aur-pb-btn");
-			tintButtons();
-		}
-	} catch (e) {
-		console.warn(`[${EXT_ID}] playbar button unavailable`, e);
+		console.warn(`[${EXT_ID}] buttons unavailable`, e);
 	}
 
-	// The glass buttons glow in the album's colour while the lyrics are open.
-	function tintButtons() {
-		const uri = S.Player.data?.item?.uri;
-		if (!uri || typeof S.colorExtractor !== "function") return;
-		Promise.resolve(S.colorExtractor(uri))
-			.then((c) => {
-				if (!c) return;
-				for (const b of [playbarEl, topbarEl]) b?.style.setProperty("--aur-pb-c", c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#b98cff");
-			})
-			.catch(() => {});
-	}
-	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange(), tintButtons()));
+	S.Player.addEventListener("songchange", () => (overlay.onSongChange(), card?.onSongChange(), launcher?.retint()));
 	S.Player.addEventListener("onplaypause", () => (overlay.onPlayPause(), card?.onPlayPause(), mini?.onPlayPause()));
 	S.Player.addEventListener("onprogress", () => (overlay.onProgress(), card?.onProgress(), mini?.onProgress()));
 

@@ -4997,7 +4997,7 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	cursor: pointer;
 }
 /* glass surface, shared by both buttons */
-:is(.aur-pb-btn, .aur-topbar-btn) {
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch) {
 	color: rgba(255, 255, 255, 0.82) !important;
 	background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04)) !important;
 	box-shadow:
@@ -5008,7 +5008,7 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	transition: background 0.3s ease, box-shadow 0.3s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 /* the glassy sheen across the top half */
-:is(.aur-pb-btn, .aur-topbar-btn)::before {
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch)::before {
 	content: "";
 	position: absolute;
 	inset: 0 0 50%;
@@ -5020,9 +5020,9 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 }
 :is(.aur-pb-btn, .aur-topbar-btn)::after { display: none !important; } /* Spotify's own "active" dot; the glow replaces it */
 .aur-pb-btn svg { position: relative; width: 16px; height: 16px; }
-:is(.aur-pb-btn, .aur-topbar-btn):hover { color: #fff !important; transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
-:is(.aur-pb-btn, .aur-topbar-btn):active { transform: scale(0.94); }
-:is(.aur-pb-btn, .aur-topbar-btn).is-on {
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):hover { color: #fff !important; transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):active { transform: scale(0.94); }
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch).is-on {
 	color: #fff !important;
 	background:
 		linear-gradient(180deg, color-mix(in oklab, var(--aur-pb-c) 55%, rgba(255, 255, 255, 0.25)), color-mix(in oklab, var(--aur-pb-c) 28%, transparent)) !important;
@@ -5032,6 +5032,51 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 		0 0 14px color-mix(in oklab, var(--aur-pb-c) 55%, transparent),
 		0 2px 8px rgba(0, 0, 0, 0.35);
 }
+
+/* Our own buttons: one placed in the player bar when Spicetify's isn't on screen, and a floating one
+   in the corner when no button is (src/launcher.js). They look like the others. */
+.aur-launch {
+	--aur-pb-c: #b98cff;
+	position: relative;
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	margin-inline: 4px;
+	padding: 0;
+	border: 0;
+	border-radius: 10px;
+	overflow: hidden;
+	cursor: pointer;
+	font: inherit;
+}
+.aur-launch[hidden] { display: none !important; }
+.aur-launch svg { position: relative; width: 16px; height: 16px; }
+.aur-launch-float {
+	position: fixed;
+	right: 22px;
+	bottom: 108px;
+	z-index: 9990;
+	width: 46px;
+	height: 46px;
+	margin: 0;
+	border-radius: 15px;
+	animation: aur-launch-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.aur-launch-float svg { width: 20px; height: 20px; }
+.aur-launch-float::after { /* a ring that pulses twice, so it gets noticed */
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	box-shadow: 0 0 0 2px color-mix(in oklab, var(--aur-pb-c) 70%, transparent);
+	opacity: 0;
+	animation: aur-launch-ping 1.6s ease-out 0.7s 2;
+}
+@keyframes aur-launch-in { from { opacity: 0; transform: translateY(10px) scale(0.8); } }
+@keyframes aur-launch-ping { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5); } }
+html.aur-covered .aur-launch-float { display: none; }
 
 /* ============================================================== custom background
    The user's own image or video (Look → Background → Custom), cover-fitted, optionally

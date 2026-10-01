@@ -49,6 +49,7 @@ const ORDER = [
 	"overlay.js",
 	"npv.js",
 	"mini.js",
+	"launcher.js",
 	"main.js",
 ];
 
