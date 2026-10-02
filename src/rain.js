@@ -64,7 +64,7 @@ vec3 traffic(vec2 uv, float sharp) {
 		for (int k = 0; k < 2; k++) {
 			vec2 c = vec2(x + (float(k) - .5) * mix(.026, .04, r.w), y);
 			float d = length((uv - c) * vec2(aspect, 1.));
-			acc += col * S(rad, rad * .3, d) * mix(.45, 1.15, sharp);
+			acc += col * S(rad, rad * .82, d) * (.75 + .45 * S(rad * .55, rad * .95, d)) * mix(.4, 1.1, sharp);
 		}
 	}
 	return acc * .75;
@@ -182,6 +182,8 @@ void main() {
 	beads(L, p, .07, .02, 7., .55);
 	beads(L, p, .034, .0102, 19., .62);
 	beads(L, p, .017, .0052, 31., .5);
+	beads(L, p, .0105, .0034, 43., .4); // fine droplets: a mist of water over the whole glass
+	beads(L, p, .0062, .0021, 57., .46);
 
 	// a wipe takes the water off the glass
 	float m = texture(uMask, gl_FragCoord.xy / uRes).r;
@@ -192,7 +194,15 @@ void main() {
 	// the glass: misted, more toward the bottom, with patches wiped clearer here and there
 	float wipe = S(.44, .8, fbm(p * 2.4 + vec2(3., uTime * .004)));
 	vec2 haze = vec2(sin(p.y * 7. + uTime * .35), sin(p.x * 5. - uTime * .3)) * .0016 * (1. - m); // the mist shimmers a little
+	// a sheet of water running down in places bends the view sideways in vertical streaks
+	float rc = floor(p.x * 38.);
+	float rr = h11(rc * 1.7 + 3.);
+	float riv = step(.7, rr) * S(.15, .6, vnoise(vec2(p.x * 38., p.y * 1.6 - uTime * (.02 + rr * .03)))) * (1. - m);
+	haze += vec2((vnoise(vec2(p.x * 230., p.y * 5. - uTime * .1)) - .5) * .0065, (vnoise(vec2(p.x * 90., p.y * 3.)) - .5) * .002) * riv;
 	vec3 col = world(uv + haze, max(wipe * .3, m * .94));
+	vec3 glowT = texture(uFog, clamp(uv + haze, vec2(.003), vec2(.997))).rgb;
+	col += max(glowT - .26, 0.) * .8 * (1. - .7 * m); // light bleeds from the brightest lamps
+	col += vec3(.55, .65, .85) * S(.06, .0, abs(dot(uv - vec2(.28, .0), normalize(vec2(1., .55))) - .12)) * .022; // the room, faintly, in the glass
 	col += vec3(.07, .1, .14) * (.35 + .65 * uv.y) * .55 * (1. - .75 * m);
 	col *= 1. - .2 * m; // clear glass lets in the dark of the night; mist scatters light
 	// the water left standing along the edge of a wiped patch: a bright line, and beads in it
@@ -299,100 +309,148 @@ function rainRng(seed) {
 	};
 }
 
-function rainGlow(g, x, y, r, rgb, a) {
-	const k = g.createRadialGradient(x, y, 0, x, y, r);
-	k.addColorStop(0, `rgba(${rgb},${a})`);
-	k.addColorStop(1, `rgba(${rgb},0)`);
-	g.fillStyle = k;
+// A light that is out of focus is not a soft blob but a disc: the shape of the lens's opening, a little
+// brighter at its edge, in a faint halo. Through a window with water on it everything outside is like that.
+function rainBokeh(g, x, y, r, rgb, a) {
+	const halo = g.createRadialGradient(x, y, 0, x, y, r * 3.4);
+	halo.addColorStop(0, `rgba(${rgb},${(a * 0.17).toFixed(3)})`);
+	halo.addColorStop(1, `rgba(${rgb},0)`);
+	g.fillStyle = halo;
+	g.fillRect(x - r * 3.4, y - r * 3.4, r * 6.8, r * 6.8);
+	const d = g.createRadialGradient(x, y, 0, x, y, r);
+	d.addColorStop(0, `rgba(${rgb},${(a * 0.6).toFixed(3)})`);
+	d.addColorStop(0.7, `rgba(${rgb},${(a * 0.72).toFixed(3)})`);
+	d.addColorStop(0.9, `rgba(${rgb},${a.toFixed(3)})`);
+	d.addColorStop(1, `rgba(${rgb},0)`);
+	g.fillStyle = d;
 	g.fillRect(x - r, y - r, r * 2, r * 2);
 }
 
-const RAIN_WINDOWS = ["255,214,138", "255,243,208", "255,196,120", "181,212,255", "255,232,170"];
+const RAIN_WINDOWS = ["255,214,138", "255,243,208", "255,196,120", "255,232,170", "255,205,150", "200,222,255"];
+const RAIN_VPX = 0.5; // where the street runs off to, as fractions of the picture
+const RAIN_VPY = 0.585;
 
-function rainSkyline(g, rnd, W, base, o) {
-	let x = -10;
-	while (x < W + 10) {
-		const bw = o.minW + rnd() * (o.maxW - o.minW);
-		const bh = o.minH + rnd() * (o.maxH - o.minH);
-		g.fillStyle = o.fill;
-		g.fillRect(x, base - bh, bw, bh + 40);
-		if (rnd() < 0.35) g.fillRect(x + bw * 0.3, base - bh - 4 - rnd() * 8, bw * 0.12, 12); // a plant room on the roof
-		const cw = o.ws * 2.2, ch = o.ws * 2.7;
-		for (let wx = x + 3; wx < x + bw - cw - 2; wx += cw + 1.5) {
-			for (let wy = base - bh + 5; wy < base - 4; wy += ch + 1.7) {
-				if (rnd() > o.lit) continue;
-				g.fillStyle = `rgba(${RAIN_WINDOWS[(rnd() * RAIN_WINDOWS.length) | 0]},${((0.35 + rnd() * 0.6) * o.dim).toFixed(2)})`;
-				g.fillRect(wx, wy, o.ws, o.ws * 1.3);
+/**
+ * The street outside, as data: skyline blocks, and every light in it (position and size as fractions of the
+ * picture's width, colour, brightness, kind). Seeded, so it is the same every time. Lamps and cars stand
+ * on a street that runs to a vanishing point; windows fill the skyline; neon hangs low at both sides.
+ */
+export function rainStreet(tint) {
+	const rnd = rainRng(11);
+	const blocks = [];
+	const lights = [];
+	const road = (z) => RAIN_VPY + 0.4 * z; // where the kerb is at depth z (0 far .. 1 near)
+	for (const [layer, base, minW, maxW, minH, maxH] of [[0, 0.585, 0.025, 0.06, 0.05, 0.16], [1, 0.62, 0.05, 0.11, 0.1, 0.27]]) {
+		let x = -0.02;
+		while (x < 1.02) {
+			const w = minW + rnd() * (maxW - minW);
+			// the middle of the picture is the street: the near blocks keep to the sides
+			const h = (minH + rnd() * (maxH - minH)) * (layer && Math.abs(x + w / 2 - 0.5) < 0.16 ? 0.35 : 1);
+			blocks.push({ x, w, base, h, layer });
+			const cols = Math.max(2, Math.floor(w / 0.011));
+			const rows = Math.max(2, Math.floor((h * 1.78) / 0.02));
+			for (let i = 0; i < cols; i++) {
+				for (let j = 0; j < rows; j++) {
+					if (rnd() > (layer ? 0.2 : 0.12) * (rnd() < 0.35 ? 0.2 : 1)) continue;
+					lights.push({ x: x + ((i + 0.5) / cols) * w, y: base - h + ((j + 0.5) / rows) * h * 0.92, r: 0.0022 + rnd() * 0.0016, rgb: RAIN_WINDOWS[(rnd() * RAIN_WINDOWS.length) | 0], a: (layer ? 0.4 : 0.28) * (0.45 + rnd() * 0.6), kind: "window" });
+				}
 			}
+			x += w + rnd() * 0.004;
 		}
-		x += bw + rnd() * 3;
 	}
+	// street lamps in two rows, sodium orange
+	for (const side of [-1, 1]) {
+		for (let i = 0; i < 9; i++) {
+			const z = Math.pow((i + 0.6) / 9.6, 1.75);
+			lights.push({ x: RAIN_VPX + side * (0.075 + 0.5 * z), y: RAIN_VPY - 0.025 - 0.36 * z, r: 0.0035 + 0.016 * z, rgb: "255,178,96", a: 0.72, kind: "lamp", z });
+		}
+	}
+	// cars: head lights coming towards us in the left lane, tail lights going away in the right
+	for (let i = 0; i < 6; i++) {
+		const z = 0.12 + rnd() * 0.75;
+		const lane = i % 2 ? 1 : -1;
+		const cx = RAIN_VPX + lane * (0.03 + 0.19 * z);
+		const sep = 0.013 + 0.055 * z;
+		const y = road(z) - 0.012 - 0.03 * z;
+		const head = lane < 0;
+		for (const dx of [-sep / 2, sep / 2]) lights.push({ x: cx + dx, y, r: 0.003 + 0.011 * z, rgb: head ? "255,244,214" : "255,38,32", a: head ? 0.68 : 0.8, kind: "car", z });
+	}
+	// traffic lights over the crossing, and shop signs low at both sides in the album's neon
+	lights.push({ x: 0.43, y: 0.5, r: 0.0085, rgb: "255,52,40", a: 0.95, kind: "lamp", z: 0.4 }, { x: 0.43, y: 0.527, r: 0.0085, rgb: "70,255,140", a: 0.3, kind: "lamp", z: 0.4 });
+	lights.push({ x: 0.575, y: 0.53, r: 0.0075, rgb: "255,190,60", a: 0.9, kind: "lamp", z: 0.35 });
+	for (let i = 0; i < 12; i++) {
+		const side = i % 2 ? 1 : -1;
+		const x = 0.5 + side * (0.2 + rnd() * 0.28);
+		lights.push({ x, y: 0.56 + rnd() * 0.15, r: 0.004 + rnd() * 0.007, rgb: rnd() < 0.5 ? tint.a : tint.b, a: 0.55, kind: "sign" });
+	}
+	for (let i = 0; i < 14; i++) lights.push({ x: rnd(), y: 0.66 + rnd() * 0.08, r: 0.003 + rnd() * 0.005, rgb: RAIN_WINDOWS[(rnd() * 4) | 0], a: 0.34, kind: "shop" });
+	for (let i = 0; i < 26; i++) lights.push({ x: rnd(), y: 0.3 + rnd() * 0.26, r: 0.0018 + rnd() * 0.002, rgb: rnd() < 0.2 ? "255,60,50" : RAIN_WINDOWS[(rnd() * RAIN_WINDOWS.length) | 0], a: 0.3 + rnd() * 0.25, kind: "window" });
+	return { blocks, lights };
 }
 
-function rainPaint(g, W, H, tint) {
-	const rnd = rainRng(11);
-	const sky = g.createLinearGradient(0, 0, 0, H);
-	[[0, "#03050c"], [0.3, "#0a1226"], [0.55, "#182749"], [0.7, "#26294d"], [1, "#080b16"]].forEach(([o, c]) => sky.addColorStop(o, c));
-	g.fillStyle = sky;
-	g.fillRect(0, 0, W, H);
+/**
+ * Paint the street at one depth of focus: 0 is nearly sharp (what a drop of water shows, and the glass
+ * where it has been wiped), 1 and 2 are further out of focus (mist). Out of focus a light grows into a
+ * disc, so the discs get bigger as the level goes up while the buildings blur.
+ */
+function rainPaint(g, W, H, street, level) {
+	const k = [0.5, 1.05, 1.7][level];
+	const blur = [3.6, 6.5, 13][level] * (W / 768);
+	// the sky and the dark masses of the city, blurred
+	const base = document.createElement("canvas");
+	base.width = W;
+	base.height = H;
+	const b = base.getContext("2d");
+	const sky = b.createLinearGradient(0, 0, 0, H * 0.66);
+	[[0, "#070b17"], [0.35, "#101a2f"], [0.62, "#22263f"], [0.85, "#43303a"], [1, "#563a2c"]].forEach(([o, c]) => sky.addColorStop(o, c));
+	b.fillStyle = sky;
+	b.fillRect(0, 0, W, H);
 	// the city's glow on the low cloud
-	rainGlow(g, W * 0.5, H * 0.62, W * 0.7, "255,150,90", 0.26);
-	rainGlow(g, W * 0.16, H * 0.6, W * 0.34, tint.a, 0.2);
-	rainGlow(g, W * 0.84, H * 0.58, W * 0.34, tint.b, 0.18);
-	// two skylines: far and small, near and big
-	rainSkyline(g, rnd, W, H * 0.74, { minH: H * 0.12, maxH: H * 0.34, minW: 14, maxW: 34, fill: "#0b1329", lit: 0.16, ws: 2.2, dim: 0.6 });
-	rainSkyline(g, rnd, W, H * 0.77, { minH: H * 0.2, maxH: H * 0.5, minW: 26, maxW: 60, fill: "#060a17", lit: 0.26, ws: 3, dim: 1 });
-	// red beacons on the towers
-	g.globalCompositeOperation = "lighter";
-	for (let i = 0; i < 4; i++) rainGlow(g, 30 + rnd() * (W - 60), H * (0.3 + rnd() * 0.08), 6, "255,60,50", 0.9);
-	// neon signs: a rectangle, a ring, a zigzag
-	const signs = [
-		[0.1, 0.52, tint.a, "rect"],
-		[0.33, 0.44, tint.b, "ring"],
-		[0.62, 0.5, tint.a, "zig"],
-		[0.86, 0.46, tint.b, "rect"],
-	];
-	for (const [fx, fy, rgb, kind] of signs) {
-		const x = fx * W, y = fy * H;
-		rainGlow(g, x, y, 34, rgb, 0.4);
-		g.save();
-		g.shadowColor = `rgb(${rgb})`;
-		g.shadowBlur = 9;
-		g.strokeStyle = `rgba(${rgb},0.95)`;
-		g.lineWidth = 2;
-		g.beginPath();
-		if (kind === "rect") g.rect(x - 14, y - 8, 28, 16);
-		else if (kind === "ring") g.arc(x, y, 10, 0, Math.PI * 2);
-		else {
-			g.moveTo(x - 16, y + 6);
-			g.lineTo(x - 6, y - 8);
-			g.lineTo(x + 4, y + 6);
-			g.lineTo(x + 16, y - 8);
-		}
-		g.stroke();
-		g.restore();
+	for (const [x, y, r, c] of [[0.5, 0.62, 0.62, "255,150,84,0.3"], [0.18, 0.6, 0.34, "170,100,150,0.16"], [0.84, 0.6, 0.34, "90,120,190,0.16"]]) {
+		const gr = b.createRadialGradient(W * x, H * y, 0, W * x, H * y, W * r);
+		gr.addColorStop(0, `rgba(${c})`);
+		gr.addColorStop(1, "rgba(0,0,0,0)");
+		b.fillStyle = gr;
+		b.fillRect(0, 0, W, H);
 	}
-	// the street: lamps, shop fronts, cars standing in the traffic
-	const lights = [];
-	for (let i = 0; i < 9; i++) lights.push([W * (0.04 + i * 0.115) + rnd() * 10, H * (0.72 + rnd() * 0.04), 3.2 + rnd() * 1.6, "255,190,108"]); // street lamps
-	for (let i = 0; i < 6; i++) lights.push([rnd() * W, H * (0.8 + rnd() * 0.08), 2.4 + rnd() * 1.4, rnd() < 0.5 ? "255,52,44" : "255,236,190"]); // cars
-	lights.push([W * 0.7, H * 0.7, 3, "60,255,140"], [W * 0.7, H * 0.66, 3, "255,60,50"]); // a traffic light
-	// the road, wet: a dark surface and each light smeared down it
-	const road = g.createLinearGradient(0, H * 0.77, 0, H);
-	road.addColorStop(0, "rgba(10,14,28,0.9)");
-	road.addColorStop(1, "rgba(4,6,14,1)");
-	g.globalCompositeOperation = "source-over";
-	g.fillStyle = road;
-	g.fillRect(0, H * 0.77, W, H);
+	for (const bl of street.blocks) {
+		b.fillStyle = bl.layer ? "#05070d" : "#0a0f1b";
+		b.fillRect(bl.x * W, (bl.base - bl.h) * H, bl.w * W + 1, bl.h * H + H * 0.1);
+	}
+	// the street: wet and dark, brighter where it catches the sky
+	const rd = b.createLinearGradient(0, H * RAIN_VPY, 0, H);
+	rd.addColorStop(0, "#251d24");
+	rd.addColorStop(0.25, "#10111b");
+	rd.addColorStop(1, "#05060b");
+	b.beginPath();
+	b.moveTo(W * (RAIN_VPX - 0.012), H * RAIN_VPY);
+	b.lineTo(W * (RAIN_VPX + 0.012), H * RAIN_VPY);
+	b.lineTo(W * 1.1, H);
+	b.lineTo(-W * 0.1, H);
+	b.closePath();
+	b.fillStyle = rd;
+	b.fill();
+	b.fillStyle = "#06080e";
+	b.fillRect(0, H * 0.66, W * 0.2, H);
+	b.fillRect(W * 0.8, H * 0.66, W * 0.2, H);
+	g.filter = `blur(${blur}px)`;
+	const m = Math.ceil(blur * 2);
+	g.drawImage(base, -m, -m, W + m * 2, H + m * 2);
+	g.filter = "none";
+	// the lights, as discs; and the wet road under every low one
 	g.globalCompositeOperation = "lighter";
-	for (const [x, y, r, rgb] of lights) {
-		rainGlow(g, x, y, r * 6, rgb, 0.45);
-		rainGlow(g, x, y, r * 2, rgb, 0.95);
-		const sm = g.createLinearGradient(0, y + r, 0, Math.min(H, y + r + 46));
-		sm.addColorStop(0, `rgba(${rgb},0.34)`);
-		sm.addColorStop(1, `rgba(${rgb},0)`);
-		g.fillStyle = sm;
-		g.fillRect(x - r * 0.9, y + r, r * 1.8, 46);
+	for (const l of street.lights) {
+		const sc = l.kind === "window" ? k * 0.9 : k;
+		if (["lamp", "car", "sign", "shop"].includes(l.kind) && l.y > RAIN_VPY - 0.1) {
+			const len = (l.kind === "lamp" ? 0.2 : 0.14) * H * (0.6 + (l.z || 0.5));
+			const w = l.r * W * sc * 0.9;
+			const sm = g.createLinearGradient(0, l.y * H, 0, l.y * H + len);
+			sm.addColorStop(0, `rgba(${l.rgb},${(l.a * 0.34).toFixed(3)})`);
+			sm.addColorStop(1, `rgba(${l.rgb},0)`);
+			g.fillStyle = sm;
+			g.fillRect(l.x * W - w, Math.max(l.y * H, H * RAIN_VPY), w * 2, len);
+		}
+		rainBokeh(g, l.x * W, l.y * H, Math.max(0.8, l.r * W * sc), l.rgb, l.a * (level === 0 ? 1.05 : level === 1 ? 0.95 : 0.8));
 	}
 	g.globalCompositeOperation = "source-over";
 }
@@ -604,24 +662,17 @@ export function createRain(canvas, root, bg, getLens) {
 		const key = tint.a + "|" + tint.b;
 		if (key === S.tintKey) return;
 		S.tintKey = key;
-		const W = 512, H = 288;
-		const base = document.createElement("canvas");
-		base.width = W;
-		base.height = H;
-		rainPaint(base.getContext("2d"), W, H, tint);
-		// sharp (barely softened), mid, and fog: the blur in px of the 512-wide picture
-		[0.7, 3.6, 11].forEach((blur, i) => {
+		const W = 768, H = 432;
+		const street = rainStreet(tint);
+		for (let i = 0; i < 3; i++) {
 			const c = document.createElement("canvas");
 			c.width = W;
 			c.height = H;
-			const g = c.getContext("2d");
-			g.filter = `blur(${blur}px)`;
-			const m = Math.ceil(blur * 2); // draw a little larger so the blur has no dark edge
-			g.drawImage(base, -m, -m, W + m * 2, H + m * 2);
+			rainPaint(c.getContext("2d"), W, H, street, i);
 			gl.activeTexture(gl.TEXTURE0 + i);
 			gl.bindTexture(gl.TEXTURE_2D, S.tex[i]);
 			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
-		});
+		}
 	}
 
 	function signals(now) {

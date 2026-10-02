@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseCssColor, rainTint } from "../src/rain.js";
+import { parseCssColor, rainTint, rainStreet } from "../src/rain.js";
 
 test("parseCssColor reads the forms the browser reports", () => {
 	assert.deepEqual(parseCssColor("rgb(159, 194, 232)"), [159, 194, 232]);
@@ -30,4 +30,22 @@ test("rainTint: a dull accent (white, grey, nothing) falls back to pink and cyan
 	const [a, b] = [fallback.a, fallback.b].map((s) => s.split(",").map(Number));
 	assert.ok(a[0] > a[1], "pink");
 	assert.ok(b[2] > b[0] || b[1] > b[0], "cyan");
+});
+
+test("rainStreet: the same street every time, with every light on the picture and in perspective", () => {
+	const tint = rainTint(null);
+	const a = rainStreet(tint);
+	assert.deepEqual(a, rainStreet(tint));
+	assert.ok(a.lights.length > 100 && a.blocks.length > 10);
+	for (const l of a.lights) {
+		assert.ok(l.r > 0 && l.a > 0 && l.a <= 1, JSON.stringify(l));
+		assert.ok(l.x > -0.1 && l.x < 1.1 && l.y > 0 && l.y < 1, JSON.stringify(l));
+		assert.match(l.rgb, /^\d+,\d+,\d+$/);
+	}
+	// the street lamps get bigger and higher up the picture as they come nearer
+	const lamps = a.lights.filter((l) => l.kind === "lamp" && l.x < 0.43 && l.z < 0.34).sort((p, q) => p.z - q.z);
+	for (let i = 1; i < lamps.length; i++) {
+		assert.ok(lamps[i].r > lamps[i - 1].r);
+		assert.ok(lamps[i].y < lamps[i - 1].y);
+	}
 });
