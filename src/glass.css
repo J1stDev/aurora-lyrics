@@ -255,6 +255,9 @@
 .aur-root[data-glass="on"][data-view="poster"] .aur-side-meta { text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5); }
 .aur-root[data-glass="on"] .aur-side-artist { color: var(--g-ink-dim); }
 
+/* a turntable's tonearm: only the Lounge theme shows it (themes/lounge.css) */
+.aur-tonearm { display: none; }
+
 /* ---------------------------------------------------------------- the small cards */
 .aur-root[data-glass="on"] .aur-upnext {
 	background: var(--g-body);

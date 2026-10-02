@@ -42,6 +42,8 @@ const ORDER = [
 	"scene-neon.js",
 	"scene-karaoke.js",
 	"scene-gothic.js",
+	"scene-blackmetal.js",
+	"scene-lounge.js",
 	"scenes.js",
 	"glass.js",
 	"net.js",

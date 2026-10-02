@@ -15,12 +15,16 @@ import { SCENE_VERT } from "./scene-glsl.js";
 import { NEON_FRAG } from "./scene-neon.js";
 import { KARAOKE_FRAG } from "./scene-karaoke.js";
 import { GOTHIC_FRAG } from "./scene-gothic.js";
+import { BLACKMETAL_FRAG } from "./scene-blackmetal.js";
+import { LOUNGE_FRAG } from "./scene-lounge.js";
 import { parseCssColor } from "./rain.js";
 
 const SCENES = {
 	neon: { frag: NEON_FRAG, palette: (accent, deep) => neonPalette(accent, deep) },
 	karaoke: { frag: KARAOKE_FRAG, palette: (accent, deep) => ktvPalette(accent, deep) },
 	gothic: { frag: GOTHIC_FRAG, palette: (accent, deep) => gothicPalette(accent, deep) },
+	blackmetal: { frag: BLACKMETAL_FRAG, palette: (accent, deep) => blackmetalPalette(accent, deep) },
+	lounge: { frag: LOUNGE_FRAG, palette: (accent, deep) => loungePalette(accent, deep) },
 };
 
 /** Does this theme have a WebGL scene? */
@@ -97,6 +101,27 @@ export function ktvPalette(accent, deep) {
 		uA: oklchToRgb(0.72, Math.max(C, 0.2), C < 0.02 ? 0 : h),
 		uB: [94 / 255, 225 / 255, 1],
 		uC: [180 / 255, 140 / 255, 1],
+		uBase: scBase(deep),
+	};
+}
+
+/** Black Metal: moonlit greys. The accent is drained to a hint, the rest is cold blue. */
+export function blackmetalPalette(accent, deep) {
+	const [, C, h] = rgbToOklch(accent || [174, 191, 205]);
+	return {
+		uA: oklchToRgb(0.8, Math.min(C, 0.04), C < 0.01 ? 250 : h),
+		uB: oklchToRgb(0.68, 0.05, 245),
+		uC: oklchToRgb(0.92, 0.02, 230),
+		uBase: scBase(deep),
+	};
+}
+
+/** Lounge: always amber, whatever the album: amber, a deep red-brown and brass. */
+export function loungePalette(accent, deep) {
+	return {
+		uA: oklchToRgb(0.76, 0.15, 68),
+		uB: oklchToRgb(0.52, 0.14, 40),
+		uC: oklchToRgb(0.84, 0.12, 90),
 		uBase: scBase(deep),
 	};
 }

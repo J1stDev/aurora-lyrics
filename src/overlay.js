@@ -139,6 +139,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			{ class: "aur-art-wrap", title: "Play / pause", "aria-label": "Play / pause", onclick: () => (playerCommand("togglePlay"), setTimeout(kick, 60)) },
 			disc,
 			h("span", { class: "aur-disc-shine", "aria-hidden": "true" }),
+			// a turntable's tonearm, shown by the Lounge theme in the Vinyl layout
+			h("span", { class: "aur-tonearm", "aria-hidden": "true" }, h("i"), h("i")),
 			artHint,
 		);
 		const sideTitle = h("div", { class: "aur-side-title" });

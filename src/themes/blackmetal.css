@@ -1,0 +1,103 @@
+/* ============================================================== Black Metal
+   A frozen forest under the moon, in cold monochrome, like the cover of an atmospheric black metal
+   record. The scene is drawn by WebGL (src/scenes.js, scene-blackmetal.js): moon and halo, cloud banks,
+   mountains, spruces and fog, black ice with cracks, snow, frost creeping in from the edges of the
+   screen, heavy grain. Here is the rest: the album's art and background turn cold and monochrome; the
+   glass is ice (a frosted pane, white at its edges, with icicles hanging from the lower edge of the
+   one round the line being sung); the lettering is frost with photocopy specks in the ink, dim and
+   out of focus until sung. Breaks show three thin icicles. Without WebGL the scene is a cold
+   gradient with a pale light where the moon is. */
+
+.aur-root[data-look="blackmetal"] {
+	--aur-glow-tint: #cfe0ee;
+	--aur-green: #dfe8ef; /* nothing coloured, not even the progress bar */
+	--bm-specks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='x'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='1' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .06 0 0 0 0 .07 0 0 0 0 .09 3.4 0 0 0 -2.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23x)'/%3E%3C/svg%3E");
+	--bm-rime: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .92 0 0 0 0 .96 0 0 0 0 1 0 0 0 1.25 -.58'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+	--bm-icicles: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f2f8ff' stop-opacity='.95'/%3E%3Cstop offset='.65' stop-color='%23cfe2f2' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23cfe2f2' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23g)'%3E%3Cpath d='M2 0H22L12 26Z'/%3E%3Cpath d='M33 0H47L40 12Z'/%3E%3Cpath d='M55 0H77L66 38Z'/%3E%3Cpath d='M85 0H99L92 18Z'/%3E%3Cpath d='M106 0H118L112 9Z'/%3E%3C/g%3E%3C/svg%3E");
+	--bm-frost: linear-gradient(180deg, #ffffff 8%, #edf3f7 55%, #b3c6d6 100%);
+	/* the glass kit: ice */
+	--g-tint: rgba(200, 222, 240, 0.09);
+	--g-tint-top: rgba(255, 255, 255, 0.2);
+	--g-lit: rgba(235, 246, 255, 0.55);
+	--g-hair: rgba(190, 215, 235, 0.16);
+	--g-rim-a: rgba(240, 250, 255, 0.85);
+	--g-rim-b: rgba(150, 180, 205, 0.12);
+	--g-shadow: rgba(0, 4, 10, 0.7);
+	--g-glow: rgba(170, 205, 235, 0.22);
+	--g-blur: 30px;
+	--g-sat: 0.85;
+	--g-bright: 0.95;
+	--g-play: linear-gradient(180deg, #ffffff, #d8e4ee);
+	--g-play-ink: #0a1118;
+	--lens-px: 0.9em;
+	--lens-py: 0.4em;
+	--lens-r: 10px;
+}
+.aur-root[data-look="blackmetal"][data-color="white"] { --aur-hi: #e9eff3; }
+
+/* the scene without WebGL: a cold gradient, a pale light where the moon is */
+.aur-root[data-fx="blackmetal"] .aur-fx {
+	background:
+		radial-gradient(30% 24% at 78% 16%, rgba(190, 210, 230, 0.2), transparent 70%),
+		linear-gradient(to bottom, #03050a, #0b1118 38%, #18212b 66%, #050608);
+}
+
+/* the album's art and background go cold and monochrome */
+.aur-root[data-look="blackmetal"] .aur-blob { filter: blur(var(--aur-bg-blur)) grayscale(1) sepia(0.25) hue-rotate(170deg) saturate(1.3) contrast(1.3) brightness(0.42); }
+.aur-root[data-look="blackmetal"] :is(.aur-art, .aur-cover, .aur-message-art) { filter: grayscale(1) sepia(0.15) hue-rotate(170deg) contrast(1.18) brightness(0.9); }
+.aur-root[data-look="blackmetal"] .aur-bg-gradient { filter: grayscale(1); }
+
+/* ---------------------------------------------------------------- the pane: ice */
+.aur-root[data-look="blackmetal"] .aur-lens-pane {
+	background:
+		var(--bm-rime) 0 0 / 220px 220px,
+		linear-gradient(180deg, rgba(58, 80, 104, 0.5), rgba(24, 38, 54, 0.62) 55%, rgba(18, 28, 40, 0.7));
+	box-shadow:
+		var(--g-edge),
+		inset 0 0 26px 2px rgba(225, 241, 255, 0.3),
+		inset 0 14px 26px -14px rgba(255, 255, 255, 0.5),
+		0 30px 70px -22px var(--g-shadow),
+		0 0 60px -14px var(--g-glow);
+}
+.aur-root[data-look="blackmetal"] .aur-lens-rim { padding: 1.5px; }
+.aur-root[data-look="blackmetal"] .aur-lens-sheen { background: linear-gradient(104deg, transparent 34%, rgba(235, 246, 255, 0.24) 47%, rgba(235, 246, 255, 0.05) 55%, transparent 68%) 160% 0 / 240% 100% no-repeat; }
+/* icicles hanging from its lower edge */
+.aur-root[data-look="blackmetal"] .aur-lens .aur-lens-line {
+	inset: auto calc(var(--lens-px) * -1 + 0.9em) calc(var(--lens-py) * -1 - 0.58em) !important;
+	height: 0.62em;
+	border-radius: 0 !important;
+	background: var(--bm-icicles) 0 0 / auto 100% repeat-x;
+	filter: drop-shadow(0 0 0.25em rgba(190, 214, 234, 0.4));
+}
+.aur-root[data-look="blackmetal"] .aur-lens[data-state="line"] .aur-lens-line { opacity: 0.95; }
+
+/* the cover: a pane of ice, with a dark edge */
+.aur-root[data-look="blackmetal"]:not([data-view="poster"]) .aur-art-wrap { --cover-r: clamp(4px, 0.8vh, 8px); }
+
+/* ---------------------------------------------------------------- the lettering: frost */
+/* sung words: frost, with photocopy specks in the ink and a cold glow; still to come: dim and out of focus */
+.aur-root[data-look="blackmetal"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--bm-a: clamp(0, var(--e) * 2.2, 1);
+	color: transparent;
+	background-image:
+		var(--bm-specks),
+		linear-gradient(180deg, color-mix(in srgb, #ffffff calc(var(--bm-a) * 100%), rgba(150, 168, 186, 0.42)) 8%, color-mix(in srgb, #edf3f7 calc(var(--bm-a) * 100%), rgba(150, 168, 186, 0.38)) 55%, color-mix(in srgb, #b3c6d6 calc(var(--bm-a) * 100%), rgba(150, 168, 186, 0.32)) 100%);
+	background-size: 160px 160px, 100% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	transform: translateY(calc(0.03em - var(--bm-a) * 0.05em)) scale(calc(0.965 + 0.035 * var(--bm-a)));
+	filter: blur(calc((1 - var(--bm-a)) * 0.05em)) drop-shadow(0 0 0.32em color-mix(in oklab, #bcd6ea calc(34% * var(--bm-a) * var(--aur-glow-k)), transparent));
+}
+.aur-root[data-look="blackmetal"] .aur-stage .aur-line.is-active:not(.has-words) .aur-main,
+.aur-root[data-look="blackmetal"][data-words="off"] .aur-stage .aur-line.is-active .aur-main {
+	color: transparent;
+	background-image: var(--bm-specks), var(--bm-frost);
+	background-size: 160px 160px, 100% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	text-shadow: none;
+	filter: drop-shadow(0 0 0.32em rgba(188, 214, 234, 0.3));
+}
+/* breaks: three thin icicles */
+.aur-root[data-look="blackmetal"] .aur-dots { gap: 0.36em; }
+.aur-root[data-look="blackmetal"] .aur-dots i { width: 2px; height: 0.6em; border-radius: 1px; background: linear-gradient(#fff, rgba(255, 255, 255, 0.15)); }
