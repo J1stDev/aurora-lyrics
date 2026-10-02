@@ -1,0 +1,247 @@
+/* ============================================================== Karaoke
+   A KTV room in glass. The room is drawn by WebGL (src/scenes.js, scene-karaoke.js): moving-head
+   beams, a mirror ball and the light it scatters, and glass equaliser columns either side of the
+   cover. The lyrics are the classic two rows, the line being sung and the next one, the top row set
+   left and the bottom row right, alternating (view.js assigns data-row; a line after a break starts
+   on the top row); each row slides in from its side and nothing scrolls. They sit on one wide pane
+   of violet glass, a caption bar with a glossy top half. The lettering is white glass with a navy
+   edge that wipes to a vivid colour (each singer's own in duets) with a bright leading edge, and a
+   glass bead hops over the word being sung. Before a line, three countdown beads run out above where
+   it starts; the intro shows a title card; long breaks clear the rows. Without WebGL the room is a
+   few pools of colour. */
+
+.aur-root[data-look="karaoke"] {
+	--ktv-edge: #0c1542;
+	--ktv-sung: oklch(from var(--aur-accent) 0.7 max(c, 0.2) h);
+	--ktv-a: oklch(from var(--aur-accent) 0.72 max(c, 0.2) h);
+	--ktv-b: #5ee1ff;
+	--ktv-c: #b48cff;
+	--ktv-row-gap: 0.42em; /* half the space between the two rows */
+	--ktv-half: calc(var(--ktv-row-gap) + var(--aur-gap) / 2 + 1.16em + 0.3em); /* from the middle of the bar to its edge: a row's text, its spacing and some air */
+	--ktv-white: linear-gradient(180deg, #fff 0%, #f2f6ff 46%, #b7c5ee 100%);
+	--ktv-hot: linear-gradient(180deg, color-mix(in oklab, var(--ktv-sung) 38%, #fff) 0%, var(--ktv-sung) 44%, color-mix(in oklab, var(--ktv-sung) 68%, #2a0a4a) 100%);
+	--aur-glow-tint: var(--ktv-a);
+	/* the glass kit: violet glass with a hot rim */
+	--g-tint: rgba(54, 16, 100, 0.42);
+	--g-tint-top: rgba(255, 255, 255, 0.18);
+	--g-lit: rgba(255, 255, 255, 0.62);
+	--g-hair: color-mix(in oklab, var(--ktv-a) 36%, transparent);
+	--g-rim-a: #fff;
+	--g-rim-b: color-mix(in oklab, var(--ktv-a) 40%, transparent);
+	--g-shadow: rgba(6, 0, 24, 0.55);
+	--g-glow: color-mix(in oklab, var(--ktv-a) 48%, transparent);
+	--g-blur: 20px;
+	--g-sat: 1.9;
+}
+.aur-root[data-look="karaoke"][data-duet="on"] .aur-line[data-singer] { --ktv-sung: var(--aur-kink); }
+
+/* the room without WebGL: pools of colour in the dark */
+.aur-root[data-fx="karaoke"] .aur-fx {
+	background:
+		radial-gradient(60% 46% at 50% 30%, color-mix(in oklab, var(--ktv-a) 22%, transparent), transparent 72%),
+		radial-gradient(50% 40% at 88% 10%, color-mix(in oklab, var(--ktv-c) 26%, transparent), transparent 70%),
+		linear-gradient(to bottom, #07031a, #0e062c 52%, #060316);
+}
+
+/* the cover is a lit screen, framed in glass */
+.aur-root[data-look="karaoke"] .aur-art-wrap { --cover-r: clamp(12px, 2vh, 20px); }
+
+/* ---------------------------------------------------------------- the caption bar and the two rows (Fade motion;
+   other motion styles keep their own movement and get the lens instead) */
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-lens { display: none; }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] { -webkit-mask-image: none; mask-image: none; overflow: visible; }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-lines {
+	left: max(var(--aur-pad), 50% - 800px);
+	right: max(var(--aur-pad), 50% - 800px);
+}
+/* the pane (a box round both rows) and its lit edge */
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-lines::before,
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-lines::after {
+	content: "";
+	position: absolute;
+	left: -0.5em;
+	right: -0.5em;
+	top: calc(50% - var(--ktv-half));
+	height: calc(var(--ktv-half) * 2);
+	font-size: var(--aur-size);
+	border-radius: min(0.85em, 48px);
+	pointer-events: none;
+	transition: opacity 0.6s ease;
+}
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-lines::before {
+	/* glossy: the top half is lighter, with a crisp edge where the highlight ends, like a gel button */
+	background:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.05) 49%, transparent 49.6%),
+		var(--g-body);
+	backdrop-filter: var(--g-rf-l) var(--g-bf);
+	box-shadow: var(--g-edge), 0 30px 70px -22px var(--g-shadow), 0 0 80px -16px var(--g-glow);
+}
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-lines::after {
+	padding: 1px;
+	background: var(--g-rim);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.aur-root[data-look="karaoke"][data-anim="fade"][data-gap="on"][data-soon="off"] .aur-stage[data-mode="synced"] .aur-lines::before,
+.aur-root[data-look="karaoke"][data-anim="fade"][data-gap="on"][data-soon="off"] .aur-stage[data-mode="synced"] .aur-lines::after { opacity: 0.4; }
+.aur-root[data-look="karaoke"][data-anim="fade"][data-intro="on"][data-soon="off"] .aur-stage[data-mode="synced"] .aur-lines::before,
+.aur-root[data-look="karaoke"][data-anim="fade"][data-intro="on"][data-soon="off"] .aur-stage[data-mode="synced"] .aur-lines::after { opacity: 1; }
+
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row] {
+	top: auto;
+	bottom: auto;
+	max-width: none;
+	margin: 0;
+	opacity: 0;
+	transform: none;
+	filter: none;
+	pointer-events: none;
+	transition: opacity 0.22s ease, translate 0.22s ease, color 0.3s ease;
+}
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row="0"] { bottom: calc(50% + var(--ktv-row-gap)); left: 0; right: 16%; text-align: left; translate: -1.4em 0; }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row="1"] { top: calc(50% + var(--ktv-row-gap)); left: 16%; right: 0; text-align: right; translate: 1.4em 0; }
+/* shown: the line being sung, and the next line (after the old one in its row has gone), which slides in */
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row].is-active,
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row][data-d="1"]:not(.is-gap) {
+	opacity: 1 !important;
+	translate: 0 0;
+	pointer-events: auto;
+}
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row][data-d="1"]:not(.is-gap) { transition: opacity 0.35s ease 0.2s, translate 0.6s var(--aur-ease) 0.2s, color 0.3s ease; }
+/* through a long break (and the intro) the rows clear until the next line is a few seconds away */
+.aur-root[data-look="karaoke"][data-anim="fade"][data-gap="on"][data-soon="off"] .aur-stage[data-mode="synced"] .aur-line.aur-line[data-row] { opacity: 0 !important; }
+/* the countdown sits just above where the next line starts: a compact row resting on that
+   line's top edge (a line is its text, 1.16em, plus the line spacing split above and below) */
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line.is-gap[data-row] { padding: 0; line-height: 0; translate: 0 0; }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.is-gap .aur-dots { height: 0.5em; }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line.is-gap[data-row="0"] { bottom: calc(50% + var(--ktv-row-gap) + 1.16em + var(--aur-gap) / 2 + 0.12em); }
+.aur-root[data-look="karaoke"][data-anim="fade"] .aur-stage[data-mode="synced"] .aur-line.aur-line.is-gap[data-row="1"] { top: auto; bottom: calc(50% - var(--ktv-row-gap) - var(--aur-gap) / 2 + 0.12em); left: 16%; right: 0; text-align: right; }
+
+/* ---------------------------------------------------------------- lettering: white glass with a navy edge, wiping to colour */
+.aur-root[data-look="karaoke"][data-color="white"] { --aur-hi: #fff; }
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"] .aur-main {
+	-webkit-text-stroke: 0.07em var(--ktv-edge);
+	paint-order: stroke fill;
+	filter: drop-shadow(0 0.05em 0.03em rgba(0, 0, 10, 0.6));
+}
+.aur-root[data-look="karaoke"][data-view="captions"] .aur-stage { --aur-size: min(var(--aur-fs), 5vw, 6.9vh); }
+/* the caption block under the cover */
+.aur-root[data-look="karaoke"][data-view="captions"] .aur-side-title { font-size: clamp(20px, 2.8vh, 30px); font-weight: 900; color: #fff; text-shadow: 0 2px 12px rgba(0, 0, 12, 0.7); }
+.aur-root[data-look="karaoke"][data-view="captions"] .aur-side-artist { font-size: clamp(14px, 1.9vh, 20px); font-weight: 800; letter-spacing: 0.03em; color: color-mix(in oklab, var(--ktv-a) 45%, #fff); text-shadow: 0 2px 10px rgba(0, 0, 12, 0.7); }
+.aur-root[data-look="karaoke"][data-view="captions"] .aur-side-album { color: rgba(255, 255, 255, 0.55); }
+/* rows that are waiting, and finished ones: white glass */
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) .aur-main {
+	color: transparent;
+	background: var(--ktv-white);
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+/* the line being sung, word by word: the sung part is colour, the rest white, and a bright edge
+   travels between them (its light fades in and out with the word, so a finished word keeps none) */
+.aur-root[data-look="karaoke"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	color: transparent;
+	background:
+		linear-gradient(90deg, transparent, color-mix(in srgb, #fff calc(sin(var(--p) * 3.14159) * 95%), transparent), transparent) calc(var(--p) * 100%) 0 / 0.18em 100% no-repeat,
+		var(--ktv-hot) 0 0 / calc(var(--p) * 100%) 100% no-repeat,
+		var(--ktv-white) 0 0 / 100% 100% no-repeat;
+	-webkit-background-clip: text;
+	background-clip: text;
+	transform: none;
+	filter: none;
+}
+/* line-synced lines have no words to wipe: the whole line takes the colour */
+.aur-root[data-look="karaoke"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-look="karaoke"][data-words="off"] .aur-stage .is-active .aur-main {
+	color: transparent;
+	background: var(--ktv-hot);
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+/* the bouncing bead: it hops once over each word, landing on its first letter as the word starts and
+   on its last as it ends, squashing on each landing (--g is 1 on the ground, 0 at the top of the hop) */
+.aur-root[data-look="karaoke"][data-words="on"] .aur-stage .is-active.has-words .aur-w.now { position: relative; }
+.aur-root[data-look="karaoke"][data-words="on"] .aur-stage .is-active.has-words .aur-w.now::after {
+	--g: calc(1 - 4 * var(--aur-wp) * (1 - var(--aur-wp)));
+	content: "";
+	position: absolute;
+	left: calc(var(--aur-wp) * 100%);
+	bottom: calc(100% - 0.16em);
+	width: 0.36em;
+	height: 0.36em;
+	margin-left: -0.18em;
+	border-radius: 50%;
+	/* a glass bead: a lit rim, a coloured heart, a bright glint */
+	background:
+		radial-gradient(circle at 32% 26%, #fff 0 9%, rgba(255, 255, 255, 0.35) 18%, transparent 34%),
+		radial-gradient(circle at 50% 56%, color-mix(in oklab, var(--ktv-sung) 70%, #fff) 0, var(--ktv-sung) 46%, color-mix(in oklab, var(--ktv-sung) 55%, #12062c) 100%);
+	box-shadow: inset 0 -0.05em 0.08em rgba(255, 255, 255, 0.45), 0 0 0 0.04em var(--ktv-edge), 0 0 0.5em color-mix(in oklab, var(--ktv-sung) 75%, transparent);
+	translate: 0 calc(-0.5em * (1 - var(--g)));
+	scale: calc(1 + 0.3 * var(--g) * var(--g)) calc(1 - 0.28 * var(--g) * var(--g));
+	transform-origin: 50% 100%;
+	pointer-events: none;
+}
+/* countdown: three glass beads, running out right to left over the last seconds */
+.aur-root[data-look="karaoke"] .aur-dots { gap: 0.24em; }
+.aur-root[data-look="karaoke"] .aur-dots i {
+	width: 0.36em;
+	height: 0.36em;
+	background:
+		radial-gradient(circle at 32% 26%, #fff 0 10%, rgba(255, 255, 255, 0.3) 20%, transparent 36%),
+		radial-gradient(circle at 50% 56%, color-mix(in oklab, var(--ktv-sung) 70%, #fff) 0, var(--ktv-sung) 46%, color-mix(in oklab, var(--ktv-sung) 60%, #1a0840) 100%);
+	box-shadow: inset 0 -0.05em 0.08em rgba(255, 255, 255, 0.4), 0 0 0 0.05em #fff, 0 0 0 0.1em var(--ktv-edge), 0 0.08em 0.12em 0.1em rgba(0, 0, 12, 0.4);
+}
+.aur-root[data-look="karaoke"] .is-active .aur-dots { animation: none; }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(3) { opacity: calc(1 - clamp(0, var(--aur-cd, 0) * 3, 1)); transform: scale(calc(1 - 0.5 * clamp(0, var(--aur-cd, 0) * 3, 1))); }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(2) { opacity: calc(1 - clamp(0, var(--aur-cd, 0) * 3 - 1, 1)); transform: scale(calc(1 - 0.5 * clamp(0, var(--aur-cd, 0) * 3 - 1, 1))); }
+.aur-root[data-look="karaoke"] .is-active .aur-dots i:nth-child(1) { opacity: calc(1 - clamp(0, var(--aur-cd, 0) * 3 - 2, 1)); transform: scale(calc(1 - 0.5 * clamp(0, var(--aur-cd, 0) * 3 - 2, 1))); }
+
+/* ---------------------------------------------------------------- title card during the intro (the small title under the cover steps aside meanwhile) */
+.aur-root[data-look="karaoke"] .aur-side-meta { transition: opacity 0.6s ease; }
+.aur-root[data-look="karaoke"][data-intro="on"][data-soon="off"] .aur-side-meta { opacity: 0; }
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"]::before,
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"]::after {
+	position: absolute;
+	left: var(--aur-pad);
+	right: var(--aur-pad);
+	text-align: center;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-family: var(--aur-font);
+	paint-order: stroke fill;
+	opacity: 0;
+	transform: translateY(0.3em);
+	transition: opacity 0.6s ease, transform 0.8s var(--aur-ease);
+	pointer-events: none;
+}
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"]::before {
+	content: attr(data-title);
+	bottom: calc(50% + 0.1em);
+	font-size: calc(var(--aur-size) * 1.2);
+	font-weight: 900;
+	line-height: 1.15;
+	color: transparent;
+	background: var(--ktv-white);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-stroke: 0.06em var(--ktv-edge);
+	filter: drop-shadow(0 0.05em 0.03em rgba(0, 0, 10, 0.6));
+}
+.aur-root[data-look="karaoke"] .aur-stage[data-mode="synced"]::after {
+	content: attr(data-artist);
+	top: calc(50% + 0.5em);
+	font-size: calc(var(--aur-size) * 0.55);
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	color: transparent;
+	background: linear-gradient(180deg, color-mix(in oklab, var(--ktv-sung) 35%, #fff), var(--ktv-sung));
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-stroke: 0.08em var(--ktv-edge);
+}
+.aur-root[data-look="karaoke"][data-intro="on"][data-soon="off"] .aur-stage[data-mode="synced"]::before,
+.aur-root[data-look="karaoke"][data-intro="on"][data-soon="off"] .aur-stage[data-mode="synced"]::after { opacity: 1; transform: none; transition-delay: 0.3s; }
+
+/* room between the caption bar and the control bar (the Captions layout) */
+.aur-root[data-look="karaoke"][data-anim="fade"][data-view="captions"]:not([data-transport="off"]) .aur-stage { top: 56vh; bottom: 150px; }

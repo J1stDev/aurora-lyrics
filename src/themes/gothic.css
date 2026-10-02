@@ -1,0 +1,106 @@
+/* ============================================================== Gothic
+   Stained glass and candlelight. The cathedral is drawn by WebGL (src/scenes.js, scene-gothic.js):
+   a rose window of jewel-coloured glass high in the dark, its light falling in long shafts through
+   the haze, candles low at both sides, mist along the floor. The line being sung sits in a leaded
+   pane: smoked glass in a frame of lead, a lattice of diamond panes, and a small medallion with a
+   fleuron on its lower edge. The lettering is bone-white blackletter that warms to ember as it is
+   sung. Breaks show three crimson diamonds. Without WebGL the nave is black with a crimson haze
+   at the top and candle glow at the corners. */
+
+.aur-root[data-look="gothic"] {
+	--gt-bone: #efe4d2;
+	--gt-gold: #d9b878;
+	--gt-lead: #140a0b;
+	--aur-glow-tint: color-mix(in oklab, var(--aur-accent) 55%, #ffd9b0);
+	/* the glass kit: smoked glass, lit by candles */
+	--g-tint: rgba(20, 8, 12, 0.6);
+	--g-tint-top: rgba(255, 214, 170, 0.07);
+	--g-lit: rgba(255, 214, 160, 0.34);
+	--g-hair: rgba(255, 200, 140, 0.13);
+	--g-rim-a: rgba(255, 214, 160, 0.6);
+	--g-rim-b: rgba(150, 70, 50, 0.12);
+	--g-shadow: rgba(2, 0, 3, 0.7);
+	--g-glow: color-mix(in oklab, var(--aur-accent) 30%, transparent);
+	--g-blur: 14px;
+	--g-sat: 1.4;
+	--g-bright: 0.82;
+	--g-play: linear-gradient(180deg, #fff6e6, #e6d2b0);
+	--g-play-ink: #2a0d10;
+	--lens-px: 0.85em;
+	--lens-py: 0.36em;
+	--lens-r: 14px;
+}
+.aur-root[data-look="gothic"][data-color="white"] { --aur-hi: var(--gt-bone); }
+
+/* the nave without WebGL: black, a crimson haze above, candle glow at the corners */
+.aur-root[data-fx="gothic"] .aur-fx {
+	background:
+		radial-gradient(50% 42% at 50% -8%, color-mix(in oklab, var(--aur-accent) 32%, transparent), transparent 70%),
+		radial-gradient(26% 60% at 5% 100%, rgba(255, 164, 72, 0.28), transparent 72%),
+		radial-gradient(26% 60% at 95% 100%, rgba(255, 164, 72, 0.28), transparent 72%),
+		#0a0507;
+}
+
+/* ---------------------------------------------------------------- the leaded pane (the lens) */
+.aur-root[data-look="gothic"] .aur-lens-pane {
+	background: linear-gradient(180deg, rgba(255, 214, 170, 0.06), rgba(16, 6, 10, 0.64) 38%, rgba(10, 4, 7, 0.72));
+	box-shadow: inset 0 0 44px rgba(0, 0, 0, 0.55), 0 30px 70px -20px var(--g-shadow), 0 0 56px -12px var(--g-glow);
+}
+.aur-root[data-look="gothic"] .aur-lens-rim { /* the lead */
+	padding: 0;
+	-webkit-mask: none;
+	mask: none;
+	background: none;
+	border: max(3px, 0.075em) solid var(--gt-lead);
+	box-shadow:
+		0 0 0 1px rgba(255, 214, 160, 0.22),
+		inset 0 0 0 1px rgba(255, 214, 160, 0.16),
+		inset 0 0 16px rgba(0, 0, 0, 0.6);
+}
+.aur-root[data-look="gothic"] .aur-lens-sheen { /* diamond panes: a lattice of fine lead */
+	animation: none !important;
+	background:
+		repeating-linear-gradient(45deg, transparent 0 calc(0.7em - 1px), rgba(20, 9, 10, 0.62) calc(0.7em - 1px) 0.7em),
+		repeating-linear-gradient(-45deg, transparent 0 calc(0.7em - 1px), rgba(20, 9, 10, 0.62) calc(0.7em - 1px) 0.7em);
+	border-radius: calc(var(--lens-r) - 3px);
+	inset: calc(var(--lens-py) * -1 + 3px) calc(var(--lens-px) * -1 + 3px);
+}
+/* the medallion on the lower edge, with a fleuron */
+.aur-root[data-look="gothic"] .aur-lens .aur-lens-line {
+	inset: auto auto calc(var(--lens-py) * -1 - 0.34em) 50% !important;
+	width: 1.9em;
+	height: 0.68em;
+	margin-left: -0.95em;
+	border-radius: 999px !important;
+	background: var(--gt-lead);
+	border: 1px solid rgba(255, 214, 160, 0.4);
+	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.6);
+	display: grid;
+	place-items: center;
+}
+.aur-root[data-look="gothic"] .aur-lens .aur-lens-line::after {
+	content: "❦";
+	font: 400 0.42em/1 Georgia, "Segoe UI Symbol", serif;
+	color: color-mix(in oklab, var(--aur-accent) 60%, var(--gt-bone));
+	text-shadow: 0 0 0.6em color-mix(in oklab, var(--aur-accent) 70%, transparent);
+}
+.aur-root[data-look="gothic"] .aur-lens[data-state="line"] .aur-lens-line { opacity: 1; }
+
+/* ---------------------------------------------------------------- the cover, in lead */
+.aur-root[data-look="gothic"]:not([data-view="poster"]) .aur-art-wrap { --cover-r: clamp(6px, 1vh, 10px); --cover-pad: clamp(7px, 1.2vh, 12px); }
+.aur-root[data-look="gothic"]:not([data-view="poster"]) .aur-art-wrap::before {
+	background: linear-gradient(180deg, rgba(255, 214, 170, 0.05), rgba(14, 5, 9, 0.7));
+	border: max(3px, 0.55vh) solid var(--gt-lead);
+	box-shadow: 0 0 0 1px rgba(255, 214, 160, 0.24), inset 0 0 0 1px rgba(255, 214, 160, 0.16), inset 0 0 18px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------------------------------------------------------- the lettering */
+.aur-root[data-look="gothic"] .aur-stage .aur-line { letter-spacing: 0.01em; }
+/* breaks: three crimson diamonds */
+.aur-root[data-look="gothic"] .aur-dots i {
+	border-radius: 1px;
+	rotate: 45deg;
+	background: color-mix(in oklab, var(--aur-accent) 75%, var(--gt-bone));
+	box-shadow: 0 0 0.35em color-mix(in oklab, var(--aur-accent) 55%, transparent);
+}
+.aur-root[data-look="gothic"] :is(.aur-side-title, .aur-title) { font-family: var(--aur-font); letter-spacing: 0.01em; }

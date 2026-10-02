@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<title>Scene harness</title>
+		<style>
+			html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+			canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+			pre { position: fixed; left: 8px; bottom: 8px; margin: 0; max-width: 90vw; max-height: 40vh; overflow: auto; color: #fb8; font: 11px/1.3 monospace; background: #000a; padding: 6px; display: none; }
+		</style>
+	</head>
+	<body>
+		<canvas id="c"></canvas>
+		<pre id="log"></pre>
+		<script type="module">
+			// A harness for the WebGL scenes: renders one scene full screen from the real source modules and shows
+			// compile errors. ?scene=gothic&t=12&beat=0&bar=0&line=0&gap=0&centered=1&accent=%23c21f3f&anim=1
+			import { SCENE_VERT } from "../src/scene-glsl.js";
+			import { NEON_FRAG } from "../src/scene-neon.js";
+			import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
+			import { GOTHIC_FRAG } from "../src/scene-gothic.js";
+			import { neonPalette, ktvPalette, gothicPalette, cssToRgb } from "../src/scenes.js";
+
+			const SC = { neon: [NEON_FRAG, neonPalette, "#ff6a3d"], karaoke: [KARAOKE_FRAG, ktvPalette, "#ff3d8b"], gothic: [GOTHIC_FRAG, gothicPalette, "#c21f3f"] };
+			const q = new URLSearchParams(location.search);
+			const id = q.get("scene") || "neon";
+			const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+			const log = document.getElementById("log");
+			const say = (m) => ((log.style.display = "block"), (log.textContent += m + "\n"));
+
+			const canvas = document.getElementById("c");
+			const scale = num("scale", 0.5);
+			canvas.width = Math.round(innerWidth * scale);
+			canvas.height = Math.round(innerHeight * scale);
+			const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, preserveDrawingBuffer: true });
+			if (!gl) say("no webgl2");
+			const [frag, palette, defAccent] = SC[id];
+			const sh = (type, src) => {
+				const s = gl.createShader(type);
+				gl.shaderSource(s, src);
+				gl.compileShader(s);
+				if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+					say((type === gl.VERTEX_SHADER ? "VERTEX " : "FRAGMENT ") + gl.getShaderInfoLog(s));
+					const lines = src.split("\n");
+					const m = /ERROR: \d+:(\d+)/.exec(gl.getShaderInfoLog(s));
+					if (m) say("  → " + lines[Number(m[1]) - 1]);
+				}
+				return s;
+			};
+			const prog = gl.createProgram();
+			gl.attachShader(prog, sh(gl.VERTEX_SHADER, SCENE_VERT));
+			gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, frag));
+			gl.linkProgram(prog);
+			if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) say("LINK " + gl.getProgramInfoLog(prog));
+			gl.useProgram(prog);
+			const buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+			const a = gl.getAttribLocation(prog, "aPos");
+			gl.enableVertexAttribArray(a);
+			gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
+			const L = (n) => gl.getUniformLocation(prog, n);
+
+			const accent = cssToRgb(q.get("accent") || defAccent);
+			const pal = palette(accent, [30, 20, 70]);
+			const box = (k, d) => (q.has(k) ? q.get(k).split(",").map(Number) : d);
+			const draw = (t) => {
+				gl.viewport(0, 0, canvas.width, canvas.height);
+				gl.uniform2f(L("uRes"), canvas.width, canvas.height);
+				gl.uniform1f(L("uTime"), t);
+				for (const k of ["uA", "uB", "uC", "uBase"]) gl.uniform3fv(L(k), pal[k]);
+				gl.uniform1f(L("uBeat"), num("beat", 0));
+				gl.uniform1f(L("uBar"), num("bar", 0));
+				gl.uniform1f(L("uLine"), num("line", 0));
+				gl.uniform1f(L("uLineId"), num("lineid", 1));
+				gl.uniform1f(L("uGap"), num("gap", 0));
+				gl.uniform1f(L("uSong"), num("song", 0.3));
+				gl.uniform1f(L("uCentered"), num("centered", 1));
+				gl.uniform4fv(L("uText"), box("text", [0.3, 0.1, 1, 0.8]));
+				gl.uniform4fv(L("uMeta"), box("meta", [-1, -1, -1, -1]));
+				gl.drawArrays(gl.TRIANGLES, 0, 3);
+			};
+			const t0 = num("t", 41);
+			draw(t0);
+			if (q.get("anim")) {
+				const s = performance.now();
+				const f = () => (draw(t0 + (performance.now() - s) / 1000), requestAnimationFrame(f));
+				f();
+			}
+			const err = gl.getError();
+			if (err) say("gl error " + err);
+			const px = new Uint8Array(4);
+			const at = (x, y) => (gl.readPixels(Math.round(x * (canvas.width - 1)), Math.round((1 - y) * (canvas.height - 1)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px), Array.from(px).slice(0, 3).join(","));
+			if (q.get("grid")) {
+				// a coarse grid of the picture's brightness (rows top to bottom), for reading a render without seeing it
+				const W = canvas.width, H = canvas.height, all = new Uint8Array(W * H * 4);
+				gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, all);
+				const rows = [];
+				for (let r = 0; r < 12; r++) {
+					const cells = [];
+					for (let c = 0; c < 24; c++) {
+						const x = Math.floor(((c + 0.5) / 24) * W), y = H - 1 - Math.floor(((r + 0.5) / 12) * H), i = (y * W + x) * 4;
+						cells.push(String(Math.round((all[i] + all[i + 1] + all[i + 2]) / 3)).padStart(3, " "));
+					}
+					rows.push(cells.join(" "));
+				}
+				say(rows.join(String.fromCharCode(10)));
+			}
+			document.title = `harness ${id} top(${at(0.5, 0.1)}) mid(${at(0.5, 0.3)}) left(${at(0.1, 0.5)})`;
+		</script>
+	</body>
+</html>

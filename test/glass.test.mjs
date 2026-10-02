@@ -1,8 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GLASS_SIZES, glassMapUri } from "../src/glass.js";
-import { neonPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
+import { neonPalette, ktvPalette, gothicPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
 import { NEON_FRAG } from "../src/scene-neon.js";
+import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
+import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 import { SCENE_VERT, SCENE_HEAD } from "../src/scene-glsl.js";
 
 const inRange = (v) => v.every((x) => Number.isFinite(x) && x >= 0 && x <= 1);
@@ -63,21 +65,50 @@ test("neon palette: valid colours, hues round the wheel from the accent", () => 
 	assert.ok(Math.abs(wrap(hue(grey.uA))) < 10);
 });
 
+test("karaoke palette: the accent made hot, with the stylesheet's cyan and violet", () => {
+	for (const accent of [[255, 61, 139], [40, 200, 255], [255, 255, 255], null]) {
+		const p = ktvPalette(accent, [30, 20, 70]);
+		for (const k of ["uA", "uB", "uC", "uBase"]) assert.ok(inRange(p[k]), `${k} for ${accent}`);
+	}
+	const p = ktvPalette([255, 61, 139], null);
+	assert.deepEqual(p.uB.map((v) => Math.round(v * 255)), [94, 225, 255]);
+	assert.deepEqual(p.uC.map((v) => Math.round(v * 255)), [180, 140, 255]);
+	const hue = (rgb) => rgbToOklch(rgb.map((v) => v * 255))[2];
+	assert.ok(Math.abs(wrap(hue(p.uA) - rgbToOklch([255, 61, 139])[2])) < 10);
+});
+
+test("gothic palette: the accent as crimson glass, sapphire and amber for the rest", () => {
+	for (const accent of [[194, 31, 63], [40, 200, 255], [255, 255, 255], null]) {
+		const p = gothicPalette(accent, [30, 20, 70]);
+		for (const k of ["uA", "uB", "uC", "uBase"]) assert.ok(inRange(p[k]), `${k} for ${accent}`);
+	}
+	const hue = (rgb) => rgbToOklch(rgb.map((v) => v * 255))[2];
+	const p = gothicPalette([194, 31, 63], null);
+	assert.ok(Math.abs(wrap(hue(p.uB) - 262)) < 10);
+	assert.ok(Math.abs(wrap(hue(p.uC) - 80)) < 10);
+});
+
 test("scenes: only themes with a shader have one", () => {
 	assert.equal(hasScene("neon"), true);
+	assert.equal(hasScene("karaoke"), true);
+	assert.equal(hasScene("gothic"), true);
 	assert.equal(hasScene("rain"), false); // Rain has its own renderer
 	assert.equal(hasScene("toString"), false);
 });
 
 test("scene shaders are well-formed GLSL ES 3.00 sources", () => {
 	assert.ok(SCENE_VERT.startsWith("#version 300 es"));
-	assert.ok(NEON_FRAG.startsWith("#version 300 es"));
-	assert.equal(NEON_FRAG.split("#version").length - 1, 1, "one version line");
-	assert.ok(NEON_FRAG.includes(SCENE_HEAD));
-	assert.match(NEON_FRAG, /void main\(\)/);
-	assert.doesNotMatch(NEON_FRAG, /\$\{/);
+	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG]) {
+		assert.ok(frag.startsWith("#version 300 es"));
+		assert.equal(frag.split("#version").length - 1, 1, "one version line");
+		assert.ok(frag.includes(SCENE_HEAD));
+		assert.match(frag, /void main\(\)/);
+		assert.doesNotMatch(frag, /\$\{/);
+		// the build checks top-level names line by line and a shader line that starts with "const" would look like JS to it
+		assert.doesNotMatch(frag, /^(const|let|var|function|class) /m);
+	}
 	// every uniform the engine sets is declared by the head
-	for (const u of ["uRes", "uTime", "uA", "uB", "uC", "uBase", "uBeat", "uBar", "uLine", "uLineId", "uGap", "uSong", "uText", "uMeta"]) {
+	for (const u of ["uRes", "uTime", "uA", "uB", "uC", "uBase", "uBeat", "uBar", "uLine", "uLineId", "uGap", "uSong", "uCentered", "uText", "uMeta"]) {
 		assert.ok(new RegExp(`uniform [a-z0-9]+ ${u};`).test(SCENE_HEAD), u);
 	}
 });

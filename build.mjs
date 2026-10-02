@@ -40,6 +40,8 @@ const ORDER = [
 	"rain.js",
 	"scene-glsl.js",
 	"scene-neon.js",
+	"scene-karaoke.js",
+	"scene-gothic.js",
 	"scenes.js",
 	"glass.js",
 	"net.js",

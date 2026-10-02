@@ -19,6 +19,7 @@ uniform float uLine;  // 1 when a new line starts
 uniform float uLineId;// which of the scene's parts that new line wakes (0..4)
 uniform float uGap;   // 0..1: an instrumental break
 uniform float uSong;  // how far through the song, 0..1
+uniform float uCentered; // 1 in the layouts that centre the cover (Captions, Stage), else 0
 uniform vec4 uText;   // where the lyrics are (x0, y0, x1, y1 in 0..1, y down): a scene keeps its brightest parts clear of it
 uniform vec4 uMeta;   // and the song title beside the cover
 out vec4 fragColor;

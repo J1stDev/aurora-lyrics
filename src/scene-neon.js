@@ -14,7 +14,7 @@ export const NEON_FRAG =
 	SCENE_HEAD +
 	`
 float aspect;
-const float HORIZON = .3;
+ const float HORIZON = .3;
 
 // height of a wave at x, and its slope
 vec2 wave(float x, float y0, vec3 a, vec3 k, vec3 w, vec3 ph, float t) {

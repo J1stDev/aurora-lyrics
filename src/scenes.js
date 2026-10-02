@@ -13,10 +13,14 @@
 
 import { SCENE_VERT } from "./scene-glsl.js";
 import { NEON_FRAG } from "./scene-neon.js";
+import { KARAOKE_FRAG } from "./scene-karaoke.js";
+import { GOTHIC_FRAG } from "./scene-gothic.js";
 import { parseCssColor } from "./rain.js";
 
 const SCENES = {
 	neon: { frag: NEON_FRAG, palette: (accent, deep) => neonPalette(accent, deep) },
+	karaoke: { frag: KARAOKE_FRAG, palette: (accent, deep) => ktvPalette(accent, deep) },
+	gothic: { frag: GOTHIC_FRAG, palette: (accent, deep) => gothicPalette(accent, deep) },
 };
 
 /** Does this theme have a WebGL scene? */
@@ -68,16 +72,43 @@ export function oklchToRgb(L, C, h) {
 	return lin.map((x) => scGam(Math.min(1, Math.max(0, x))));
 }
 
+/** The tint of a scene's dark: the album's deep colour, much darker and quieter. */
+function scBase(deep) {
+	const base = rgbToOklch(deep || [20, 30, 60]);
+	return oklchToRgb(Math.min(base[0], 0.45) * 0.5, Math.min(base[1], 0.12), base[2]);
+}
+
 /** The neon colours of a scene from the album's accent and deep colour (both [r, g, b] 0-255 or null). */
 export function neonPalette(accent, deep) {
 	const [, C, h] = rgbToOklch(accent || [255, 255, 255]);
 	const hue = C < 0.02 ? 0 : h; // a colourless accent: the same hot pink the stylesheet gets
-	const base = rgbToOklch(deep || [20, 30, 60]);
 	return {
 		uA: oklchToRgb(0.74, Math.max(C, 0.22), hue),
 		uB: oklchToRgb(0.8, Math.max(C, 0.18), hue + 150),
 		uC: oklchToRgb(0.76, Math.max(C, 0.2), hue - 40),
-		uBase: oklchToRgb(Math.min(base[0], 0.45) * 0.5, Math.min(base[1], 0.12), base[2]),
+		uBase: scBase(deep),
+	};
+}
+
+/** Karaoke: the accent made hot, with a cool cyan and a violet for company (as the stylesheet's --ktv-a, -b, -c). */
+export function ktvPalette(accent, deep) {
+	const [, C, h] = rgbToOklch(accent || [255, 61, 139]);
+	return {
+		uA: oklchToRgb(0.72, Math.max(C, 0.2), C < 0.02 ? 0 : h),
+		uB: [94 / 255, 225 / 255, 1],
+		uC: [180 / 255, 140 / 255, 1],
+		uBase: scBase(deep),
+	};
+}
+
+/** Gothic: the accent as deep crimson glass, with sapphire and amber for the rest of the window. */
+export function gothicPalette(accent, deep) {
+	const [, C, h] = rgbToOklch(accent || [194, 31, 63]);
+	return {
+		uA: oklchToRgb(0.5, Math.max(C, 0.17), C < 0.02 ? 22 : h),
+		uB: oklchToRgb(0.46, 0.15, 262),
+		uC: oklchToRgb(0.78, 0.15, 80),
+		uBase: scBase(deep),
 	};
 }
 
@@ -119,7 +150,7 @@ export function createScenes(canvas, root, bg, fx, textRects) {
 		beat: 0, bar: 0, line: 0, lineId: 0, gap: 0, bt: "", barKey: "", lb: "",
 	};
 	const FRAME_MS = 1000 / 30;
-	const NAMES = ["uRes", "uTime", "uA", "uB", "uC", "uBase", "uBeat", "uBar", "uLine", "uLineId", "uGap", "uSong", "uText", "uMeta"];
+	const NAMES = ["uRes", "uTime", "uA", "uB", "uC", "uBase", "uBeat", "uBar", "uLine", "uLineId", "uGap", "uSong", "uCentered", "uText", "uMeta"];
 	let observer = null;
 
 	function compile(gl, type, src) {
@@ -134,7 +165,7 @@ export function createScenes(canvas, root, bg, fx, textRects) {
 		if (S.ok !== null) return S.ok;
 		S.ok = false;
 		try {
-			const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false });
+			const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: !!globalThis.AURORA_LYRICS_DEBUG }); // the preview page keeps the picture so it can be read back
 			if (!gl) return false;
 			const buf = gl.createBuffer();
 			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -278,6 +309,7 @@ export function createScenes(canvas, root, bg, fx, textRects) {
 		gl.uniform1f(L.uLineId, S.lineId);
 		gl.uniform1f(L.uGap, S.gap);
 		gl.uniform1f(L.uSong, parseFloat(fx?.style.getPropertyValue("--aur-song")) || 0);
+		gl.uniform1f(L.uCentered, root.dataset.view === "captions" || root.dataset.view === "stage" ? 1 : 0);
 		textBoxes(now);
 		gl.uniform4fv(L.uText, S.box);
 		gl.uniform4fv(L.uMeta, S.meta);
