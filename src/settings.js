@@ -63,6 +63,7 @@ export const SCHEMA = [
 	// Theme ("accent" = "album" or a "#rrggbb" colour; used for glow, tints, karaoke, gradient)
 	{ key: "accent", section: "Theme", label: "Accent colour", type: "color", default: "album" },
 	{ key: "ambience", section: "Theme", label: "Theme ambience (scanlines, spotlights, stars…)", type: "toggle", default: true },
+	{ key: "glassRefract", section: "Theme", label: "Glass refraction (glass themes bend what is behind them; turn off if the lyrics stutter)", type: "toggle", default: true },
 	{ key: "beatSync", section: "Theme", label: "Time ambience to the beat (when Spotify has beat data for the song)", type: "toggle", default: true },
 	// Text
 	{ key: "font", section: "Text", label: "Font", type: "select", ui: "fonts", options: Object.entries(FONTS).map(([k, f]) => [k, f.label]), default: "spotify" },
@@ -196,12 +197,14 @@ export const SCHEMA = [
  * theme doesn't list take their defaults, so applying a theme always gives the same result.
  * Font size and line spacing are left alone (they're about readability, not style).
  * swatch = colours for the theme card's preview.
+ * glass: true = the theme wears the liquid-glass kit (glass.css): a lens behind the line being sung,
+ * glass control bar and cover.
  */
 export const LOOK_KEYS = ["view", "font", "fontWeight", "textAlign", "textColor", "glow", "accent", "animation", "wordAnim", "depthBlur", "bgStyle", "bgOpacity"];
 export const THEMES = [
 	{ id: "aurora", label: "Aurora", hint: "The default look", swatch: ["#6d3bd1", "#1b2a6b"], values: {} },
-	{ id: "neon", label: "Neon", hint: "Brick wall, glass tubes", swatch: ["#ff2fb3", "#14101c"], values: { font: "neon", fontWeight: "700", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "neon", depthBlur: false, bgStyle: "gradient", bgOpacity: 0.35 } },
-	{ id: "minimal", label: "Minimal", hint: "Quiet and clean", swatch: ["#26262b", "#0d0d10"], values: { view: "lyrics", font: "system", fontWeight: "700", glow: "off", animation: "slide", depthBlur: false, bgStyle: "solid" } },
+	{ id: "neon", label: "Neon", hint: "Liquid light in glass tubes", glass: true, swatch: ["#ff2fb3", "#14101c"], values: { font: "neon", fontWeight: "700", glow: "radiant", textColor: "accent", animation: "scale", wordAnim: "neon", depthBlur: false, bgStyle: "gradient", bgOpacity: 0.35 } },
+	{ id: "minimal", label: "Minimal", hint: "Quiet frosted glass", glass: true, swatch: ["#8f98ab", "#0d0e12"], values: { view: "lyrics", font: "system", fontWeight: "700", glow: "off", animation: "slide", depthBlur: false, bgStyle: "album", bgOpacity: 0.6 } },
 	{ id: "karaoke", label: "Karaoke", hint: "KTV stage, bouncing ball", swatch: ["#ff3d8b", "#1a0b44"], values: { view: "captions", font: "rounded", fontWeight: "900", textAlign: "center", accent: "#ff3d8b", glow: "off", animation: "fade", wordAnim: "karaoke", bgStyle: "gradient", bgOpacity: 0.5 } },
 	{ id: "gothic", label: "Gothic", hint: "Candlelit blackletter", swatch: ["#9e1030", "#0d0709"], values: { view: "lyrics", font: "gothic", fontWeight: "700", textAlign: "center", accent: "#c21f3f", animation: "fade", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.62 } },
 	{ id: "blackmetal", label: "Black Metal", hint: "Frozen forest under the moon", swatch: ["#cfd9e2", "#07090c"], values: { view: "lyrics", font: "gothic", fontWeight: "700", textAlign: "center", accent: "#aebfcd", animation: "fade", wordAnim: "focus", bgOpacity: 0.6 } },

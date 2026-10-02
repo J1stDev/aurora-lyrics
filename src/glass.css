@@ -1,0 +1,271 @@
+/* ============================================================== liquid glass
+   The look shared by the remade themes (settings.js marks them glass: true, which sets
+   data-glass="on" on the root). Every surface is a pane of glass over the scene: a faint tint that
+   is a little brighter at the top, a frosted and bent view of what is behind it (backdrop blur
+   plus the refraction filters of glass.js), a hairline rim that catches light at two corners, a
+   lit top edge and a soft shadow. Themes dress the same panes in their own material by changing
+   the tokens below (and a few extra layers of their own), so the controls stay familiar while
+   each theme looks like itself.
+
+   What gets the glass: the lens behind the line being sung, the three islands of the control
+   bar, the track header (lyrics-only layouts), the big cover's frame, the up-next card and the
+   toast. */
+
+.aur-root[data-glass="on"] {
+	--g-tint: rgba(255, 255, 255, 0.055); /* the body of the glass */
+	--g-tint-top: rgba(255, 255, 255, 0.15); /* its upper part, a little brighter */
+	--g-lit: rgba(255, 255, 255, 0.42); /* the lit top edge */
+	--g-hair: rgba(255, 255, 255, 0.1); /* the hairline all round */
+	--g-rim-a: rgba(255, 255, 255, 0.72); /* the two corners of the rim that catch the light... */
+	--g-rim-b: rgba(255, 255, 255, 0.06); /* ...and the long stretches that don't */
+	--g-shadow: rgba(3, 3, 12, 0.45);
+	--g-glow: color-mix(in oklab, var(--aur-glow-tint) 30%, transparent); /* a faint halo of the album's colour */
+	--g-blur: 22px;
+	--g-sat: 1.7;
+	--g-bright: 1.05;
+	--g-bf: blur(var(--g-blur)) saturate(var(--g-sat)) brightness(var(--g-bright));
+	--g-rf-s: url(#aur-rf-s); /* refraction (glass.js): small, medium, large rims */
+	--g-rf-m: url(#aur-rf-m);
+	--g-rf-l: url(#aur-rf-l);
+	--g-body: linear-gradient(180deg, var(--g-tint-top), var(--g-tint) 46%, rgba(255, 255, 255, 0.015));
+	--g-rim: linear-gradient(140deg, var(--g-rim-a), var(--g-rim-b) 26%, var(--g-rim-b) 64%, var(--g-rim-a) 100%);
+	--g-edge: inset 0 1px 0 var(--g-lit), inset 0 -1px 0 rgba(255, 255, 255, 0.07), inset 0 0 0 1px var(--g-hair);
+	--g-ink: #fff;
+	--g-ink-dim: rgba(255, 255, 255, 0.62);
+	--g-play: linear-gradient(180deg, #fff, #e9ecf6);
+	--g-play-ink: #0b0b10;
+	--g-ease: cubic-bezier(0.34, 1.32, 0.52, 1); /* a small overshoot: panes settle like a drop of water */
+}
+
+/* Refraction off (the setting, or the scene engine found the machine too slow): plain frosted glass. */
+.aur-root[data-glass="on"]:is([data-refract="off"], [data-lite="on"]) { --g-rf-s: ; --g-rf-m: ; --g-rf-l: ; }
+
+/* The rim: a one-pixel ring whose brightness runs round the shape (two bright corners). A mask cuts
+   the ring out of a gradient, so it follows any border radius. */
+.aur-root[data-glass="on"] :is(.aur-player-center, .aur-player-side, .aur-header, .aur-upnext, .aur-toast)::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+.aur-root[data-glass="on"] :is(.aur-player-center, .aur-player-side, .aur-header, .aur-upnext, .aur-toast)::before,
+.aur-root[data-glass="on"] .aur-lens-rim {
+	padding: 1px;
+	background: var(--g-rim);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+	pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- the lens */
+/* view.js sets --lx --ly --lw --lh (the text's box in overlay coordinates) and --lf (the line's font
+   size), and data-state "line" | "gap" | "none". The box is the text; the glass extends beyond it by a
+   little padding (in em, so it follows the type). Size and place change by CSS transitions, so the
+   pane glides from line to line. */
+.aur-lens {
+	--lens-px: 0.62em;
+	--lens-py: 0.3em;
+	--lens-r: min(0.66em, 46px);
+	display: none;
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: var(--lw, 0px);
+	height: var(--lh, 0px);
+	font-size: var(--lf, 56px);
+	transform: translate3d(var(--lx, 0px), var(--ly, 0px), 0);
+	transition: transform 0.9s var(--g-ease, ease), width 0.9s var(--g-ease, ease), height 0.9s var(--g-ease, ease);
+	pointer-events: none;
+}
+.aur-root[data-glass="on"] .aur-lens { display: block; }
+.aur-lens.is-snap { transition: none; }
+.aur-lens[data-state="gap"] { --lens-px: 0.5em; --lens-py: 0.26em; --lens-r: 999px; }
+.aur-lens > i {
+	position: absolute;
+	inset: calc(var(--lens-py) * -1) calc(var(--lens-px) * -1);
+	border-radius: var(--lens-r);
+	transition: opacity 0.45s ease; /* the layers fade, not the lens: an element with opacity hides what is behind it from its own backdrop filter */
+}
+.aur-lens[data-state="none"] > i,
+.aur-lens[data-browse="on"] > i { opacity: 0; }
+.aur-lens-pane {
+	background: var(--g-body);
+	backdrop-filter: var(--g-rf-l) var(--g-bf);
+	box-shadow: var(--g-edge), inset 0 0 30px rgba(255, 255, 255, 0.045), 0 26px 60px -18px var(--g-shadow), 0 0 44px -10px var(--g-glow);
+}
+/* Light passes through the glass on every new line. data-lb flips a/b on the root, which starts the
+   other of two identical animations. */
+.aur-lens-sheen {
+	overflow: hidden;
+	background: linear-gradient(104deg, transparent 34%, rgba(255, 255, 255, 0.2) 47%, rgba(255, 255, 255, 0.05) 55%, transparent 68%) 160% 0 / 240% 100% no-repeat;
+}
+.aur-root[data-lb="a"] .aur-lens-sheen { animation: aur-lens-sweep-a 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
+.aur-root[data-lb="b"] .aur-lens-sheen { animation: aur-lens-sweep-b 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
+@keyframes aur-lens-sweep-a { from { background-position-x: 160%; } to { background-position-x: -60%; } }
+@keyframes aur-lens-sweep-b { from { background-position-x: 160%; } to { background-position-x: -60%; } }
+/* the line's progress as a hairline along the bottom edge (a theme that wants it shows .aur-lens-line
+   while the lens is on a line, and view.js writes --lp when the theme is in LINE_PROGRESS_LOOKS) */
+.aur-lens-line {
+	inset: auto calc(var(--lens-px) * -1 + 1.1em) calc(var(--lens-py) * -1 + 0.16em) !important;
+	height: 2px;
+	border-radius: 2px !important;
+	background: linear-gradient(90deg, rgba(255, 255, 255, 0.9) calc(var(--lp, 0) * 100%), rgba(255, 255, 255, 0.14) calc(var(--lp, 0) * 100%));
+	opacity: 0;
+}
+/* and it quivers a little as it settles on the new line, like a drop of water (the scale property is
+   separate from the transform that places the lens, so the two don't fight) */
+.aur-root[data-glass="on"][data-motion="full"][data-lb="a"] .aur-lens { animation: aur-lens-jelly-a 0.95s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.aur-root[data-glass="on"][data-motion="full"][data-lb="b"] .aur-lens { animation: aur-lens-jelly-b 0.95s cubic-bezier(0.3, 0.7, 0.3, 1); }
+@keyframes aur-lens-jelly-a { 0% { scale: 1; } 26% { scale: 1.016 0.958; } 56% { scale: 0.993 1.024; } 100% { scale: 1; } }
+@keyframes aur-lens-jelly-b { 0% { scale: 1; } 26% { scale: 1.016 0.958; } 56% { scale: 0.993 1.024; } 100% { scale: 1; } }
+.aur-root[data-motion="reduced"] .aur-lens { transition: none; }
+.aur-root[data-motion="reduced"] .aur-lens-sheen { animation: none; }
+
+/* ---------------------------------------------------------------- the control bar: three islands */
+.aur-root[data-glass="on"] .aur-player { column-gap: 18px; padding-bottom: 22px; }
+/* the islands keep their natural width and the player takes what is left, so they never overlap */
+@media (min-width: 781px) {
+	.aur-root[data-glass="on"] .aur-player { grid-template-columns: minmax(min-content, 1fr) minmax(300px, 600px) minmax(min-content, 1fr); }
+}
+.aur-root[data-glass="on"] .aur-player-center,
+.aur-root[data-glass="on"] .aur-player-side {
+	position: relative;
+	background: var(--g-body);
+	backdrop-filter: var(--g-rf-m) var(--g-bf);
+	box-shadow: var(--g-edge), 0 22px 50px -14px var(--g-shadow), 0 0 36px -12px var(--g-glow);
+}
+.aur-root[data-glass="on"] .aur-player-center { gap: 3px; padding: 11px 26px 9px; border-radius: 32px; }
+.aur-root[data-glass="on"] .aur-player-side { height: 54px; padding: 0 12px; border-radius: 999px; align-self: end; margin-bottom: 4px; }
+.aur-root[data-glass="on"] .aur-player-side.is-left { justify-self: start; }
+.aur-root[data-glass="on"] .aur-player-side.is-right { justify-self: end; }
+.aur-root[data-glass="on"]:not([data-transport="off"]) .aur-stage { bottom: 132px; }
+
+/* progress: a groove in the glass, filled with light */
+.aur-root[data-glass="on"] .aur-progress-track {
+	height: 5px;
+	margin-top: -2.5px;
+	background: rgba(255, 255, 255, 0.11);
+	box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.07);
+}
+.aur-root[data-glass="on"] .aur-progress:hover .aur-progress-track,
+.aur-root[data-glass="on"] .aur-progress.is-scrubbing .aur-progress-track { height: 7px; margin-top: -3.5px; background: rgba(255, 255, 255, 0.16); }
+.aur-root[data-glass="on"] .aur-progress-fill {
+	background: linear-gradient(90deg, color-mix(in oklab, var(--aur-glow-tint) 70%, #fff), #fff);
+	box-shadow: 0 0 14px color-mix(in oklab, var(--aur-glow-tint) 65%, transparent);
+}
+.aur-root[data-glass="on"] .aur-progress-knob {
+	width: 15px;
+	height: 15px;
+	margin-top: -7.5px;
+	left: -7.5px;
+	background: radial-gradient(circle at 34% 28%, #fff, #eef1fa 55%, #cdd3e6);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 4px color-mix(in oklab, var(--aur-glow-tint) 24%, transparent), inset 0 -2px 3px rgba(0, 0, 0, 0.14);
+}
+.aur-root[data-glass="on"] .aur-time { color: var(--g-ink-dim); }
+
+/* play: the one solid piece of glass, lit from above */
+.aur-root[data-glass="on"] .aur-play-btn {
+	background: var(--g-play);
+	color: var(--g-play-ink);
+	box-shadow:
+		inset 0 1px 0 #fff,
+		inset 0 -8px 14px rgba(40, 50, 90, 0.16),
+		0 10px 26px rgba(0, 0, 0, 0.34),
+		0 0 30px -4px color-mix(in oklab, var(--aur-glow-tint) 55%, transparent);
+}
+.aur-root[data-glass="on"] .aur-play-btn:hover {
+	box-shadow:
+		inset 0 1px 0 #fff,
+		inset 0 -8px 14px rgba(40, 50, 90, 0.16),
+		0 12px 30px rgba(0, 0, 0, 0.36),
+		0 0 0 7px color-mix(in oklab, var(--aur-glow-tint) 18%, transparent),
+		0 0 36px -2px color-mix(in oklab, var(--aur-glow-tint) 65%, transparent);
+}
+
+/* the small controls sit directly on the glass */
+.aur-root[data-glass="on"] .aur-icon-btn { color: var(--g-ink-dim); }
+.aur-root[data-glass="on"] .aur-icon-btn:hover { background: rgba(255, 255, 255, 0.13); color: #fff; }
+.aur-root[data-glass="on"] .aur-source { background: rgba(255, 255, 255, 0.09); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.aur-root[data-glass="on"] .aur-source:hover { background: rgba(255, 255, 255, 0.16); }
+.aur-root[data-glass="on"] .aur-offset-group { background: rgba(255, 255, 255, 0.07); }
+.aur-root[data-glass="on"] .aur-player-side .aur-sep { background: rgba(255, 255, 255, 0.16); }
+@media (max-width: 1180px) {
+	/* tighter islands, so the three still fit side by side */
+	.aur-root[data-glass="on"] .aur-player { column-gap: 10px; }
+	.aur-root[data-glass="on"] .aur-player-side { padding: 0 6px; }
+	.aur-root[data-glass="on"] .aur-player-side .aur-icon-btn { width: 32px; height: 32px; }
+	.aur-root[data-glass="on"] .aur-player-center { padding-inline: 18px; }
+}
+@media (max-width: 960px) {
+	.aur-root[data-glass="on"] .aur-player { grid-template-columns: minmax(min-content, 1fr) minmax(240px, 600px) minmax(min-content, 1fr); }
+	.aur-root[data-glass="on"] .aur-transport { gap: 8px; }
+	.aur-root[data-glass="on"] .aur-play-btn { width: 50px; height: 50px; }
+	.aur-root[data-glass="on"] .aur-source { max-width: 120px; }
+	.aur-root[data-glass="on"] .aur-player-side .aur-icon-btn { width: 30px; height: 30px; }
+}
+@media (max-width: 780px) {
+	.aur-root[data-glass="on"] .aur-player-side { height: 48px; padding: 0 6px; }
+	.aur-root[data-glass="on"] .aur-player-center { padding: 8px 14px 6px; border-radius: 26px; }
+	.aur-root[data-glass="on"]:not([data-transport="off"]) .aur-stage { bottom: 112px; }
+}
+
+/* ---------------------------------------------------------------- the track header (layouts without a big cover) */
+.aur-root[data-glass="on"] .aur-header {
+	padding: 7px 20px 7px 7px;
+	border-radius: 22px;
+	background: var(--g-body);
+	backdrop-filter: var(--g-rf-s) var(--g-bf);
+	box-shadow: var(--g-edge), 0 18px 40px -14px var(--g-shadow);
+}
+.aur-root[data-glass="on"] .aur-cover { width: 46px; height: 46px; border-radius: 15px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.aur-root[data-glass="on"] .aur-artist { color: var(--g-ink-dim); }
+
+/* ---------------------------------------------------------------- the big cover: a framed pane of glass */
+.aur-root[data-glass="on"]:not([data-view="poster"]) .aur-art-wrap {
+	--cover-r: clamp(18px, 3.2vh, 32px);
+	--cover-pad: clamp(7px, 1.3vh, 13px);
+	isolation: isolate;
+	border-radius: var(--cover-r);
+	box-shadow: 0 40px 80px -24px var(--g-shadow), 0 0 60px -20px var(--g-glow) !important;
+}
+.aur-root[data-glass="on"]:not([data-view="poster"]) .aur-art-wrap::before { /* the frame: glass round the picture */
+	content: "";
+	position: absolute;
+	inset: calc(var(--cover-pad) * -1);
+	z-index: -1;
+	border-radius: calc(var(--cover-r) + var(--cover-pad));
+	background: var(--g-body);
+	backdrop-filter: var(--g-rf-l) var(--g-bf);
+	box-shadow: var(--g-edge);
+}
+.aur-root[data-glass="on"]:not([data-view="poster"]) .aur-art-wrap::after { /* a gloss across the picture, and its own lit edge */
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	background:
+		linear-gradient(128deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.04) 34%, transparent 52%),
+		linear-gradient(0deg, rgba(0, 0, 0, 0.16), transparent 28%);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+	pointer-events: none;
+}
+.aur-root[data-glass="on"][data-view="vinyl"] .aur-art-wrap { --cover-r: 50%; }
+.aur-root[data-glass="on"][data-view="vinyl"] .aur-art-wrap::before { border-radius: 50%; }
+.aur-root[data-glass="on"][data-view="poster"] .aur-side-meta { text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5); }
+.aur-root[data-glass="on"] .aur-side-artist { color: var(--g-ink-dim); }
+
+/* ---------------------------------------------------------------- the small cards */
+.aur-root[data-glass="on"] .aur-upnext {
+	background: var(--g-body);
+	backdrop-filter: var(--g-rf-s) var(--g-bf);
+	border: 0;
+	box-shadow: var(--g-edge), 0 18px 44px -14px var(--g-shadow);
+}
+.aur-root[data-glass="on"] .aur-upnext:hover { background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)); }
+.aur-root[data-glass="on"] .aur-toast {
+	background: var(--g-body);
+	backdrop-filter: var(--g-bf);
+	border: 0;
+	box-shadow: var(--g-edge), 0 18px 44px -14px var(--g-shadow);
+}

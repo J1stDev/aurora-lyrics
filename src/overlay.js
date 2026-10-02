@@ -2,7 +2,7 @@
 // loads lyrics on track changes, and applies settings live.
 
 import { h, clamp, nextFrame, setText, EXT_ID } from "./util.js";
-import { settings, FONTS, PROVIDER_INFO } from "./settings.js";
+import { settings, FONTS, PROVIDER_INFO, THEMES } from "./settings.js";
 import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
 import { lyricsCache, localLyrics } from "./cache.js";
@@ -16,6 +16,8 @@ import { ICONS } from "./icons.js";
 import { loadBackground } from "./media.js";
 import { loadBeats, beatIndexAt } from "./beats.js";
 import { createRain } from "./rain.js";
+import { createScenes, hasScene } from "./scenes.js";
+import { createGlassDefs } from "./glass.js";
 import { validStats, addTime, addLine, pruneStats, summarize } from "./stats.js";
 import { store } from "./storage.js";
 
@@ -80,6 +82,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 	let ui = null; // built lazily on first open
 	let rain = null; // the Rain theme's WebGL scene, created when that theme is first shown
+	let scenes = null; // the glass themes' WebGL scenes (scenes.js), created when the first one is shown
 	const reducedQuery = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
 
 	// ---------------------------------------------------------------------------
@@ -107,6 +110,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				h("i", { class: "aur-fx-e" }, Array.from({ length: 24 }, () => h("i"))),
 				// The Rain theme draws its whole scene here with WebGL (see rain.js); hidden otherwise.
 				h("canvas", { class: "aur-fx-gl", "aria-hidden": "true" }),
+				// Glass themes with a WebGL scene (scenes.js) draw it here.
+				h("canvas", { class: "aur-fx-sc", "aria-hidden": "true" }),
 			),
 			h("div", { class: "aur-bg-grain" }),
 		);
@@ -117,6 +122,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const header = h("div", { class: "aur-header aur-chrome" }, cover, h("div", { class: "aur-meta" }, title, artist));
 
 		const stage = h("div", { class: "aur-stage", role: "main" });
+
+		// The lens: in glass themes, a pane of glass behind the line being sung (view.js places it).
+		// It sits under the stage, not in it: the stage is masked, and a backdrop filter inside a masked
+		// element only sees what is inside it.
+		const lens = h("div", { class: "aur-lens", "aria-hidden": "true", "data-state": "none" }, h("i", { class: "aur-lens-pane" }), h("i", { class: "aur-lens-rim" }), h("i", { class: "aur-lens-sheen" }), h("i", { class: "aur-lens-line" }));
 
 		// Split view: big cover (click = play/pause) + track info beside the lyrics.
 		const artA = h("img", { class: "aur-art", alt: "", decoding: "async" });
@@ -337,6 +347,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			h("div", { class: "aur-drag", "aria-hidden": "true" }), // keeps the window draggable
 			header,
 			side,
+			lens,
 			stage,
 			dock,
 			miniProgress,
@@ -345,9 +356,11 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			tabsPop,
 			upNext,
 			toastEl,
+			createGlassDefs(),
 		);
 
 		const view = new LyricsView(stage, {
+			lens,
 			onShare: (i) => openShare(i),
 			onLine: () => state.open && isPlaying() && !document.hidden && state.track && addLine(statsObj(), state.track.uri),
 			onSeek: (t) => {
@@ -401,7 +414,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		});
 
 		document.body.append(root);
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), gl: bg.querySelector(".aur-fx-gl"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurSettings = settings; // the preview page sets this, to switch themes from the console
+		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), gl: bg.querySelector(".aur-fx-gl"), sc: bg.querySelector(".aur-fx-sc"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -443,6 +457,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			tabs: all.tabsButton ? "on" : "off",
 			fx: all.ambience ? all.themeFx || "none" : "none",
 			look: all.themeFx || "none", // the theme's lyric styling, independent of the ambience toggle
+			glass: THEMES.find((t) => t.id === all.themeFx)?.glass ? "on" : "off", // the liquid-glass kit (glass.css): lens, glass bar, glass cover
+			refract: all.glassRefract ? "on" : "off",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle === "custom" && !all.customBg ? "album" : all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
@@ -472,7 +488,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (SOURCE_KEYS.has(key) && state.open) loadLyrics();
 		if (key === "estimateWords" && state.lyrics) displayLyrics();
 		if (["beatSync", "ambience", "*"].includes(key)) syncBeats();
-		if (["themeFx", "ambience", "bgAnimate", "reducedMotion", "*"].includes(key)) syncRain();
+		if (["themeFx", "ambience", "bgAnimate", "reducedMotion", "*"].includes(key)) (syncRain(), syncScene());
 		ui.trBtn.classList.toggle("is-on", !!all.translate);
 		if (key === "translate" || key === "translateTo") {
 			state.trNotice = "";
@@ -561,6 +577,30 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		if (!state.open || document.hidden) rain.stop();
 		else if (ui.root.dataset.bganim === "on") rain.start();
 		else rain.still();
+	}
+
+	// The glass themes with a WebGL scene (scenes.js) draw it in a canvas in the ambience layer. It runs
+	// while the theme's ambience is on, the lyrics are open and the window is visible; without WebGL
+	// (data-sc="off") the theme's plain CSS ambience stays.
+	function syncScene() {
+		if (!ui) return;
+		const all = settings.all();
+		if (!(all.ambience && hasScene(all.themeFx))) {
+			scenes?.stop();
+			delete ui.root.dataset.sc;
+			return;
+		}
+		scenes ||= createScenes(ui.sc, ui.root, ui.bg, ui.fx, () => ({ text: ui.stage.getBoundingClientRect(), meta: ui.sideTitle.parentElement.getBoundingClientRect() }));
+		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurScenes = scenes;
+		if (!scenes.init() || !scenes.use(all.themeFx)) {
+			ui.root.dataset.sc = "off";
+			scenes.stop();
+			return;
+		}
+		ui.root.dataset.sc = "on";
+		if (!state.open || document.hidden) scenes.stop();
+		else if (ui.root.dataset.bganim === "on") scenes.start();
+		else scenes.still();
 	}
 
 	function sizeBackground() {
@@ -1100,6 +1140,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		wake();
 		syncBeats();
 		syncRain();
+		syncScene();
 		if (state.stale || state.track?.uri !== getCurrentTrack()?.uri) loadLyrics();
 		else {
 			ui.view.relayout();
@@ -1123,6 +1164,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		saveStats();
 		ui.root.classList.remove("is-open");
 		syncRain();
+		syncScene();
 		if (state.enteredFullscreen && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 		state.closeTimer = setTimeout(() => (ui.root.hidden = true), CLOSE_MS);
 		kick(); // cancels pending frames because state.open is false
@@ -1252,6 +1294,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	document.addEventListener("visibilitychange", () => {
 		if (document.hidden) (statsTick(), saveStats());
 		syncRain();
+		syncScene();
 	});
 
 	// ---------------------------------------------------------------------------

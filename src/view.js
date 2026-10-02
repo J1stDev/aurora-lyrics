@@ -40,6 +40,8 @@ export class LyricsView {
 		this.onSeek = opts.onSeek;
 		this.onShare = opts.onShare;
 		this.onLine = opts.onLine; // a sung line was reached in normal playback (stats)
+		this.lens = opts.lens || null; // the glass pane behind the line being sung (see placeLens)
+		this.lensState = "";
 		this.list = h("div", { class: "aur-lines" });
 		this.message = h("div", { class: "aur-message", role: "status" });
 		stage.append(this.list, this.message);
@@ -98,6 +100,7 @@ export class LyricsView {
 		};
 		if (this.reduced || this.stage.dataset.mode === "none") return run();
 		this.frozen = true;
+		this.setLens("none");
 		this.stage.classList.add("is-leaving");
 		this.swapTimer = setTimeout(run, LEAVE_MS);
 	}
@@ -123,6 +126,7 @@ export class LyricsView {
 		this.wordEls = [];
 		this.active = -2;
 		this.wordIdx = -1;
+		this.setLens("none");
 	}
 
 	/**
@@ -349,7 +353,7 @@ export class LyricsView {
 			const el = this.lineEls[idx];
 			const end = line.words?.at(-1)?.end ?? line.end;
 			const p = clamp((pos - line.time) / Math.max(1, end - line.time), 0, 1);
-			if (this.lineProgress) el.style.setProperty("--aur-lp", p.toFixed(3));
+			if (this.lineProgress) this.lens?.style.setProperty("--lp", p.toFixed(3)); // on the lens only: a custom property on the line would restyle every word
 			const sung = p >= 0.97;
 			if (sung !== el.classList.contains("is-sung")) el.classList.toggle("is-sung", sung);
 			if (this.wordEls[idx] && this.wordSync) this.updateWords(idx, pos);
@@ -425,9 +429,77 @@ export class LyricsView {
 			this.list.style.setProperty("--aur-anchor-y", `${Math.round(this.stage.clientHeight * ANCHOR - this.list.offsetTop)}px`);
 		}
 
+		this.placeLens(instant);
+
 		if (instant) {
 			void this.list.offsetHeight; // flush so no-anim applies to this change only
 			nextFrame(() => this.stage.classList.remove("aur-no-anim"));
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// The lens: a pane of glass behind the line being sung
+	// -------------------------------------------------------------------------
+	// Glass themes put a frosted, refracting pane behind the current line. It can't live inside the
+	// stage (the stage is masked, so a backdrop filter in there would see nothing but the lyrics), so
+	// it is a sibling of the stage and this works out where the line will rest, in the overlay's own
+	// coordinates, from layout alone (not from where the line happens to be mid-animation). The pane
+	// glides and resizes to each new line (CSS transitions on --lx --ly --lw --lh).
+
+	setLens(state) {
+		const lens = this.lens;
+		if (!lens || state === this.lensState) return;
+		this.lensState = state;
+		lens.dataset.state = state;
+	}
+
+	/** Where the text of a line sits inside the line's own box (undoing the line's current scale). */
+	textBox(el) {
+		const gap = el.classList.contains("is-gap");
+		const parts = gap ? [el.querySelector(".aur-dots")] : [el.querySelector(".aur-main"), el.querySelector(".aur-tr"), el.querySelector(".aur-bgv")];
+		const L = el.getBoundingClientRect();
+		if (!L.width) return null;
+		const k = el.offsetWidth / L.width;
+		const range = (this.range ||= document.createRange());
+		let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+		for (const part of parts) {
+			if (!part) continue;
+			range.selectNodeContents(part);
+			const r = gap ? part.getBoundingClientRect() : range.getBoundingClientRect();
+			if (!r.width || !r.height) continue;
+			x0 = Math.min(x0, r.left);
+			y0 = Math.min(y0, r.top);
+			x1 = Math.max(x1, r.right);
+			y1 = Math.max(y1, r.bottom);
+		}
+		if (x0 === Infinity) return null;
+		return { x: (x0 - L.left) * k, y: (y0 - L.top) * k, w: (x1 - x0) * k, h: (y1 - y0) * k };
+	}
+
+	placeLens(instant = false) {
+		const lens = this.lens;
+		if (!lens) return;
+		const el = this.lyrics?.synced && this.active >= 0 ? this.lineEls[this.active] : null;
+		const box = el && this.textBox(el);
+		if (!box) return this.setLens("none");
+		// where the line comes to rest: the list layout scrolls it to the anchor (this.y); the stack layout
+		// centres it on its top edge (translateY(-50%))
+		const rest = this.layout === "stack" ? el.offsetTop - el.offsetHeight / 2 : el.offsetTop + this.y;
+		const x = this.stage.offsetLeft + this.list.offsetLeft + el.offsetLeft + box.x;
+		const y = this.stage.offsetTop + this.list.offsetTop + rest + box.y;
+		const st = lens.style;
+		// a pane that was hidden appears where it belongs instead of gliding there from where it was
+		const snap = instant || this.lensState === "none" || this.lensState === "";
+		if (snap) lens.classList.add("is-snap");
+		st.setProperty("--lx", `${x.toFixed(1)}px`);
+		st.setProperty("--ly", `${y.toFixed(1)}px`);
+		st.setProperty("--lw", `${box.w.toFixed(1)}px`);
+		st.setProperty("--lh", `${box.h.toFixed(1)}px`);
+		st.setProperty("--lf", getComputedStyle(el).fontSize); // the line's font size: the pane's padding is in em
+		this.setLens(el.classList.contains("is-gap") ? "gap" : "line");
+		if (snap) {
+			void lens.offsetWidth;
+			nextFrame(() => lens.classList.remove("is-snap"));
 		}
 	}
 
@@ -474,6 +546,7 @@ export class LyricsView {
 		if (!this.browsing) {
 			this.browsing = true;
 			this.stage.classList.add("is-browsing");
+			if (this.lens) this.lens.dataset.browse = "on";
 		}
 		this.list.style.setProperty("--aur-y", `${Math.round(this.browseY)}px`);
 		clearTimeout(this.browseTimer);
@@ -486,6 +559,7 @@ export class LyricsView {
 		if (!this.browsing) return;
 		this.browsing = false;
 		this.stage.classList.remove("is-browsing");
+		if (this.lens) delete this.lens.dataset.browse;
 		if (instant) return;
 		this.list.dataset.dir = this.browseY > this.y ? "up" : "down";
 		this.list.style.setProperty("--aur-y", `${this.y}px`);

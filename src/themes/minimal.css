@@ -1,0 +1,45 @@
+/* ============================================================== Minimal
+   Quiet frosted glass. The album's colours are washed down to a graphite haze with only a trace of
+   the cover's hue, so nothing competes with the words. The line being sung rests on a clear pane
+   of glass with a hairline along its bottom edge that fills as the line is sung; everything else
+   is the glass kit, kept plain. Instrumental breaks show three short dashes. */
+
+.aur-root[data-look="minimal"] {
+	--g-tint: rgba(255, 255, 255, 0.045);
+	--g-tint-top: rgba(255, 255, 255, 0.12);
+	--g-blur: 26px;
+	--g-sat: 1.25;
+	--g-glow: rgba(255, 255, 255, 0.05);
+	--lens-px: 0.7em;
+	--lens-py: 0.34em;
+}
+
+/* the haze: the album's colour, mostly drained, and a pale light from the top left */
+.aur-root[data-look="minimal"] .aur-bg-stack,
+.aur-root[data-look="minimal"] .aur-bg-gradient { filter: saturate(0.3) brightness(0.8); }
+.aur-root[data-fx="minimal"] .aur-bg-grain { opacity: 0.05; }
+.aur-root[data-fx="minimal"] .aur-fx-a {
+	display: block;
+	inset: 0;
+	background:
+		radial-gradient(60% 55% at 14% -6%, rgba(255, 255, 255, 0.09), transparent 70%),
+		radial-gradient(70% 60% at 100% 110%, rgba(0, 0, 0, 0.4), transparent 70%),
+		linear-gradient(rgba(120, 138, 175, 0.07), rgba(120, 138, 175, 0.07));
+}
+/* a slow band of light drifting across, like daylight moving over a glass table */
+.aur-root[data-fx="minimal"] .aur-fx-b {
+	display: block;
+	inset: -10% -60%;
+	background: linear-gradient(100deg, transparent 43%, rgba(255, 255, 255, 0.045) 50%, transparent 57%);
+	animation: aur-mn-drift 52s ease-in-out infinite alternate;
+}
+@keyframes aur-mn-drift { from { transform: translateX(-17%); } to { transform: translateX(17%); } }
+
+/* type */
+.aur-root[data-look="minimal"] .aur-line { letter-spacing: -0.028em; }
+.aur-root[data-look="minimal"] .aur-lens[data-state="line"] .aur-lens-line { opacity: 1; }
+
+/* breaks: three short dashes instead of dots */
+.aur-root[data-look="minimal"] .aur-dots i { width: 0.7em; height: 2px; border-radius: 1px; }
+.aur-root[data-look="minimal"] .is-active .aur-dots { animation: none; }
+.aur-root[data-look="minimal"] .is-active .aur-dots i { transform: none; }

@@ -1,0 +1,145 @@
+/* ============================================================== Neon
+   Liquid light in glass tubes. The room is drawn by WebGL (src/scenes.js): long neon tubes, a ring
+   and a bolt, haze, and a wet glass floor that mirrors them; all in colours taken from the album.
+   Here is the rest: the glass is smoked and its edges are lit tubes (the lens round the line being
+   sung, the frame round the cover), the lettering is tube lettering (a line that isn't being sung
+   is unlit glass, an outline; the line being sung lights up word by word), and the control bar is
+   dark glass with a lit edge. Without WebGL the room is a few soft pools of colour on black. */
+
+.aur-root[data-look="neon"] {
+	--neon-a: oklch(from var(--aur-accent) 0.74 max(c, 0.22) h);
+	--neon-b: oklch(from var(--aur-accent) 0.8 max(c, 0.18) calc(h + 150));
+	--neon-c: oklch(from var(--aur-accent) 0.76 max(c, 0.2) calc(h - 40));
+	--neon: var(--neon-a);
+	--unlit: color-mix(in oklab, color-mix(in oklab, var(--neon) 82%, #fff) 66%, transparent); /* glass that isn't lit: a pale outline */
+	--aur-glow-tint: var(--neon-a);
+	/* the glass kit: smoked glass, lit at the edge by the tubes */
+	--g-tint: rgba(9, 5, 20, 0.5);
+	--g-tint-top: rgba(255, 255, 255, 0.075);
+	--g-lit: color-mix(in oklab, var(--neon-a) 62%, #fff);
+	--g-hair: color-mix(in oklab, var(--neon-a) 26%, transparent);
+	--g-rim-a: color-mix(in oklab, var(--neon-a) 78%, #fff);
+	--g-rim-b: color-mix(in oklab, var(--neon-b) 24%, transparent);
+	--g-shadow: rgba(2, 0, 8, 0.6);
+	--g-glow: color-mix(in oklab, var(--neon-a) 42%, transparent);
+	--g-blur: 18px;
+	--g-sat: 1.9;
+	--g-bright: 0.92;
+	--lens-px: 0.7em;
+	--lens-py: 0.34em;
+	--lens-r: min(0.72em, 50px);
+}
+
+/* the room without WebGL: pools of colour on black */
+.aur-root[data-fx="neon"] .aur-fx {
+	background:
+		radial-gradient(60% 50% at 88% 6%, color-mix(in oklab, var(--neon-c) 34%, transparent), transparent 70%),
+		radial-gradient(70% 55% at 12% 100%, color-mix(in oklab, var(--neon-a) 30%, transparent), transparent 72%),
+		radial-gradient(50% 45% at 92% 92%, color-mix(in oklab, var(--neon-b) 26%, transparent), transparent 70%),
+		#07040f;
+}
+.aur-fx > canvas.aur-fx-sc { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.aur-root[data-sc="on"] .aur-fx > canvas.aur-fx-sc { display: block; }
+
+/* ---------------------------------------------------------------- the lens: a tube round smoked glass */
+.aur-root[data-look="neon"] .aur-lens-pane {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(10, 5, 22, 0.56) 55%, rgba(8, 4, 18, 0.62));
+	box-shadow:
+		inset 0 0 36px color-mix(in oklab, var(--neon-a) 20%, transparent),
+		0 0 70px -6px color-mix(in oklab, var(--neon-a) 32%, transparent);
+}
+.aur-root[data-look="neon"] .aur-lens-rim { /* the tube */
+	padding: 0;
+	-webkit-mask: none;
+	mask: none;
+	background: none;
+	border: max(2px, 0.05em) solid color-mix(in oklab, var(--neon-a) 86%, #fff 14%);
+	box-shadow:
+		0 0 0.12em 0.01em var(--neon-a),
+		0 0 0.5em 0.04em color-mix(in oklab, var(--neon-a) 70%, transparent),
+		0 0 1.6em 0.1em color-mix(in oklab, var(--neon-a) 34%, transparent),
+		inset 0 0 0.3em color-mix(in oklab, var(--neon-a) 60%, transparent),
+		inset 0 0 1.2em color-mix(in oklab, var(--neon-a) 20%, transparent);
+}
+.aur-root[data-look="neon"] .aur-lens-rim::after { /* its hot core */
+	content: "";
+	position: absolute;
+	inset: max(0px, calc(max(2px, 0.05em) * 0.18));
+	border-radius: inherit;
+	border: max(1px, 0.014em) solid rgba(255, 255, 255, 0.88);
+	box-shadow: 0 0 0.1em rgba(255, 255, 255, 0.7);
+	opacity: 0.9;
+}
+.aur-root[data-look="neon"] .aur-lens-sheen { /* a reflection on the glass, not the sweep of the other themes */
+	background: linear-gradient(112deg, rgba(255, 255, 255, 0.11), transparent 22%, transparent 70%, color-mix(in oklab, var(--neon-b) 14%, transparent));
+	animation: none !important;
+}
+/* a tube strikes when a new line begins: it stutters on (two identical animations, swapped on every line) */
+.aur-root[data-look="neon"][data-motion="full"][data-lb="a"] .aur-lens-rim { animation: aur-nn-strike-a 0.6s steps(1); }
+.aur-root[data-look="neon"][data-motion="full"][data-lb="b"] .aur-lens-rim { animation: aur-nn-strike-b 0.6s steps(1); }
+@keyframes aur-nn-strike-a { 0%, 14%, 30% { opacity: 0.25; } 8%, 22%, 40%, 100% { opacity: 1; } }
+@keyframes aur-nn-strike-b { 0%, 14%, 30% { opacity: 0.25; } 8%, 22%, 40%, 100% { opacity: 1; } }
+
+/* ---------------------------------------------------------------- the cover, framed by a tube */
+.aur-root[data-look="neon"]:not([data-view="poster"]) .aur-art-wrap { --cover-r: clamp(10px, 1.8vh, 18px); --cover-pad: clamp(8px, 1.5vh, 14px); }
+.aur-root[data-look="neon"]:not([data-view="poster"]) .aur-art-wrap::before {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(10, 5, 22, 0.6));
+	border: max(2px, 0.5vh) solid color-mix(in oklab, var(--neon-a) 86%, #fff 14%);
+	outline: max(1px, 0.18vh) solid rgba(255, 255, 255, 0.85);
+	outline-offset: calc(max(2px, 0.5vh) * -0.62);
+	box-shadow:
+		0 0 1.2vh 0.1vh var(--neon-a),
+		0 0 4vh 0.4vh color-mix(in oklab, var(--neon-a) 62%, transparent),
+		0 0 12vh 1.2vh color-mix(in oklab, var(--neon-a) 26%, transparent),
+		inset 0 0 2.4vh color-mix(in oklab, var(--neon-a) 45%, transparent);
+}
+.aur-root[data-look="neon"][data-playing="false"]:not([data-view="poster"]) .aur-art-wrap::before { opacity: 0.55; }
+.aur-root[data-look="neon"][data-view="vinyl"] .aur-art-wrap::before { border-radius: 50%; }
+
+/* ---------------------------------------------------------------- the lyrics, in tube lettering */
+/* unlit tubes stay readable: the lines around the one being sung are brighter than in other themes */
+.aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="-1"], .aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="1"] { opacity: 0.66; }
+.aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="-2"], .aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="2"] { opacity: 0.42; }
+.aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="-3"], .aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="3"] { opacity: 0.26; }
+.aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="-4"], .aur-root[data-look="neon"][data-layout="list"] .aur-line[data-d="4"] { opacity: 0.16; }
+/* glass that isn't lit: every line that isn't being sung is an outline */
+.aur-root[data-look="neon"] .aur-stage[data-mode="synced"] .aur-line:not(.is-active) :is(.aur-main, .aur-w, .aur-c) {
+	color: color-mix(in oklab, var(--neon) 6%, transparent);
+	-webkit-text-stroke: 0.03em var(--unlit);
+	text-shadow: none;
+}
+/* the line being sung, word by word: a word strikes as it's reached, then stays lit */
+.aur-root[data-look="neon"][data-words="on"] .aur-stage .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 5, 1);
+	color: color-mix(in oklab, color-mix(in oklab, var(--neon) 20%, #fff) calc(var(--lit) * 100%), color-mix(in oklab, var(--neon) 8%, transparent));
+	-webkit-text-stroke: 0.03em color-mix(in oklab, var(--neon) calc(var(--lit) * 100%), var(--unlit));
+	paint-order: stroke fill;
+	transform: none;
+	filter:
+		drop-shadow(0 0 0.03em color-mix(in srgb, #fff calc(60% * var(--lit)), transparent))
+		drop-shadow(0 0 0.12em color-mix(in oklab, var(--neon) calc(85% * var(--lit)), transparent))
+		drop-shadow(0 0 0.34em color-mix(in oklab, var(--neon) calc(70% * var(--lit)), transparent));
+}
+.aur-root[data-look="neon"][data-words="on"] .aur-stage .is-active .aur-w.now { animation: aur-neon-on 0.5s linear; }
+/* a line without word timing lights all at once, flickering on like a tube striking */
+.aur-root[data-look="neon"] .aur-stage .is-active:not(.has-words) .aur-main,
+.aur-root[data-look="neon"][data-words="off"] .aur-stage .is-active .aur-main {
+	color: color-mix(in oklab, var(--neon) 20%, #fff);
+	-webkit-text-stroke: 0.014em var(--neon);
+	paint-order: stroke fill;
+	text-shadow:
+		0 0 0.04em rgba(255, 255, 255, 0.7),
+		0 0 0.14em color-mix(in oklab, var(--neon) 90%, transparent),
+		0 0 0.36em color-mix(in oklab, var(--neon) 75%, transparent),
+		0 0 0.9em color-mix(in oklab, var(--neon) 45%, transparent);
+}
+.aur-root[data-look="neon"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.has-words) .aur-main { animation: aur-nn-line 0.55s linear; }
+@keyframes aur-nn-line {
+	0%, 18%, 38% { opacity: 0.25; }
+	10%, 28%, 100% { opacity: 1; }
+}
+.aur-root[data-look="neon"] .aur-dots i { background: color-mix(in oklab, var(--neon) 30%, #fff); box-shadow: 0 0 0.3em var(--neon), 0 0 0.8em color-mix(in oklab, var(--neon) 60%, transparent); }
+
+/* ---------------------------------------------------------------- the rest of the chrome */
+.aur-root[data-look="neon"] :is(.aur-side-title, .aur-title) { text-shadow: 0 0 0.5em color-mix(in oklab, var(--neon-a) 55%, transparent); }
+.aur-root[data-look="neon"] .aur-play-btn { --g-play-ink: #1b0f2e; }

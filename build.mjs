@@ -5,7 +5,9 @@
 // concatenated (in dependency order) into a single IIFE:
 //   - `import … from "./x.js"` lines are removed (everything shares one scope),
 //   - `export` keywords are stripped,
-//   - "./styles.js" is virtual: it becomes `const CSS = "<contents of src/styles.css>"`.
+//   - "./styles.js" is virtual: it becomes `const CSS = "<the stylesheets>"`: src/styles.css, then
+//     src/glass.css (the liquid-glass kit shared by the glass themes), then src/themes/*.css in
+//     alphabetical order.
 // Rule for src/: top-level names must be unique across modules (checked below).
 //
 // Usage:
@@ -13,7 +15,7 @@
 //   node build.mjs --out <dir>           → also copy the result into <dir>
 //   node build.mjs --watch [--out <dir>] → rebuild on changes in src/
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync, watch } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, existsSync, watch } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -36,6 +38,10 @@ const ORDER = [
 	"beats.js",
 	"stats.js",
 	"rain.js",
+	"scene-glsl.js",
+	"scene-neon.js",
+	"scenes.js",
+	"glass.js",
 	"net.js",
 	"sources.js",
 	"providers.js",
@@ -58,6 +64,13 @@ const outIdx = args.indexOf("--out");
 const extraOut = outIdx >= 0 ? args[outIdx + 1] : null;
 const watchMode = args.includes("--watch");
 
+/** The stylesheets, in cascade order: the base, the shared glass kit, then one file per remade theme. */
+function stylesheets() {
+	const themes = join(SRC, "themes");
+	const extra = existsSync(themes) ? readdirSync(themes).filter((f) => f.endsWith(".css")).sort().map((f) => join("themes", f)) : [];
+	return ["styles.css", "glass.css", ...extra].filter((f) => existsSync(join(SRC, f)));
+}
+
 function transform(file, code) {
 	const stripped = code
 		.replace(/^import\s[^;]*?from\s+["'][^"']+["'];?[ \t]*\r?\n/gm, "")
@@ -76,7 +89,9 @@ function build() {
 		let code;
 		if (file === "styles.js") {
 			// Light minification: drop comments and indentation (keeps the bundle readable-ish).
-			const css = readFileSync(join(SRC, "styles.css"), "utf8")
+			const css = stylesheets()
+				.map((f) => readFileSync(join(SRC, f), "utf8"))
+				.join("\n")
 				.replace(/\/\*[\s\S]*?\*\//g, "")
 				.replace(/\s*\n\s*/g, "\n")
 				.replace(/\n+/g, "\n")
@@ -127,7 +142,7 @@ try {
 if (watchMode) {
 	let t = 0;
 	console.log("[build] watching src/ …");
-	watch(SRC, () => {
+	watch(SRC, { recursive: true }, () => {
 		clearTimeout(t);
 		t = setTimeout(() => {
 			try {

@@ -69,6 +69,36 @@
 			document.getElementById("play").onclick = Player.togglePlay;
 			document.getElementById("next").onclick = Player.next;
 			document.getElementById("prev").onclick = Player.back;
+			// Console helper: await __t("neon", 13100) opens the lyrics, applies a theme and seeks (used for checking looks).
+			window.__t = async (id, pos = 13100, wait = 2200) => {
+				while (!window.AuroraLyrics) await new Promise((r) => setTimeout(r, 100));
+				if (!document.querySelector(".aur-root.is-open")) {
+					AuroraLyrics.open();
+					await new Promise((r) => setTimeout(r, 900));
+				}
+				__aurSettings.applyTheme(id);
+				window.mock.Player.seek(pos);
+				await new Promise((r) => setTimeout(r, wait));
+				const root = document.querySelector(".aur-root");
+				return `${root.dataset.look} fx=${root.dataset.fx} glass=${root.dataset.glass} lens=${document.querySelector(".aur-lens")?.dataset.state}`;
+			};
+			// ?theme=neon&pos=13100&set=view:lyrics,animation:fade : open the lyrics on a theme (checking looks).
+			{
+				const q = new URLSearchParams(location.search);
+				if (q.get("theme")) {
+					(async () => {
+						await window.__t(q.get("theme"), Number(q.get("pos") || 13100), 300);
+						for (const pair of (q.get("set") || "").split(",").filter(Boolean)) {
+							const [k, v] = pair.split(":");
+							let val = v;
+							try {
+								val = JSON.parse(v);
+							} catch {}
+							window.__aurSettings.set(k, val);
+						}
+					})();
+				}
+			}
 			// ?demo: open the overlay on a nice moment (used to render docs/preview.png).
 			if (/[?&]demo(&|$)/.test(location.search)) {
 				localStorage.setItem("aurora-lyrics:settings", JSON.stringify({ seenTip: true, autoHideControls: false }));
