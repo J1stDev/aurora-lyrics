@@ -17,6 +17,7 @@ import { KARAOKE_FRAG } from "./scene-karaoke.js";
 import { GOTHIC_FRAG } from "./scene-gothic.js";
 import { BLACKMETAL_FRAG } from "./scene-blackmetal.js";
 import { LOUNGE_FRAG } from "./scene-lounge.js";
+import { OCEAN_FRAG } from "./scene-ocean.js";
 import { parseCssColor } from "./rain.js";
 
 const SCENES = {
@@ -25,6 +26,7 @@ const SCENES = {
 	gothic: { frag: GOTHIC_FRAG, palette: (accent, deep) => gothicPalette(accent, deep) },
 	blackmetal: { frag: BLACKMETAL_FRAG, palette: (accent, deep) => blackmetalPalette(accent, deep) },
 	lounge: { frag: LOUNGE_FRAG, palette: (accent, deep) => loungePalette(accent, deep) },
+	ocean: { frag: OCEAN_FRAG, palette: (accent, deep) => oceanPalette(accent, deep) },
 };
 
 /** Does this theme have a WebGL scene? */
@@ -113,6 +115,17 @@ export function blackmetalPalette(accent, deep) {
 		uB: oklchToRgb(0.68, 0.05, 245),
 		uC: oklchToRgb(0.92, 0.02, 230),
 		uBase: scBase(deep),
+	};
+}
+
+/** Ocean: the accent as cool aqua, a turquoise, and a violet-pink for what glows in the deep. */
+export function oceanPalette(accent, deep) {
+	const [, C, h] = rgbToOklch(accent || [95, 212, 255]);
+	return {
+		uA: oklchToRgb(0.82, Math.max(C, 0.1), C < 0.02 ? 215 : h),
+		uB: oklchToRgb(0.78, 0.12, 185),
+		uC: oklchToRgb(0.7, 0.2, 330),
+		uBase: oklchToRgb(0.1, 0.05, 245),
 	};
 }
 

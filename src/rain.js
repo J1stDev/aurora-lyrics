@@ -7,6 +7,11 @@
 // worked out per pixel in one fragment shader from a few hashes (there are no textures for the drops).
 // The only images are three copies of one night street, painted once with the 2D canvas and blurred
 // by different amounts: the shader picks between them depending on how clear the glass is there.
+//
+// The pane of glass that holds the line being sung (the lens, glass.css) is a patch of this window
+// that has just been wiped: clear, sharp, a little darker, with water standing at its edge and the
+// drops gone. A small feedback texture remembers where the lens has been and lets the mist come
+// back over a couple of seconds, so a pane gliding from line to line leaves a fading wipe behind it.
 
 const RAIN_VERT = `#version 300 es
 in vec2 aPos;
@@ -23,6 +28,7 @@ uniform float uPulse;  // the beat, 0..1
 uniform sampler2D uSharp;
 uniform sampler2D uMid;
 uniform sampler2D uFog;
+uniform sampler2D uMask;  // where the glass has been wiped, 0..1 (see createRain)
 out vec4 fragColor;
 
 #define S smoothstep
@@ -177,11 +183,26 @@ void main() {
 	beads(L, p, .034, .0102, 19., .62);
 	beads(L, p, .017, .0052, 31., .5);
 
+	// a wipe takes the water off the glass
+	float m = texture(uMask, gl_FragCoord.xy / uRes).r;
+	L.cov *= 1. - m;
+	L.trail *= 1. - m;
+	L.edge *= 1. - m;
+
 	// the glass: misted, more toward the bottom, with patches wiped clearer here and there
 	float wipe = S(.44, .8, fbm(p * 2.4 + vec2(3., uTime * .004)));
-	vec2 haze = vec2(sin(p.y * 7. + uTime * .35), sin(p.x * 5. - uTime * .3)) * .0016; // the mist shimmers a little
-	vec3 col = world(uv + haze, wipe * .3);
-	col += vec3(.07, .1, .14) * (.35 + .65 * uv.y) * .55;
+	vec2 haze = vec2(sin(p.y * 7. + uTime * .35), sin(p.x * 5. - uTime * .3)) * .0016 * (1. - m); // the mist shimmers a little
+	vec3 col = world(uv + haze, max(wipe * .3, m * .94));
+	col += vec3(.07, .1, .14) * (.35 + .65 * uv.y) * .55 * (1. - .75 * m);
+	col *= 1. - .2 * m; // clear glass lets in the dark of the night; mist scatters light
+	// the water left standing along the edge of a wiped patch: a bright line, and beads in it
+	float ridge = m * (1. - m) * 4.;
+	col += ridge * vec3(.5, .62, .85) * .12 * (.5 + vnoise(p * 70.));
+	vec2 bg9 = gl_FragCoord.xy / 9.;
+	vec4 br = h42(floor(bg9));
+	float bead = step(.5, br.z) * S(.24, .1, length(fract(bg9) - .5 - (br.xy - .5) * .45)) * S(.1, .55, ridge);
+	col += bead * vec3(.9, .95, 1.) * .55;       // beads of water along the edge
+	col *= 1. - bead * .15 * (1. - ridge);
 
 	// a trail is clear glass: the street is nearly sharp there, and bent a little, with water
 	// standing along its two sides
@@ -380,17 +401,50 @@ function rainPaint(g, W, H, tint) {
 // The renderer
 // ---------------------------------------------------------------------------------------------
 
+// The wipe: a small texture, fed back to itself every frame, that remembers where the lens has been.
+const MASK_W = 192;
+const MASK_H = 108;
+const MASK_HALF_LIFE = 1.7; // seconds for a wiped patch to be half misted over again
+
+const MASK_FRAG = `#version 300 es
+precision highp float;
+uniform vec2 uMaskRes;
+uniform vec4 uRect;    // the lens as fractions of the screen (x0, y0, x1, y1, y down); x1 < x0 means no lens
+uniform float uDecay;  // how much of last frame's wipe is left
+uniform float uAspect;
+uniform sampler2D uPrev;
+out vec4 o;
+float sdRoundBox(vec2 p, vec2 b, float r) {
+	vec2 q = abs(p) - b + r;
+	return length(max(q, 0.)) + min(max(q.x, q.y), 0.) - r;
+}
+void main() {
+	vec2 g = gl_FragCoord.xy / uMaskRes;
+	float prev = texture(uPrev, g).r;
+	vec2 uv = vec2(g.x, 1. - g.y);
+	float m = 0.;
+	if (uRect.z > uRect.x) {
+		vec2 k = vec2(uAspect, 1.);
+		vec2 c = (uRect.xy + uRect.zw) * .5;
+		vec2 h = (uRect.zw - uRect.xy) * .5 * k;
+		float d = sdRoundBox((uv - c) * k, h, min(.04, min(h.x, h.y)));
+		m = smoothstep(.016, -.016, d);
+	}
+	o = vec4(max(prev * uDecay, m), 0., 0., 1.);
+}`;
+
 /**
- * createRain(canvas, root, bg): draws into `canvas`. `root` (.aur-root) and `bg` (.aur-bg) are read
+ * createRain(canvas, root, bg, getLens): draws into `canvas`. `root` (.aur-root) and `bg` (.aur-bg) are read
  * for the signals that drive the scene: data-gap on root (an instrumental break: it rains harder)
- * and data-bt / data-bar on bg (the beat and the bar, flipping a/b).
+ * and data-bt / data-bar on bg (the beat and the bar, flipping a/b). getLens() returns the box of the
+ * lens pane on the page (null when there is none), which is wiped clear.
  * Returns { init, start, stop, still, flash, ok, running }; ok is null until init() has run.
  */
-export function createRain(canvas, root, bg) {
+export function createRain(canvas, root, bg, getLens) {
 	const S = {
 		gl: null, loc: {}, tex: [], ok: null, running: false, raf: 0, last: 0, t0: 0, still: false,
 		scale: 0.5, w: 0, h: 0, sized: false, tintKey: "", tintAt: 0, dts: [],
-		flashAt: -1e9, nextFlash: 0, pulse: 0, bt: "", bar: "", rain: 0.55, lastNow: 0,
+		flashAt: -1e9, nextFlash: 0, pulse: 0, bt: "", bar: "", rain: 0.55, lastNow: 0, lastWipe: 0, mask: null, prog: null,
 	};
 	const FRAME_MS = 1000 / 30;
 	const TEX = 3;
@@ -404,6 +458,69 @@ export function createRain(canvas, root, bg) {
 		return sh;
 	}
 
+	/** The wipe's two textures and the pass that updates them. */
+	function initMask(gl) {
+		const prog = gl.createProgram();
+		gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, RAIN_VERT));
+		gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, MASK_FRAG));
+		gl.bindAttribLocation(prog, 0, "aPos");
+		gl.linkProgram(prog);
+		if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || "mask link");
+		const loc = {};
+		for (const n of ["uMaskRes", "uRect", "uDecay", "uAspect", "uPrev"]) loc[n] = gl.getUniformLocation(prog, n);
+		const tex = [];
+		const fbo = [];
+		for (let i = 0; i < 2; i++) {
+			const t = gl.createTexture();
+			gl.activeTexture(gl.TEXTURE4);
+			gl.bindTexture(gl.TEXTURE_2D, t);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, MASK_W, MASK_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+			const f = gl.createFramebuffer();
+			gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+			gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+			if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("mask framebuffer");
+			gl.clearColor(0, 0, 0, 1);
+			gl.clear(gl.COLOR_BUFFER_BIT);
+			tex.push(t);
+			fbo.push(f);
+		}
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		return { prog, loc, tex, fbo, cur: 0 };
+	}
+
+	/** One step of the wipe: last frame's mist-free glass fades a little, and the lens wipes its own place clear. */
+	function wipeStep(w, h, dt) {
+		const gl = S.gl;
+		const g = S.mask;
+		let rect = [1, 1, 0, 0];
+		try {
+			const r = getLens?.();
+			const c = canvas.getBoundingClientRect();
+			if (r && r.width > 0 && r.height > 0 && c.width > 0) rect = [(r.left - c.left) / c.width, (r.top - c.top) / c.height, (r.right - c.left) / c.width, (r.bottom - c.top) / c.height];
+		} catch {}
+		gl.bindFramebuffer(gl.FRAMEBUFFER, g.fbo[1 - g.cur]);
+		gl.viewport(0, 0, MASK_W, MASK_H);
+		gl.useProgram(g.prog);
+		gl.activeTexture(gl.TEXTURE4);
+		gl.bindTexture(gl.TEXTURE_2D, g.tex[g.cur]);
+		gl.uniform1i(g.loc.uPrev, 4);
+		gl.uniform2f(g.loc.uMaskRes, MASK_W, MASK_H);
+		gl.uniform4f(g.loc.uRect, rect[0], rect[1], rect[2], rect[3]);
+		gl.uniform1f(g.loc.uDecay, dt < 0 ? 0 : Math.pow(0.5, dt / MASK_HALF_LIFE));
+		gl.uniform1f(g.loc.uAspect, w / h);
+		gl.drawArrays(gl.TRIANGLES, 0, 3);
+		g.cur = 1 - g.cur;
+		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+		gl.viewport(0, 0, w, h);
+		gl.useProgram(S.prog);
+		gl.activeTexture(gl.TEXTURE3);
+		gl.bindTexture(gl.TEXTURE_2D, g.tex[g.cur]);
+	}
+
 	function init() {
 		if (S.ok !== null) return S.ok;
 		S.ok = false;
@@ -413,6 +530,7 @@ export function createRain(canvas, root, bg) {
 			const prog = gl.createProgram();
 			gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, RAIN_VERT));
 			gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, RAIN_FRAG));
+			gl.bindAttribLocation(prog, 0, "aPos"); // both programs read the same triangle from attribute 0
 			gl.linkProgram(prog);
 			if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || "link");
 			gl.useProgram(prog);
@@ -422,7 +540,7 @@ export function createRain(canvas, root, bg) {
 			const a = gl.getAttribLocation(prog, "aPos");
 			gl.enableVertexAttribArray(a);
 			gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-			for (const n of ["uRes", "uTime", "uRain", "uFlash", "uPulse", "uSharp", "uMid", "uFog"]) S.loc[n] = gl.getUniformLocation(prog, n);
+			for (const n of ["uRes", "uTime", "uRain", "uFlash", "uPulse", "uSharp", "uMid", "uFog", "uMask"]) S.loc[n] = gl.getUniformLocation(prog, n);
 			for (let i = 0; i < TEX; i++) {
 				const t = gl.createTexture();
 				gl.activeTexture(gl.TEXTURE0 + i);
@@ -436,6 +554,10 @@ export function createRain(canvas, root, bg) {
 			gl.uniform1i(S.loc.uSharp, 0);
 			gl.uniform1i(S.loc.uMid, 1);
 			gl.uniform1i(S.loc.uFog, 2);
+			gl.uniform1i(S.loc.uMask, 3);
+			S.prog = prog;
+			S.mask = initMask(gl);
+			gl.useProgram(prog);
 			S.gl = gl;
 			canvas.style.color = "var(--aur-accent)"; // read back later, to tint the neon in the street
 			canvas.addEventListener("webglcontextlost", (e) => {
@@ -534,6 +656,9 @@ export function createRain(canvas, root, bg) {
 			gl.viewport(0, 0, w, h);
 		}
 		upload(now);
+		const dtWipe = S.still ? -1 : Math.min(0.25, Math.max(0, (now - S.lastWipe) / 1000));
+		S.lastWipe = now;
+		wipeStep(w, h, dtWipe);
 		const flash = S.still ? 0 : signals(now);
 		const t = S.still ? 41 : ((now - S.t0) / 1000) % 100000;
 		gl.uniform2f(S.loc.uRes, w, h);

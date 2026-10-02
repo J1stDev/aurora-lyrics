@@ -1,0 +1,35 @@
+/* ============================================================== Rain
+   A night window in the rain. The window is drawn by WebGL (src/rain.js): a misted-glass view of a
+   night city, drops that are little lenses, bigger drops that run and wipe a clear trail, lightning,
+   neon in the album's colours (the CSS scene in styles.css is the fallback without WebGL). The lens
+   of the glass kit is not a pane in front of it here: the line being sung sits in a patch of the
+   window that has just been wiped (the renderer reads where the pane is). It is clear, sharp and
+   darker, with water standing at its edge and the drops gone, and as the pane glides to the next line
+   the mist comes back over the place it left. The control bar and the cover are misted glass over
+   the window. The lyrics are misted-glass white that clears from a blur, as if wiped. */
+
+.aur-root[data-look="rain"] {
+	--aur-glow-tint: #8fb4e6;
+	/* the glass kit: misted glass */
+	--g-tint: rgba(150, 180, 215, 0.07);
+	--g-tint-top: rgba(220, 235, 255, 0.14);
+	--g-lit: rgba(220, 235, 255, 0.4);
+	--g-hair: rgba(180, 205, 235, 0.14);
+	--g-rim-a: rgba(225, 238, 255, 0.7);
+	--g-rim-b: rgba(120, 150, 190, 0.1);
+	--g-shadow: rgba(2, 5, 14, 0.6);
+	--g-glow: rgba(120, 160, 215, 0.2);
+	--g-blur: 26px;
+	--g-sat: 1.2;
+	--lens-px: 0.7em;
+	--lens-py: 0.36em;
+	--lens-r: min(0.7em, 44px);
+}
+.aur-root[data-look="rain"][data-color="white"] { --aur-hi: #e8f1ff; }
+
+/* with WebGL running, the wiped patch is in the picture and the pane itself draws nothing (its box is still read) */
+.aur-root[data-look="rain"][data-gl="on"] .aur-lens > i { opacity: 0 !important; }
+
+/* misted-glass lyrics that clear from a blur */
+.aur-root[data-look="rain"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-rn-wipe 1.5s var(--aur-ease); }
+@keyframes aur-rn-wipe { from { opacity: 0.3; filter: blur(7px); } }

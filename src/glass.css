@@ -255,6 +255,10 @@
 .aur-root[data-glass="on"][data-view="poster"] .aur-side-meta { text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5); }
 .aur-root[data-glass="on"] .aur-side-artist { color: var(--g-ink-dim); }
 
+/* the WebGL scene canvas (scenes.js): drawn while a scene runs (data-sc="on"), else the theme's plain CSS ambience shows */
+.aur-fx > canvas.aur-fx-sc { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.aur-root[data-sc="on"] .aur-fx > canvas.aur-fx-sc { display: block; }
+
 /* a turntable's tonearm: only the Lounge theme shows it (themes/lounge.css) */
 .aur-tonearm { display: none; }
 

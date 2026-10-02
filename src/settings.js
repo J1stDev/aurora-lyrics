@@ -215,8 +215,8 @@ export const THEMES = [
 	{ id: "sunset", label: "Sunset", hint: "Warm shimmer", swatch: ["#ff8a4c", "#3a0e2e"], values: { font: "inter", textColor: "accent", accent: "#ff8a4c", animation: "spring", wordAnim: "shimmer", bgStyle: "gradient", bgOpacity: 0.4 } },
 	{ id: "midnight", label: "Midnight", hint: "Cool blue", swatch: ["#7aa2ff", "#0b1330"], values: { font: "inter", textColor: "accent", accent: "#7aa2ff", bgStyle: "gradient", bgOpacity: 0.6 } },
 	{ id: "vaporwave", label: "Vaporwave", hint: "Pastel dream, checker floor, VHS", swatch: ["#ff71ce", "#2b0f5c"], values: { view: "split", font: "wide", fontWeight: "700", accent: "#ff71ce", glow: "soft", animation: "slide", wordAnim: "glow", bgStyle: "gradient", bgOpacity: 0.3 } },
-	{ id: "ocean", label: "Ocean", hint: "A dive: light shafts, manta, jellyfish", swatch: ["#3fb4e8", "#04264f"], values: { view: "split", font: "rounded", fontWeight: "800", accent: "#5fd4ff", animation: "flow", wordAnim: "shimmer", bgStyle: "gradient", bgOpacity: 0.3 } },
-	{ id: "rain", label: "Rain", hint: "Real drops on a night window", swatch: ["#8fb4e6", "#0b1220"], values: { view: "lyrics", font: "inter", fontWeight: "700", textAlign: "center", accent: "#9fc2e8", glow: "soft", animation: "fade", wordAnim: "focus", bgStyle: "gradient", bgOpacity: 0.55 } },
+	{ id: "ocean", label: "Ocean", hint: "A dive: light shafts, bubbles, jellyfish", glass: true, swatch: ["#3fb4e8", "#04264f"], values: { view: "split", font: "rounded", fontWeight: "800", accent: "#5fd4ff", animation: "flow", wordAnim: "shimmer", bgStyle: "gradient", bgOpacity: 0.3 } },
+	{ id: "rain", label: "Rain", hint: "A wiped patch on a rainy night window", glass: true, swatch: ["#8fb4e6", "#0b1220"], values: { view: "lyrics", font: "inter", fontWeight: "700", textAlign: "center", accent: "#9fc2e8", glow: "soft", animation: "fade", wordAnim: "focus", bgStyle: "gradient", bgOpacity: 0.55 } },
 ];
 
 /** The full look a theme produces (defaults + its own values). */

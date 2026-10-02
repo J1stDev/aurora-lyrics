@@ -1,0 +1,89 @@
+/* ============================================================== Ocean
+   A dive that lasts one song. The water is drawn by WebGL (src/scenes.js, scene-ocean.js): bright
+   shallows with the rippling underside of the surface, webs of light, shafts of sun, a manta ray and a
+   school of fish, which give way as you sink to dark water, marine snow and jellyfish glowing in the
+   deep; glass-sphere bubbles rise throughout. Here is the rest: the line being sung sits in an air
+   bubble (a pane that is nearly clear, with a thin rainbow sheen round its edge and two glints, like the
+   skin of a soap bubble); the cover is a porthole with a riveted steel flange; the lyrics are pale aqua
+   and rise into place like bubbles; the breaks are three small bubbles. Without WebGL the water is a
+   gradient that darkens as the song goes on (--aur-song). */
+
+.aur-root[data-look="ocean"] {
+	--aur-glow-tint: #7fe0ff;
+	/* the glass kit: clear water-glass */
+	--g-tint: rgba(140, 220, 255, 0.07);
+	--g-tint-top: rgba(220, 247, 255, 0.17);
+	--g-lit: rgba(235, 250, 255, 0.55);
+	--g-hair: rgba(170, 230, 255, 0.18);
+	--g-rim-a: rgba(240, 252, 255, 0.9);
+	--g-rim-b: rgba(120, 200, 235, 0.14);
+	--g-shadow: rgba(0, 20, 50, 0.5);
+	--g-glow: rgba(90, 210, 255, 0.28);
+	--g-blur: 12px;
+	--g-sat: 1.45;
+	--g-bright: 1.1;
+	--lens-px: 0.8em;
+	--lens-py: 0.36em;
+	--lens-r: 999px;
+}
+.aur-root[data-look="ocean"][data-color="white"] { --aur-hi: #e6fbff; }
+
+/* the water without WebGL: turquoise sinking to deep blue as the song goes on */
+.aur-root[data-fx="ocean"] .aur-fx {
+	background:
+		radial-gradient(70% 36% at 50% -8%, rgba(210, 250, 255, 0.36), transparent 70%),
+		linear-gradient(to bottom,
+			color-mix(in oklab, rgb(30, 172, 214) calc((1 - var(--aur-song, 0)) * 100%), rgb(8, 72, 130)) 0%,
+			color-mix(in oklab, rgb(12, 114, 172) calc((1 - var(--aur-song, 0)) * 100%), rgb(5, 44, 98)) 34%,
+			color-mix(in oklab, rgb(6, 68, 130) calc((1 - var(--aur-song, 0)) * 100%), rgb(3, 24, 68)) 68%,
+			color-mix(in oklab, rgb(3, 36, 86) calc((1 - var(--aur-song, 0)) * 100%), rgb(2, 10, 36)) 100%);
+}
+
+/* ---------------------------------------------------------------- the air bubble (the lens) */
+.aur-root[data-look="ocean"] .aur-lens-pane {
+	background:
+		radial-gradient(ellipse 26% 46% at 8% 14%, rgba(255, 255, 255, 0.36), transparent 70%),
+		radial-gradient(ellipse 20% 36% at 92% 88%, rgba(255, 255, 255, 0.2), transparent 70%),
+		linear-gradient(180deg, rgba(210, 245, 255, 0.12), rgba(120, 210, 245, 0.05) 55%, rgba(120, 220, 255, 0.1));
+	box-shadow: inset 0 0 26px rgba(150, 235, 255, 0.2), 0 22px 50px -18px var(--g-shadow), 0 0 50px -10px var(--g-glow);
+}
+.aur-root[data-look="ocean"] .aur-lens-rim { /* the thin film: a rainbow sheen round the edge */
+	padding: 2px;
+	background: conic-gradient(from 15deg, rgba(150, 255, 235, 0.9), rgba(150, 170, 255, 0.8), rgba(255, 160, 230, 0.8), rgba(255, 235, 160, 0.8), rgba(150, 255, 235, 0.9));
+}
+
+/* ---------------------------------------------------------------- the cover, a porthole (Split, Mirrored, Captions and Stage layouts) */
+.aur-root[data-look="ocean"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap {
+	--oc-rim: max(12px, 2.4vmin);
+	--cover-r: 50%;
+	box-shadow: 0 0 0 max(3px, 0.5vmin) #06131c, 0 2vmin 5vmin rgba(0, 12, 30, 0.6) !important;
+}
+/* the flange: brushed steel in sections, riveted */
+.aur-root[data-look="ocean"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap::before {
+	inset: calc(var(--oc-rim) * -1 - max(3px, 0.5vmin));
+	z-index: auto;
+	border-radius: 50%;
+	background:
+		repeating-conic-gradient(from 0deg, rgba(8, 20, 28, 0.8) 0 1.4deg, transparent 1.4deg 30deg),
+		conic-gradient(from 25deg, #b3c3cc, #6d7f89, #c9d6dd, #56666f, #aebdc6, #64747d, #b3c3cc);
+	-webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--oc-rim)), #000 calc(100% - var(--oc-rim) + 1px));
+	mask: radial-gradient(farthest-side, transparent calc(100% - var(--oc-rim)), #000 calc(100% - var(--oc-rim) + 1px));
+	backdrop-filter: none;
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+/* the glass: a glint across it, and a deep tint at its edge */
+.aur-root[data-look="ocean"]:is([data-view="split"], [data-view="mirror"], [data-view="captions"], [data-view="stage"]) .aur-art-wrap::after {
+	border-radius: 50%;
+	background:
+		linear-gradient(135deg, rgba(255, 255, 255, 0.34) 0, rgba(255, 255, 255, 0.06) 30%, transparent 31%),
+		radial-gradient(circle, transparent 60%, rgba(0, 30, 60, 0.42));
+	box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- the lyrics and the breaks */
+.aur-root[data-look="ocean"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-oc-line 1.6s var(--aur-ease); }
+@keyframes aur-oc-line { from { opacity: 0.3; transform: translateY(0.3em); } }
+.aur-root[data-look="ocean"] .aur-dots i {
+	background: radial-gradient(circle at 34% 30%, #fff 0 12%, rgba(255, 255, 255, 0.22) 32%, rgba(120, 220, 255, 0.34) 72%);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 0 0.4em rgba(120, 220, 255, 0.4);
+}

@@ -417,7 +417,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		document.body.append(root);
 		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurSettings = settings; // the preview page sets this, to switch themes from the console
-		ui = { trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), gl: bg.querySelector(".aur-fx-gl"), sc: bg.querySelector(".aur-fx-sc"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { lens, trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), gl: bg.querySelector(".aur-fx-gl"), sc: bg.querySelector(".aur-fx-sc"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -569,7 +569,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			delete ui.root.dataset.gl;
 			return;
 		}
-		rain ||= createRain(ui.gl, ui.root, ui.bg);
+		rain ||= createRain(ui.gl, ui.root, ui.bg, () => (ui.lens.dataset.state === "none" || ui.lens.dataset.browse === "on" ? null : ui.lens.firstElementChild.getBoundingClientRect())); // the pane of the lens is wiped clear
 		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurRain = rain; // the preview page sets this, to poke at the scene
 		if (!rain.init()) {
 			ui.root.dataset.gl = "off";

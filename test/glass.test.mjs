@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GLASS_SIZES, glassMapUri } from "../src/glass.js";
-import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
+import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oceanPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
 import { NEON_FRAG } from "../src/scene-neon.js";
 import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
 import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 import { BLACKMETAL_FRAG } from "../src/scene-blackmetal.js";
 import { LOUNGE_FRAG } from "../src/scene-lounge.js";
+import { OCEAN_FRAG } from "../src/scene-ocean.js";
 import { SCENE_VERT, SCENE_HEAD } from "../src/scene-glsl.js";
 
 const inRange = (v) => v.every((x) => Number.isFinite(x) && x >= 0 && x <= 1);
@@ -107,8 +108,20 @@ test("lounge palette: always amber", () => {
 	}
 });
 
+test("ocean palette: aqua from the accent, a turquoise, and a violet-pink for the deep", () => {
+	const hue = (rgb) => rgbToOklch(rgb.map((v) => v * 255))[2];
+	for (const accent of [[95, 212, 255], [255, 60, 60], [255, 255, 255], null]) {
+		const p = oceanPalette(accent, null);
+		for (const k of ["uA", "uB", "uC", "uBase"]) assert.ok(inRange(p[k]), `${k} for ${accent}`);
+		assert.ok(Math.abs(wrap(hue(p.uB) - 185)) < 10);
+		assert.ok(Math.abs(wrap(hue(p.uC) - 330)) < 10);
+	}
+	assert.ok(Math.abs(wrap(hue(oceanPalette([95, 212, 255], null).uA) - rgbToOklch([95, 212, 255])[2])) < 10);
+});
+
 test("scenes: only themes with a shader have one", () => {
 	assert.equal(hasScene("neon"), true);
+	assert.equal(hasScene("ocean"), true);
 	assert.equal(hasScene("blackmetal"), true);
 	assert.equal(hasScene("lounge"), true);
 	assert.equal(hasScene("karaoke"), true);
@@ -119,7 +132,7 @@ test("scenes: only themes with a shader have one", () => {
 
 test("scene shaders are well-formed GLSL ES 3.00 sources", () => {
 	assert.ok(SCENE_VERT.startsWith("#version 300 es"));
-	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG]) {
+	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG, OCEAN_FRAG]) {
 		assert.ok(frag.startsWith("#version 300 es"));
 		assert.equal(frag.split("#version").length - 1, 1, "one version line");
 		assert.ok(frag.includes(SCENE_HEAD));
