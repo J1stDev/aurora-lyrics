@@ -29,7 +29,7 @@ test("Neon and Rain are drawn by their stylesheets, with every layer they rely o
 	assert.match(neon, /-webkit-box-reflect/, "the mirrored floor");
 	assert.equal((neon.match(/--lit: url\(/g) || []).length, 11, "a lit mask for each sign");
 	const rain = css["themes/rain.css"];
-	assert.match(rain, /@property --rx/, "the registered properties that glide the wiped patch");
-	assert.match(rain, /clip-path: var\(--clip\)/, "the patch");
-	for (const v of ["aur-rn-fall-far", "aur-rn-fall-mid", "aur-rn-fall-near", "aur-rn-approach", "aur-rn-recede"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
+	assert.match(rain, /\.aur-fx-e > i:nth-child\(22\) \{ background-image: url\("data:image\/svg\+xml/, "the cat");
+	for (const v of ["aur-rn-fall-far", "aur-rn-fall-near", "aur-rn-drift", "aur-rn-tail", "aur-rn-steam", "aur-rn-flicker", "aur-rn-bolt"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
+	assert.doesNotMatch(rain, /data:image\/png/, "all of it is vector art");
 });

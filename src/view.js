@@ -41,7 +41,6 @@ export class LyricsView {
 		this.onShare = opts.onShare;
 		this.onLine = opts.onLine; // a sung line was reached in normal playback (stats)
 		this.lens = opts.lens || null; // the glass pane behind the line being sung (see placeLens)
-		this.mirror = opts.mirror || null; // an element that is told where the pane is, for a theme that wipes a patch of glass clear (Rain)
 		this.lensState = "";
 		this.list = h("div", { class: "aur-lines" });
 		this.message = h("div", { class: "aur-message", role: "status" });
@@ -452,7 +451,6 @@ export class LyricsView {
 		if (!lens || state === this.lensState) return;
 		this.lensState = state;
 		lens.dataset.state = state;
-		if (this.mirror) this.mirror.dataset.lens = state;
 	}
 
 	/** Where the text of a line sits inside the line's own box (undoing the line's current scale). */
@@ -498,16 +496,6 @@ export class LyricsView {
 		st.setProperty("--lw", `${box.w.toFixed(1)}px`);
 		st.setProperty("--lh", `${box.h.toFixed(1)}px`);
 		st.setProperty("--lf", getComputedStyle(el).fontSize); // the line's font size: the pane's padding is in em
-		if (this.mirror) {
-			const m = this.mirror;
-			if (snap) m.dataset.snap = "on";
-			m.style.setProperty("--rx", `${x.toFixed(1)}px`);
-			m.style.setProperty("--ry", `${y.toFixed(1)}px`);
-			m.style.setProperty("--rw", `${box.w.toFixed(1)}px`);
-			m.style.setProperty("--rh", `${box.h.toFixed(1)}px`);
-			m.style.setProperty("--rf", st.getPropertyValue("--lf"));
-			if (snap) nextFrame(() => delete m.dataset.snap);
-		}
 		this.setLens(el.classList.contains("is-gap") ? "gap" : "line");
 		if (snap) {
 			void lens.offsetWidth;
@@ -559,7 +547,6 @@ export class LyricsView {
 			this.browsing = true;
 			this.stage.classList.add("is-browsing");
 			if (this.lens) this.lens.dataset.browse = "on";
-			if (this.mirror) this.mirror.dataset.browse = "on";
 		}
 		this.list.style.setProperty("--aur-y", `${Math.round(this.browseY)}px`);
 		clearTimeout(this.browseTimer);
@@ -573,7 +560,6 @@ export class LyricsView {
 		this.browsing = false;
 		this.stage.classList.remove("is-browsing");
 		if (this.lens) delete this.lens.dataset.browse;
-		if (this.mirror) delete this.mirror.dataset.browse;
 		if (instant) return;
 		this.list.dataset.dir = this.browseY > this.y ? "up" : "down";
 		this.list.style.setProperty("--aur-y", `${this.y}px`);

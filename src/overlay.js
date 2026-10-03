@@ -359,7 +359,6 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const view = new LyricsView(stage, {
 			lens,
-			mirror: bg.querySelector(".aur-fx"),
 			onShare: (i) => openShare(i),
 			onLine: () => state.open && isPlaying() && !document.hidden && state.track && addLine(statsObj(), state.track.uri),
 			onSeek: (t) => {
