@@ -12,17 +12,14 @@
 // always agree.
 
 import { SCENE_VERT } from "./scene-glsl.js";
-import { NEON_FRAG } from "./scene-neon.js";
 import { KARAOKE_FRAG } from "./scene-karaoke.js";
 import { GOTHIC_FRAG } from "./scene-gothic.js";
 import { BLACKMETAL_FRAG } from "./scene-blackmetal.js";
 import { LOUNGE_FRAG } from "./scene-lounge.js";
 import { OCEAN_FRAG } from "./scene-ocean.js";
 import { RETRO_FRAG } from "./scene-retro.js";
-import { parseCssColor } from "./rain.js";
 
 const SCENES = {
-	neon: { frag: NEON_FRAG, palette: (accent, deep) => neonPalette(accent, deep) },
 	karaoke: { frag: KARAOKE_FRAG, palette: (accent, deep) => ktvPalette(accent, deep) },
 	gothic: { frag: GOTHIC_FRAG, palette: (accent, deep) => gothicPalette(accent, deep) },
 	blackmetal: { frag: BLACKMETAL_FRAG, palette: (accent, deep) => blackmetalPalette(accent, deep) },
@@ -84,18 +81,6 @@ export function oklchToRgb(L, C, h) {
 function scBase(deep) {
 	const base = rgbToOklch(deep || [20, 30, 60]);
 	return oklchToRgb(Math.min(base[0], 0.45) * 0.5, Math.min(base[1], 0.12), base[2]);
-}
-
-/** The neon colours of a scene from the album's accent and deep colour (both [r, g, b] 0-255 or null). */
-export function neonPalette(accent, deep) {
-	const [, C, h] = rgbToOklch(accent || [255, 255, 255]);
-	const hue = C < 0.02 ? 0 : h; // a colourless accent: the same hot pink the stylesheet gets
-	return {
-		uA: oklchToRgb(0.74, Math.max(C, 0.22), hue),
-		uB: oklchToRgb(0.8, Math.max(C, 0.18), hue + 150),
-		uC: oklchToRgb(0.76, Math.max(C, 0.2), hue - 40),
-		uBase: scBase(deep),
-	};
 }
 
 /** Karaoke: the accent made hot, with a cool cyan and a violet for company (as the stylesheet's --ktv-a, -b, -c). */
@@ -163,6 +148,24 @@ export function gothicPalette(accent, deep) {
 		uC: oklchToRgb(0.78, 0.15, 80),
 		uBase: scBase(deep),
 	};
+}
+
+/** "rgb(…)", "rgba(…)", "color(srgb r g b)" or "#rgb"/"#rrggbb" → [r, g, b] (0-255), or null. */
+export function parseCssColor(s) {
+	if (typeof s !== "string") return null;
+	s = s.trim().toLowerCase();
+	let m = s.match(/^#([0-9a-f]{3,8})$/);
+	if (m) {
+		let h = m[1];
+		if (h.length === 3 || h.length === 4) h = [...h].map((c) => c + c).join("");
+		if (h.length !== 6 && h.length !== 8) return null;
+		return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+	}
+	m = s.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/);
+	if (m) return [m[1], m[2], m[3]].map((v) => Math.max(0, Math.min(255, Math.round(Number(v)))));
+	m = s.match(/^color\(\s*srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+	if (m) return [m[1], m[2], m[3]].map((v) => Math.max(0, Math.min(255, Math.round(Number(v) * 255))));
+	return null;
 }
 
 let scSwatch = null;

@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GLASS_SIZES, glassMapUri } from "../src/glass.js";
-import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oceanPalette, retroPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
-import { NEON_FRAG } from "../src/scene-neon.js";
+import { ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oceanPalette, retroPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
 import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
 import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 import { BLACKMETAL_FRAG } from "../src/scene-blackmetal.js";
@@ -52,21 +51,6 @@ test("out-of-gamut colours lose chroma but keep their hue", () => {
 	assert.ok(inRange(rgb));
 	const [, c, h] = rgbToOklch(rgb.map((v) => v * 255));
 	assert.ok(c < 0.4 && Math.abs(h - 140) < 6, `${c} ${h}`);
-});
-
-test("neon palette: valid colours, hues round the wheel from the accent", () => {
-	for (const accent of [[255, 90, 40], [40, 200, 255], [120, 255, 120], [255, 255, 255], [0, 0, 0], null]) {
-		const p = neonPalette(accent, [30, 20, 70]);
-		for (const k of ["uA", "uB", "uC", "uBase"]) assert.ok(inRange(p[k]), `${k} for ${accent}`);
-	}
-	const hue = (rgb) => rgbToOklch(rgb.map((v) => v * 255))[2];
-	const p = neonPalette([255, 90, 40], null);
-	const h0 = hue(p.uA);
-	assert.ok(Math.abs(wrap(hue(p.uB) - h0 - 150)) < 10);
-	assert.ok(Math.abs(wrap(hue(p.uC) - h0 + 40)) < 10);
-	// a colourless accent gives the same hot pink as the stylesheet's oklch(from … 0.74 0.22 h)
-	const grey = neonPalette([128, 128, 128], null);
-	assert.ok(Math.abs(wrap(hue(grey.uA))) < 10);
 });
 
 test("karaoke palette: the accent made hot, with the stylesheet's cyan and violet", () => {
@@ -131,20 +115,20 @@ test("retro palette: the phosphor is the accent, amber by default", () => {
 });
 
 test("scenes: only themes with a shader have one", () => {
-	assert.equal(hasScene("neon"), true);
+	assert.equal(hasScene("neon"), false); // Neon and Rain are drawn by the stylesheet
 	assert.equal(hasScene("ocean"), true);
 	assert.equal(hasScene("blackmetal"), true);
 	assert.equal(hasScene("lounge"), true);
 	assert.equal(hasScene("karaoke"), true);
 	assert.equal(hasScene("gothic"), true);
 	assert.equal(hasScene("retro"), true);
-	assert.equal(hasScene("rain"), false); // Rain has its own renderer
+	assert.equal(hasScene("rain"), false);
 	assert.equal(hasScene("toString"), false);
 });
 
 test("scene shaders are well-formed GLSL ES 3.00 sources", () => {
 	assert.ok(SCENE_VERT.startsWith("#version 300 es"));
-	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG, OCEAN_FRAG, RETRO_FRAG]) {
+	for (const frag of [KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG, OCEAN_FRAG, RETRO_FRAG]) {
 		assert.ok(frag.startsWith("#version 300 es"));
 		assert.equal(frag.split("#version").length - 1, 1, "one version line");
 		assert.ok(frag.includes(SCENE_HEAD));

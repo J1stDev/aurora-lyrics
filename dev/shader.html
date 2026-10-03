@@ -16,17 +16,16 @@
 			// A harness for the WebGL scenes: renders one scene full screen from the real source modules and shows
 			// compile errors. ?scene=gothic&t=12&beat=0&bar=0&line=0&gap=0&centered=1&accent=%23c21f3f&anim=1
 			import { SCENE_VERT } from "../src/scene-glsl.js";
-			import { NEON_FRAG } from "../src/scene-neon.js";
 			import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
 			import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 			import { BLACKMETAL_FRAG } from "../src/scene-blackmetal.js";
 			import { LOUNGE_FRAG } from "../src/scene-lounge.js";
 			import { RETRO_FRAG } from "../src/scene-retro.js";
-			import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, retroPalette, cssToRgb } from "../src/scenes.js";
+			import { ktvPalette, gothicPalette, blackmetalPalette, loungePalette, retroPalette, cssToRgb } from "../src/scenes.js";
 
-			const SC = { neon: [NEON_FRAG, neonPalette, "#ff6a3d"], karaoke: [KARAOKE_FRAG, ktvPalette, "#ff3d8b"], gothic: [GOTHIC_FRAG, gothicPalette, "#c21f3f"], blackmetal: [BLACKMETAL_FRAG, blackmetalPalette, "#aebfcd"], lounge: [LOUNGE_FRAG, loungePalette, "#e3a35a"], retro: [RETRO_FRAG, retroPalette, "#ffb000"] };
+			const SC = { karaoke: [KARAOKE_FRAG, ktvPalette, "#ff3d8b"], gothic: [GOTHIC_FRAG, gothicPalette, "#c21f3f"], blackmetal: [BLACKMETAL_FRAG, blackmetalPalette, "#aebfcd"], lounge: [LOUNGE_FRAG, loungePalette, "#e3a35a"], retro: [RETRO_FRAG, retroPalette, "#ffb000"] };
 			const q = new URLSearchParams(location.search);
-			const id = q.get("scene") || "neon";
+			const id = q.get("scene") || "karaoke";
 			const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
 			const log = document.getElementById("log");
 			const say = (m) => ((log.style.display = "block"), (log.textContent += m + "\n"));
