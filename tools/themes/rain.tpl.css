@@ -70,6 +70,7 @@
 }
 .aur-root[data-fx="rain"] .aur-fx[data-snap] .aur-fx-a { transition: none; }
 .aur-root[data-fx="rain"] .aur-fx:is([data-lens="none"], [data-browse="on"]) .aur-fx-a { --rw: 0px; --rh: 0px; --rf: 0px; }
+.aur-root[data-fx="rain"][data-lens="off"] .aur-fx-a { --rw: 0px; --rh: 0px; --rf: 0px; } /* the glass box is switched off: so is the wiped patch */
 .aur-root[data-fx="rain"] .aur-fx-a::before { /* the street, sharp */
 	content: "";
 	position: absolute;
@@ -262,7 +263,7 @@
 	content: "";
 	position: absolute;
 	inset: max(-5px, -0.14em);
-	border: max(3px, 0.1em) dotted rgba(228, 240, 255, 0.46);
+	border: max(2.5px, 0.075em) dotted rgba(228, 240, 255, 0.4);
 	border-radius: 999px;
 }
 .aur-root[data-look="rain"] .aur-lens-rim::after { /* a glint along the top left of the edge */

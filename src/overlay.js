@@ -1006,18 +1006,21 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	function keepPhase(change) {
 		let loops = [];
 		try {
-			loops = ui.fx.getAnimations({ subtree: true }).filter((a) => {
-				const t = a.effect?.getTiming?.();
-				return t && t.iterations === Infinity && t.direction === "normal" && a.playState === "running";
-			});
+			loops = ui.fx.getAnimations({ subtree: true }).filter((a) => a.effect?.getTiming?.().iterations === Infinity && a.playState === "running");
 		} catch {}
-		const at = loops.map((a) => a.effect.getComputedTiming().progress);
+		// where each is in its loop: the iteration, and how far through it the clock is (an alternating loop runs backwards on odd rounds)
+		const seen = loops.map((a) => {
+			const t = a.effect.getComputedTiming();
+			const back = (t.direction === "alternate" && t.currentIteration % 2 === 1) || (t.direction === "alternate-reverse" && t.currentIteration % 2 === 0) || t.direction === "reverse";
+			return { d: t.duration, it: t.currentIteration, at: t.progress == null ? null : back ? 1 - t.progress : t.progress };
+		});
 		change();
 		try {
 			void getComputedStyle(ui.fx).animationDuration; // let the new durations take hold
 			loops.forEach((a, i) => {
-				const d = a.effect.getComputedTiming().duration;
-				if (at[i] != null && d > 0) a.currentTime = at[i] * d;
+				const t = a.effect.getComputedTiming();
+				const s = seen[i];
+				if (s.at != null && t.duration > 0 && t.duration !== s.d) a.currentTime = t.delay + (s.it + s.at) * t.duration;
 			});
 		} catch {}
 	}

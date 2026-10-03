@@ -329,7 +329,8 @@ def build_street(seed=11):
                         continue
                     c = pick_window(r)
                     a = (0.95 - 0.55 * fg) * r.uniform(0.6, 1.0)
-                    buckets.setdefault((c, round(a, 1)), []).append(q)
+                    if zc < 150 or r.random() < (0.55 if zc < 260 else 0.3):  # a far window is a speck: draw only some in the sharp picture (all of them light the fog)
+                        buckets.setdefault((c, round(a, 1)), []).append(q)
                     d.window(q, c, a)
             for (c, a), qs in buckets.items():
                 d.svg.append(f"<path d='{''.join(seg(q) for q in qs)}' fill='{rgb(c)}' fill-opacity='{n(a, 1)}'/>")
