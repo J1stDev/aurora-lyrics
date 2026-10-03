@@ -461,6 +461,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			look: all.themeFx || "none", // the theme's lyric styling, independent of the ambience toggle
 			glass: THEMES.find((t) => t.id === all.themeFx)?.glass ? "on" : "off", // the liquid-glass kit (glass.css): lens, glass bar, glass cover
 			refract: all.glassRefract ? "on" : "off",
+			lens: all.glassLens ? "on" : "off",
 			depth: all.depthBlur ? "on" : "off",
 			bg: all.bgStyle === "custom" && !all.customBg ? "album" : all.bgStyle,
 			bganim: all.bgAnimate && !reduced ? "on" : "off",
@@ -569,7 +570,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			delete ui.root.dataset.gl;
 			return;
 		}
-		rain ||= createRain(ui.gl, ui.root, ui.bg, () => (ui.lens.dataset.state === "none" || ui.lens.dataset.browse === "on" ? null : ui.lens.firstElementChild.getBoundingClientRect())); // the pane of the lens is wiped clear
+		rain ||= createRain(ui.gl, ui.root, ui.bg, () => (ui.root.dataset.lens === "off" || ui.lens.dataset.state === "none" || ui.lens.dataset.browse === "on" ? null : ui.lens.firstElementChild.getBoundingClientRect())); // the pane of the lens is wiped clear
 		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurRain = rain; // the preview page sets this, to poke at the scene
 		if (!rain.init()) {
 			ui.root.dataset.gl = "off";

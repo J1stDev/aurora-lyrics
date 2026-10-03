@@ -63,6 +63,7 @@ export const SCHEMA = [
 	// Theme ("accent" = "album" or a "#rrggbb" colour; used for glow, tints, karaoke, gradient)
 	{ key: "accent", section: "Theme", label: "Accent colour", type: "color", default: "album" },
 	{ key: "ambience", section: "Theme", label: "Theme ambience (scanlines, spotlights, stars…)", type: "toggle", default: true },
+	{ key: "glassLens", section: "Theme", label: "Glass box behind the lyrics (glass themes frame the current line in a pane)", type: "toggle", default: true },
 	{ key: "glassRefract", section: "Theme", label: "Glass refraction (glass themes bend what is behind them; turn off if the lyrics stutter)", type: "toggle", default: true },
 	{ key: "beatSync", section: "Theme", label: "Time ambience to the beat (when Spotify has beat data for the song)", type: "toggle", default: true },
 	// Text

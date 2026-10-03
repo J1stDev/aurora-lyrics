@@ -79,6 +79,7 @@
 	pointer-events: none;
 }
 .aur-root[data-glass="on"] .aur-lens { display: block; }
+.aur-root[data-glass="on"][data-lens="off"] .aur-lens { display: none; }
 .aur-lens.is-snap { transition: none; }
 .aur-lens[data-state="gap"] { --lens-px: 0.5em; --lens-py: 0.26em; --lens-r: 999px; }
 .aur-lens > i {
