@@ -1027,6 +1027,26 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		setBeats(null);
 		loadBeats(uri).then((grid) => state.beatUri === uri && setBeats(grid));
 	}
+	/** Run `change` (which alters --aur-beat) without the looping animations of the ambience jumping: their durations follow
+	 *  the beat, and a CSS animation whose duration changes keeps its clock, not its place in the loop, so it would leap. */
+	function keepPhase(change) {
+		let loops = [];
+		try {
+			loops = ui.fx.getAnimations({ subtree: true }).filter((a) => {
+				const t = a.effect?.getTiming?.();
+				return t && t.iterations === Infinity && t.direction === "normal" && a.playState === "running";
+			});
+		} catch {}
+		const at = loops.map((a) => a.effect.getComputedTiming().progress);
+		change();
+		try {
+			void getComputedStyle(ui.fx).animationDuration; // let the new durations take hold
+			loops.forEach((a, i) => {
+				const d = a.effect.getComputedTiming().duration;
+				if (at[i] != null && d > 0) a.currentTime = at[i] * d;
+			});
+		} catch {}
+	}
 	function setBeats(grid) {
 		state.beats = grid;
 		state.beatIdx = state.barIdx = state.secIdx = -1;
@@ -1034,10 +1054,10 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		const bg = ui.bg;
 		if (grid) {
 			bg.dataset.beats = "on";
-			bg.style.setProperty("--aur-beat", `${Math.round(60000 / grid.tempo)}ms`);
+			keepPhase(() => bg.style.setProperty("--aur-beat", `${Math.round(60000 / grid.tempo)}ms`));
 		} else {
 			for (const k of ["beats", "bt", "bar"]) delete bg.dataset[k];
-			bg.style.removeProperty("--aur-beat");
+			keepPhase(() => bg.style.removeProperty("--aur-beat"));
 			ui.fx.style.removeProperty("--aur-energy");
 		}
 	}

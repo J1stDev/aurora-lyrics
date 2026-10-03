@@ -2863,11 +2863,13 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-root[data-fx="vaporwave"] .aur-fx-c::before {
 	content: "";
 	position: absolute;
-	left: -300%;
-	right: -300%;
-	top: calc(var(--vw-p) * 0.287 - 1500px);
-	height: 3000px;
-	transform-origin: 50% 1500px;
+	left: -190%; /* wide enough that the far rows, which are faded into the horizon, still fill the screen; a plane any bigger is a very large layer for the GPU */
+	right: -190%;
+	top: calc(var(--vw-p) * 0.287 - 1100px);
+	height: 2200px;
+	transform-origin: 50% 1100px;
+	will-change: transform;
+	backface-visibility: hidden;
 	transform: rotateX(74deg);
 	background:
 		linear-gradient(rgba(255, 255, 255, 0.2) 0 2px, transparent 2px) 0 0 / var(--vw-cell) var(--vw-cell),
