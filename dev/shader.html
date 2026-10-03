@@ -21,9 +21,10 @@
 			import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 			import { BLACKMETAL_FRAG } from "../src/scene-blackmetal.js";
 			import { LOUNGE_FRAG } from "../src/scene-lounge.js";
-			import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, cssToRgb } from "../src/scenes.js";
+			import { RETRO_FRAG } from "../src/scene-retro.js";
+			import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, retroPalette, cssToRgb } from "../src/scenes.js";
 
-			const SC = { neon: [NEON_FRAG, neonPalette, "#ff6a3d"], karaoke: [KARAOKE_FRAG, ktvPalette, "#ff3d8b"], gothic: [GOTHIC_FRAG, gothicPalette, "#c21f3f"], blackmetal: [BLACKMETAL_FRAG, blackmetalPalette, "#aebfcd"], lounge: [LOUNGE_FRAG, loungePalette, "#e3a35a"] };
+			const SC = { neon: [NEON_FRAG, neonPalette, "#ff6a3d"], karaoke: [KARAOKE_FRAG, ktvPalette, "#ff3d8b"], gothic: [GOTHIC_FRAG, gothicPalette, "#c21f3f"], blackmetal: [BLACKMETAL_FRAG, blackmetalPalette, "#aebfcd"], lounge: [LOUNGE_FRAG, loungePalette, "#e3a35a"], retro: [RETRO_FRAG, retroPalette, "#ffb000"] };
 			const q = new URLSearchParams(location.search);
 			const id = q.get("scene") || "neon";
 			const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);

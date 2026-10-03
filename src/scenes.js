@@ -18,6 +18,7 @@ import { GOTHIC_FRAG } from "./scene-gothic.js";
 import { BLACKMETAL_FRAG } from "./scene-blackmetal.js";
 import { LOUNGE_FRAG } from "./scene-lounge.js";
 import { OCEAN_FRAG } from "./scene-ocean.js";
+import { RETRO_FRAG } from "./scene-retro.js";
 import { parseCssColor } from "./rain.js";
 
 const SCENES = {
@@ -27,6 +28,7 @@ const SCENES = {
 	blackmetal: { frag: BLACKMETAL_FRAG, palette: (accent, deep) => blackmetalPalette(accent, deep) },
 	lounge: { frag: LOUNGE_FRAG, palette: (accent, deep) => loungePalette(accent, deep) },
 	ocean: { frag: OCEAN_FRAG, palette: (accent, deep) => oceanPalette(accent, deep) },
+	retro: { frag: RETRO_FRAG, palette: (accent, deep) => retroPalette(accent, deep) },
 };
 
 /** Does this theme have a WebGL scene? */
@@ -126,6 +128,19 @@ export function oceanPalette(accent, deep) {
 		uB: oklchToRgb(0.78, 0.12, 185),
 		uC: oklchToRgb(0.7, 0.2, 330),
 		uBase: oklchToRgb(0.1, 0.05, 245),
+	};
+}
+
+/** Retro: the phosphor is the accent (amber unless the user picks another): the colour itself, a deeper shade for what has faded, and a hot near-white for what is brightest. */
+export function retroPalette(accent, deep) {
+	const [, C, h] = rgbToOklch(accent || [255, 176, 0]);
+	const hue = C < 0.03 ? 75 : h;
+	const chroma = Math.min(Math.max(C, 0.13), 0.19);
+	return {
+		uA: oklchToRgb(0.8, chroma, hue),
+		uB: oklchToRgb(0.52, chroma * 0.85, hue - 12),
+		uC: oklchToRgb(0.95, 0.06, hue + 8),
+		uBase: oklchToRgb(0.09, 0.025, hue),
 	};
 }
 

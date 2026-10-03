@@ -1,0 +1,204 @@
+/* ============================================================== Retro
+   An amber CRT terminal behind glass. The tube is drawn by WebGL (src/scenes.js, scene-retro.js): a
+   bulging screen in a black bezel, a log scrolling up it in dot-matrix type, a status bar that fills
+   as the song plays, a level meter of lit cells, scanlines, a rolling refresh bar and a window
+   reflected in the glass. The phosphor is the accent (amber by default; pick green and the whole
+   terminal turns green). Here is the rest: the line being sung sits in a window of the terminal (smoked
+   glass, a double rule, a file name on its top edge, and the line's progress as a row of blocks), the
+   cover is a phosphor picture on a scan-lined screen, the lettering glows like phosphor, each new
+   line arrives with a sync glitch, and a block cursor blinks at the end of the line. Without WebGL
+   the screen is scanlines and a warm glow on black. */
+
+.aur-root[data-look="retro"] {
+	--rt: var(--aur-accent);
+	--rt-dim: color-mix(in oklab, var(--rt) 62%, #000);
+	--rt-ink: #0e0800;
+	--rt-mono: "JetBrains Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+	--aur-glow-tint: var(--rt);
+	/* the glass kit: smoked glass lit from within by the phosphor */
+	--g-tint: rgba(14, 8, 0, 0.52);
+	--g-tint-top: color-mix(in oklab, var(--rt) 11%, transparent);
+	--g-lit: color-mix(in oklab, var(--rt) 52%, transparent);
+	--g-hair: color-mix(in oklab, var(--rt) 26%, transparent);
+	--g-rim-a: color-mix(in oklab, var(--rt) 82%, #fff);
+	--g-rim-b: color-mix(in oklab, var(--rt) 20%, transparent);
+	--g-shadow: rgba(0, 0, 0, 0.7);
+	--g-glow: color-mix(in oklab, var(--rt) 30%, transparent);
+	--g-blur: 12px;
+	--g-sat: 1.35;
+	--g-bright: 0.86;
+	--g-ink: color-mix(in oklab, var(--rt) 38%, #fff);
+	--g-ink-dim: color-mix(in oklab, var(--rt) 76%, #000);
+	--g-play: linear-gradient(180deg, color-mix(in oklab, var(--rt) 55%, #fff), var(--rt));
+	--g-play-ink: var(--rt-ink);
+	--lens-px: 0.62em;
+	--lens-py: 0.32em;
+	--lens-r: 7px;
+}
+.aur-root[data-look="retro"][data-color="white"] { --aur-hi: color-mix(in oklab, var(--rt) 30%, #fff); }
+
+/* the screen without WebGL: scanlines and a warm glow on black, in a dark bezel */
+.aur-root[data-fx="retro"] .aur-fx {
+	background:
+		repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+		radial-gradient(ellipse at 50% 45%, color-mix(in oklab, var(--rt) 13%, transparent), transparent 66%),
+		radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.62) 100%),
+		#0a0600;
+	box-shadow: inset 0 0 0 22px #050300, inset 0 0 0 23px color-mix(in oklab, var(--rt) 12%, transparent);
+}
+
+/* the chrome is set in the terminal's type */
+.aur-root[data-look="retro"] :is(.aur-time, .aur-source, .aur-title, .aur-artist, .aur-side-title, .aur-side-artist, .aur-offset-group, .aur-upnext, .aur-toast) { font-family: var(--rt-mono); }
+.aur-root[data-look="retro"] :is(.aur-side-title, .aur-title) { text-shadow: 0 0 0.5em color-mix(in oklab, var(--rt) 55%, transparent); }
+.aur-root[data-look="retro"][data-glass="on"] .aur-player-center { border-radius: 14px; }
+.aur-root[data-look="retro"][data-glass="on"] .aur-player-side { border-radius: 14px; }
+.aur-root[data-look="retro"][data-glass="on"] .aur-header { border-radius: 10px; }
+.aur-root[data-look="retro"][data-glass="on"] .aur-cover { border-radius: 5px; }
+.aur-root[data-look="retro"][data-glass="on"] .aur-play-btn { border-radius: 50%; }
+.aur-root[data-look="retro"][data-glass="on"] .aur-progress-track {
+	height: 7px;
+	margin-top: -3.5px;
+	border-radius: 0;
+	-webkit-mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px);
+	mask: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 7px); /* the bar is a row of blocks */
+}
+.aur-root[data-look="retro"][data-glass="on"] .aur-progress-fill { border-radius: 0; box-shadow: 0 0 10px color-mix(in oklab, var(--rt) 70%, transparent); }
+.aur-root[data-look="retro"][data-glass="on"] .aur-progress-knob { border-radius: 2px; width: 9px; height: 15px; left: -4.5px; margin-top: -7.5px; background: color-mix(in oklab, var(--rt) 55%, #fff); box-shadow: 0 0 10px var(--rt); }
+
+/* ---------------------------------------------------------------- the lens: a window of the terminal */
+.aur-root[data-look="retro"] .aur-lens-pane {
+	background:
+		repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+		linear-gradient(180deg, color-mix(in oklab, var(--rt) 9%, rgba(12, 7, 0, 0.5)), rgba(8, 5, 0, 0.62));
+	box-shadow:
+		inset 0 0 34px color-mix(in oklab, var(--rt) 13%, transparent),
+		0 0 54px -10px color-mix(in oklab, var(--rt) 28%, transparent),
+		0 26px 60px -18px var(--g-shadow);
+}
+.aur-root[data-look="retro"] .aur-lens-rim { /* a double rule */
+	padding: 0;
+	-webkit-mask: none;
+	mask: none;
+	background: none;
+	border: 1px solid color-mix(in oklab, var(--rt) 78%, #fff 6%);
+	box-shadow: 0 0 0.35em color-mix(in oklab, var(--rt) 55%, transparent), inset 0 0 0.5em color-mix(in oklab, var(--rt) 22%, transparent);
+}
+.aur-root[data-look="retro"] .aur-lens-rim::before { /* the inner rule */
+	content: "";
+	position: absolute;
+	inset: max(3px, 0.07em);
+	border: 1px solid color-mix(in oklab, var(--rt) 34%, transparent);
+	border-radius: calc(var(--lens-r) - 3px);
+}
+.aur-root[data-look="retro"] .aur-lens-rim::after { /* the window's file name, on its top edge */
+	content: "LYRICS.TXT";
+	position: absolute;
+	left: 1.3em;
+	top: max(-0.48em, -12px);
+	padding: 0 0.55em;
+	font: 700 max(0.2em, 10px) / 1.5 var(--rt-mono);
+	letter-spacing: 0.14em;
+	color: var(--rt);
+	background: #0b0700;
+	text-shadow: 0 0 0.6em color-mix(in oklab, var(--rt) 70%, transparent);
+	white-space: nowrap;
+}
+.aur-root[data-look="retro"] .aur-lens-pane::after { /* and its state, on the right */
+	content: "● PLAY";
+	position: absolute;
+	right: 1.3em;
+	top: max(-0.48em, -12px);
+	padding: 0 0.55em;
+	font: 700 max(0.2em, 10px) / 1.5 var(--rt-mono);
+	letter-spacing: 0.14em;
+	color: var(--rt);
+	background: #0b0700;
+	white-space: nowrap;
+	animation: aur-rt-rec 1.6s steps(1) infinite;
+}
+.aur-root[data-look="retro"][data-playing="false"] .aur-lens-pane::after { content: "❚❚ HOLD"; animation: none; }
+@keyframes aur-rt-rec { 50% { opacity: 0.35; } }
+.aur-root[data-look="retro"] .aur-lens[data-state="gap"] { --lens-r: 7px; }
+.aur-root[data-look="retro"] .aur-lens[data-state="gap"] .aur-lens-rim::after,
+.aur-root[data-look="retro"] .aur-lens[data-state="gap"] .aur-lens-pane::after { display: none; }
+.aur-root[data-look="retro"] .aur-lens-sheen { /* a sweep of scan light on every new line */
+	background: linear-gradient(180deg, transparent 38%, color-mix(in oklab, var(--rt) 18%, transparent) 50%, transparent 62%) 0 -160% / 100% 260% no-repeat;
+	animation: none !important;
+}
+.aur-root[data-look="retro"][data-motion="full"][data-lb="a"] .aur-lens-sheen { animation: aur-rt-scan-a 0.9s linear !important; }
+.aur-root[data-look="retro"][data-motion="full"][data-lb="b"] .aur-lens-sheen { animation: aur-rt-scan-b 0.9s linear !important; }
+@keyframes aur-rt-scan-a { from { background-position-y: -160%; } to { background-position-y: 160%; } }
+@keyframes aur-rt-scan-b { from { background-position-y: -160%; } to { background-position-y: 160%; } }
+/* the line's progress: a row of blocks along the bottom of the window */
+.aur-root[data-look="retro"] .aur-lens .aur-lens-line {
+	inset: auto calc(var(--lens-px) * -1 + 1.1em) calc(var(--lens-py) * -1 + 0.2em) !important;
+	height: max(4px, 0.1em);
+	border-radius: 0 !important;
+	background: linear-gradient(90deg, var(--rt) calc(var(--lp, 0) * 100%), color-mix(in oklab, var(--rt) 18%, transparent) calc(var(--lp, 0) * 100%));
+	-webkit-mask: repeating-linear-gradient(90deg, #000 0 0.34em, transparent 0.34em 0.44em);
+	mask: repeating-linear-gradient(90deg, #000 0 0.34em, transparent 0.34em 0.44em);
+}
+.aur-root[data-look="retro"] .aur-lens[data-state="line"] .aur-lens-line { opacity: 1; }
+
+/* ---------------------------------------------------------------- the cover: a phosphor picture on a scan-lined screen */
+.aur-root[data-look="retro"]:not([data-view="poster"]) .aur-art-wrap { --cover-r: clamp(8px, 1.5vh, 16px); --cover-pad: clamp(8px, 1.4vh, 14px); }
+.aur-root[data-look="retro"] :is(.aur-art, .aur-cover) { filter: grayscale(1) contrast(1.35) brightness(1.3); }
+.aur-root[data-look="retro"] .aur-cover { box-shadow: 0 0 0 1px color-mix(in oklab, var(--rt) 50%, transparent), 0 0 14px -2px color-mix(in oklab, var(--rt) 50%, transparent); }
+.aur-root[data-look="retro"]:not([data-view="poster"]) .aur-art-wrap::before {
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(8, 5, 0, 0.72));
+	box-shadow:
+		0 0 0 max(3px, 0.5vh) #0a0600,
+		0 0 0 calc(max(3px, 0.5vh) + 1px) color-mix(in oklab, var(--rt) 36%, transparent),
+		inset 0 0 18px color-mix(in oklab, var(--rt) 25%, transparent),
+		0 0 5vh -1vh color-mix(in oklab, var(--rt) 38%, transparent);
+}
+.aur-root[data-look="retro"]:not([data-view="poster"]) .aur-art-wrap::after { /* the picture is tinted with the phosphor and lined */
+	background:
+		repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px),
+		radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.5) 100%),
+		color-mix(in oklab, var(--rt) 80%, #fff);
+	mix-blend-mode: multiply;
+	box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.5);
+}
+.aur-root[data-look="retro"][data-view="vinyl"] .aur-art-wrap::before { border-radius: 50%; }
+
+/* ---------------------------------------------------------------- the lettering */
+/* phosphor glow */
+.aur-root[data-look="retro"] .aur-stage .aur-line .aur-main {
+	text-shadow:
+		0 0 0.08em color-mix(in oklab, var(--rt) 55%, transparent),
+		0 0 0.45em color-mix(in oklab, var(--rt) 22%, transparent);
+}
+/* sync glitch on each new line: a sideways jolt with colour fringes */
+.aur-root[data-look="retro"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-glitch 0.32s steps(1); }
+@keyframes aur-fx-glitch {
+	0% { transform: translateX(0.06em); text-shadow: -0.05em 0 rgba(255, 40, 90, 0.7), 0.05em 0 rgba(40, 200, 255, 0.7); }
+	25% { transform: translateX(-0.04em) skewX(-4deg); }
+	50% { transform: translateX(0.02em); text-shadow: 0.03em 0 rgba(255, 40, 90, 0.5), -0.03em 0 rgba(40, 200, 255, 0.5); }
+	75%, 100% { transform: none; }
+}
+/* block caret while typing */
+.aur-root[data-look="retro"][data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c::after {
+	top: 0.12em;
+	bottom: 0.06em;
+	right: -0.6em;
+	width: 0.52em;
+	border-radius: 0;
+	background: color-mix(in oklab, var(--rt) 75%, transparent);
+}
+/* blinking block cursor at the end of the line (once it's sung, or straight away without word timing) */
+.aur-root[data-look="retro"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.is-gap) .aur-main::after {
+	content: "";
+	display: inline-block;
+	width: 0.5em;
+	height: 0.82em;
+	margin-left: 0.12em;
+	vertical-align: -0.08em;
+	background: var(--aur-hi);
+	box-shadow: 0 0 0.3em color-mix(in oklab, var(--rt) 50%, transparent);
+	animation: aur-fx-blink 1.05s steps(1) infinite;
+}
+.aur-root[data-look="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words:not(.is-sung) .aur-main::after { opacity: 0; }
+@keyframes aur-fx-blink { 50% { background: transparent; box-shadow: none; } }
+/* breaks: block characters instead of dots */
+.aur-root[data-look="retro"] .aur-dots i { width: 0.34em; height: 0.56em; border-radius: 0; background: var(--rt); box-shadow: 0 0 0.3em color-mix(in oklab, var(--rt) 60%, transparent); }

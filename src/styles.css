@@ -2349,78 +2349,6 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	opacity: 0.92;
 }
 
-/* Retro: an amber CRT terminal. Rounded tube corners in a black bezel, flickering scanlines,
-   a phosphor tint, and a slow rolling refresh bar. Text glows like phosphor; each new line
-   arrives with a quick sync glitch, the typewriter caret is a terminal block, a block cursor
-   blinks at the end of a finished line, and breaks show block characters instead of dots. */
-.aur-root[data-fx="retro"] .aur-fx-a {
-	display: block;
-	inset: 0;
-	background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px);
-	opacity: 0.55;
-	animation: aur-fx-flicker 0.12s steps(2) infinite;
-}
-@keyframes aur-fx-flicker { 50% { opacity: 0.47; } }
-.aur-root[data-fx="retro"] .aur-fx-b {
-	display: block;
-	inset: 10px;
-	border-radius: 4.5vmin;
-	background: radial-gradient(ellipse at 50% 45%, color-mix(in oklab, var(--aur-accent) 10%, transparent), transparent 65%), radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.6) 100%);
-	box-shadow:
-		0 0 0 40px #050300,
-		inset 0 0 3vmin color-mix(in oklab, var(--aur-accent) 12%, transparent),
-		inset 0 0 0 1px color-mix(in oklab, var(--aur-accent) 10%, transparent);
-}
-.aur-root[data-fx="retro"] .aur-fx-c {
-	display: block;
-	left: 0;
-	right: 0;
-	top: 0;
-	height: 22%;
-	background: linear-gradient(transparent, color-mix(in oklab, var(--aur-accent) 7%, transparent), transparent);
-	animation: aur-fx-roll 8s linear infinite;
-}
-@keyframes aur-fx-roll { from { transform: translateY(-30vh); } to { transform: translateY(130vh); } }
-.aur-root[data-fx="retro"] .aur-bg-grain { opacity: 0.06; }
-/* phosphor glow */
-.aur-root[data-look="retro"] .aur-stage .aur-line .aur-main {
-	text-shadow:
-		0 0 0.08em color-mix(in oklab, var(--aur-accent) 55%, transparent),
-		0 0 0.45em color-mix(in oklab, var(--aur-accent) 22%, transparent);
-}
-/* sync glitch on each new line: a sideways jolt with colour fringes */
-.aur-root[data-look="retro"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-fx-glitch 0.32s steps(1); }
-@keyframes aur-fx-glitch {
-	0% { transform: translateX(0.06em); text-shadow: -0.05em 0 rgba(255, 40, 90, 0.7), 0.05em 0 rgba(40, 200, 255, 0.7); }
-	25% { transform: translateX(-0.04em) skewX(-4deg); }
-	50% { transform: translateX(0.02em); text-shadow: 0.03em 0 rgba(255, 40, 90, 0.5), -0.03em 0 rgba(40, 200, 255, 0.5); }
-	75%, 100% { transform: none; }
-}
-/* block caret while typing */
-.aur-root[data-look="retro"][data-words="on"][data-wordanim="typewriter"] .is-active.has-words .aur-w .aur-c::after {
-	top: 0.12em;
-	bottom: 0.06em;
-	right: -0.6em;
-	width: 0.52em;
-	border-radius: 0;
-	background: color-mix(in oklab, var(--aur-accent) 75%, transparent);
-}
-/* blinking block cursor at the end of the line (once it's sung, or straight away without word timing) */
-.aur-root[data-look="retro"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.is-gap) .aur-main::after {
-	content: "";
-	display: inline-block;
-	width: 0.5em;
-	height: 0.82em;
-	margin-left: 0.12em;
-	vertical-align: -0.08em;
-	background: var(--aur-hi);
-	box-shadow: 0 0 0.3em color-mix(in oklab, var(--aur-accent) 50%, transparent);
-	animation: aur-fx-blink 1.05s steps(1) infinite;
-}
-.aur-root[data-look="retro"][data-words="on"] .aur-stage[data-mode="synced"] .aur-line.is-active.has-words:not(.is-sung) .aur-main::after { opacity: 0; }
-@keyframes aur-fx-blink { 50% { background: transparent; box-shadow: none; } }
-.aur-root[data-look="retro"] .aur-dots i { width: 0.34em; height: 0.56em; border-radius: 0; }
-
 /* Synthwave: an outrun sunset. A graded dusk sky with stars, a big striped sun (its slats
    widen toward the horizon) glowing behind two ranges of neon-rimmed mountains, and a
    perspective grid rolling toward you, drawn in 2D with true perspective spacing: the
@@ -3504,14 +3432,9 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 @keyframes aur-fx-flash-b { from { opacity: 1; } }
 @keyframes aur-fx-swell-a { from { transform: scale(1.1); } }
 @keyframes aur-fx-swell-b { from { transform: scale(1.1); } }
-@keyframes aur-fx-blip-a { 0% { opacity: 0.75; } 100% { opacity: 0.55; } }
-@keyframes aur-fx-blip-b { 0% { opacity: 0.75; } 100% { opacity: 0.55; } }
 /* Aurora: the stars glint on each bar */
 .aur-root[data-fx="aurora"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-au-twinkle 8s steps(48) infinite alternate, aur-fx-flash-a 1.1s ease-out; }
 .aur-root[data-fx="aurora"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx::before { animation: aur-au-twinkle 8s steps(48) infinite alternate, aur-fx-flash-b 1.1s ease-out; }
-/* Retro: the scanlines blip on the beat */
-.aur-root[data-fx="retro"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-a { animation: aur-fx-blip-a 0.12s steps(1); }
-.aur-root[data-fx="retro"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-a { animation: aur-fx-blip-b 0.12s steps(1); }
 /* Synthwave: the grid rolls one line every two beats (every beat through breaks); the
    horizon haze flares on the bar */
 .aur-root[data-fx="synthwave"] .aur-bg[data-beats="on"] .aur-fx-b::before { animation-duration: calc(var(--aur-beat) * 2); }

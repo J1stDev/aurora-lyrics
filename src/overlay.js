@@ -34,7 +34,7 @@ const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
 const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip"]);
 // Themes that draw the current line's progress (--aur-lp, written every frame, which restyles
 // the whole line, so only when something uses it).
-const LINE_PROGRESS_LOOKS = new Set(["minimal"]);
+const LINE_PROGRESS_LOOKS = new Set(["minimal", "retro"]);
 const UP_NEXT_MS = 20000; // show the next track this long before the current one ends
 
 function isTyping(target) {

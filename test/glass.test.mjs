@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GLASS_SIZES, glassMapUri } from "../src/glass.js";
-import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oceanPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
+import { neonPalette, ktvPalette, gothicPalette, blackmetalPalette, loungePalette, oceanPalette, retroPalette, oklchToRgb, rgbToOklch, hasScene, cssToRgb } from "../src/scenes.js";
 import { NEON_FRAG } from "../src/scene-neon.js";
 import { KARAOKE_FRAG } from "../src/scene-karaoke.js";
 import { GOTHIC_FRAG } from "../src/scene-gothic.js";
 import { BLACKMETAL_FRAG } from "../src/scene-blackmetal.js";
 import { LOUNGE_FRAG } from "../src/scene-lounge.js";
+import { RETRO_FRAG } from "../src/scene-retro.js";
 import { OCEAN_FRAG } from "../src/scene-ocean.js";
 import { SCENE_VERT, SCENE_HEAD } from "../src/scene-glsl.js";
 
@@ -119,6 +120,16 @@ test("ocean palette: aqua from the accent, a turquoise, and a violet-pink for th
 	assert.ok(Math.abs(wrap(hue(oceanPalette([95, 212, 255], null).uA) - rgbToOklch([95, 212, 255])[2])) < 10);
 });
 
+test("retro palette: the phosphor is the accent, amber by default", () => {
+	const hue = (rgb) => rgbToOklch(rgb.map((v) => v * 255))[2];
+	for (const accent of [[255, 176, 0], [60, 255, 120], [255, 255, 255], null]) {
+		const p = retroPalette(accent, [30, 20, 70]);
+		for (const k of ["uA", "uB", "uC", "uBase"]) assert.ok(inRange(p[k]), `${k} for ${accent}`);
+	}
+	assert.ok(Math.abs(wrap(hue(retroPalette(null, null).uA) - 75)) < 12, "amber with no accent");
+	assert.ok(Math.abs(wrap(hue(retroPalette([60, 255, 120], null).uA) - rgbToOklch([60, 255, 120])[2])) < 12, "green phosphor");
+});
+
 test("scenes: only themes with a shader have one", () => {
 	assert.equal(hasScene("neon"), true);
 	assert.equal(hasScene("ocean"), true);
@@ -126,13 +137,14 @@ test("scenes: only themes with a shader have one", () => {
 	assert.equal(hasScene("lounge"), true);
 	assert.equal(hasScene("karaoke"), true);
 	assert.equal(hasScene("gothic"), true);
+	assert.equal(hasScene("retro"), true);
 	assert.equal(hasScene("rain"), false); // Rain has its own renderer
 	assert.equal(hasScene("toString"), false);
 });
 
 test("scene shaders are well-formed GLSL ES 3.00 sources", () => {
 	assert.ok(SCENE_VERT.startsWith("#version 300 es"));
-	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG, OCEAN_FRAG]) {
+	for (const frag of [NEON_FRAG, KARAOKE_FRAG, GOTHIC_FRAG, BLACKMETAL_FRAG, LOUNGE_FRAG, OCEAN_FRAG, RETRO_FRAG]) {
 		assert.ok(frag.startsWith("#version 300 es"));
 		assert.equal(frag.split("#version").length - 1, 1, "one version line");
 		assert.ok(frag.includes(SCENE_HEAD));
