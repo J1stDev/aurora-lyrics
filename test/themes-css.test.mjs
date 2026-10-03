@@ -25,9 +25,9 @@ test("every animation a stylesheet names is defined", () => {
 
 test("Neon and Rain are drawn by their stylesheets, with every layer they rely on", () => {
 	const neon = css["themes/neon.css"];
-	assert.match(neon, /\.aur-fx-e > i:nth-child\(-n \+ 11\)/, "the signs");
-	assert.match(neon, /-webkit-box-reflect/, "the mirrored floor");
-	assert.equal((neon.match(/--lit: url\(/g) || []).length, 11, "a lit mask for each sign");
+	for (const v of ["aur-nn-chase", "aur-nn-march", "aur-nn-juke", "aur-nn-bubbles", "aur-nn-turn", "aur-nn-strike"]) assert.match(neon, new RegExp(`@keyframes ${v}`));
+	assert.equal((neon.match(/mask-image: url\("data:image\/svg\+xml/g) || []).length, 12, "a lit and a core mask for each of the three colours");
+	assert.doesNotMatch(neon, /data:image\/png/, "all of it is vector art");
 	const rain = css["themes/rain.css"];
 	assert.match(rain, /\.aur-fx-e > i:nth-child\(22\) \{ background-image: url\("data:image\/svg\+xml/, "the cat");
 	for (const v of ["aur-rn-fall-far", "aur-rn-fall-near", "aur-rn-drift", "aur-rn-tail", "aur-rn-steam", "aur-rn-flicker", "aur-rn-bolt"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
