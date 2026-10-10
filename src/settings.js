@@ -95,6 +95,7 @@ export const SCHEMA = [
 			["zoom", "Zoom"],
 			["flip", "Flip"],
 			["depth", "Depth"],
+			["cascade", "Cascade"],
 		],
 		hints: {
 			flow: "Spring wave",
@@ -108,6 +109,7 @@ export const SCHEMA = [
 			zoom: "Fly through",
 			flip: "Split-flap",
 			depth: "3D parallax",
+			cascade: "Words rise in one by one",
 		},
 		default: "flow",
 	},
@@ -133,6 +135,8 @@ export const SCHEMA = [
 			["neon", "Neon"],
 			["typewriter", "Typewriter"],
 			["shimmer", "Shimmer"],
+			["reveal", "Reveal"],
+			["glitch", "Glitch"],
 		],
 		hints: {
 			fill: "Soft sweep + lift",
@@ -146,6 +150,8 @@ export const SCHEMA = [
 			neon: "Flicker on in colour",
 			typewriter: "Typed letter by letter",
 			shimmer: "Light sweeps through",
+			reveal: "Rises out of a mask",
+			glitch: "Lands with a jolt",
 		},
 		default: "fill",
 	},

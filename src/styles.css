@@ -482,6 +482,59 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 		drop-shadow(0 0 0.3em color-mix(in oklab, var(--rim) calc((24% * var(--e) + 34% * var(--hop)) * max(var(--aur-glow-k), 0.5)), transparent));
 }
 
+/* Reveal: every word waits as a faint ghost. As it's sung, a bright copy of it (::after, from data-t;
+   this style never splits words into letters, so the copy lines up exactly) rises into place out of a
+   mask along the bottom of the word's own slot, and the ghost fades as it arrives. The clip moves
+   against the copy's offset, so the edge it rises out of stays at the bottom of the slot (opening a
+   little as it lands, for descenders); the copy starts far enough down that not even an accent shows.
+   The rise plays over the first ~40% of the word, eased out; a held word swells a little at its middle. */
+.aur-root[data-words="on"][data-wordanim="reveal"] .is-active.has-words .aur-w {
+	--r: clamp(0, var(--e) * 2.6, 1);
+	--rv: calc(1 - (1 - var(--r)) * (1 - var(--r)) * (1 - var(--r)));
+	--drop: calc((1 - var(--rv)) * 1.35em);
+	position: relative;
+	color: color-mix(in srgb, var(--aur-hi) calc(26% * (1 - var(--rv))), transparent);
+	transform: none;
+}
+.aur-root[data-words="on"][data-wordanim="reveal"] .is-active.has-words .aur-w.is-long { transform: translateY(calc(-0.05em * var(--hop))) scale(calc(1 + 0.05 * var(--hop))); }
+.aur-root[data-words="on"][data-wordanim="reveal"] .is-active.has-words .aur-w::after {
+	content: attr(data-t);
+	position: absolute;
+	left: 0;
+	top: 0;
+	white-space: pre;
+	color: var(--aur-hi);
+	translate: 0 var(--drop);
+	clip-path: inset(-0.6em -0.5em calc(var(--drop) - 0.14em * var(--rv)) -0.5em);
+	pointer-events: none;
+}
+/* (reduced motion: the copy fades in where it stands) */
+.aur-root[data-motion="reduced"][data-words="on"][data-wordanim="reveal"] .is-active.has-words .aur-w::after { translate: none; clip-path: none; opacity: var(--rv); }
+/* a line without word timing rises out of its slot as a whole, once */
+.aur-root[data-wordanim="reveal"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.has-words) .aur-main { animation: aur-reveal-line 0.75s var(--aur-ease); }
+@keyframes aur-reveal-line {
+	from { translate: 0 1.35em; clip-path: inset(-0.6em -1em 1.35em -1em); }
+	to { translate: 0 0; clip-path: inset(-0.6em -1em -0.14em -1em); }
+}
+
+/* Glitch: words wait dim and light fast as they start. As each word lands it jolts through four broken
+   frames (stepped, not tweened): red and cyan copies, a slip sideways, a band missing. Then it's clean.
+   A line without word timing does the same once, as a whole. */
+.aur-root[data-words="on"][data-wordanim="glitch"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 6, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+	transform: none;
+}
+.aur-root[data-words="on"][data-wordanim="glitch"] .is-active .aur-w.now,
+.aur-root[data-wordanim="glitch"] .aur-stage[data-mode="synced"] .aur-line.is-active:not(.has-words) .aur-main { animation: aur-glitch 0.36s steps(1, end); }
+@keyframes aur-glitch {
+	0% { translate: -0.06em 0; text-shadow: 0.08em 0 rgba(255, 46, 99, 0.9), -0.08em 0 rgba(40, 232, 255, 0.9); clip-path: inset(0 -0.2em 52% -0.2em); }
+	16% { translate: 0.07em 0; text-shadow: -0.06em 0 rgba(255, 46, 99, 0.85), 0.06em 0 rgba(40, 232, 255, 0.85); clip-path: inset(38% -0.2em 0 -0.2em); }
+	34% { translate: -0.03em 0; text-shadow: 0.04em 0 rgba(255, 46, 99, 0.7), -0.04em 0 rgba(40, 232, 255, 0.7); clip-path: inset(-0.2em -0.2em 18% -0.2em); }
+	52% { translate: 0.015em 0; text-shadow: -0.02em 0 rgba(255, 46, 99, 0.5), 0.02em 0 rgba(40, 232, 255, 0.5); clip-path: none; }
+	70%, 100% { translate: 0 0; text-shadow: none; clip-path: none; }
+}
+
 /* ---- translation: a smaller, softer line under each lyric; brightens with the active line */
 .aur-tr {
 	margin-top: 0.22em;
@@ -820,6 +873,35 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	transition-timing-function: ease-out, cubic-bezier(0.2, 1.45, 0.35, 1), ease-out, ease, ease;
 	transition-delay: 0.1s, 0.1s, 0.1s, 0s, 0s;
 }
+
+/* ---- Cascade (stack): one line at a time. When a line starts, its words rise into place one after
+   another (each word is a no-wrap group with its place in the line as --k, set by view.js, which in
+   this style splits lines without word timing into words too), and the line before lifts away and
+   fades. Only translate and opacity move, on the group, so a word style's own per-frame transform
+   (on the .aur-w inside it) still applies. The stagger stops growing after 14 words, so a long
+   line is in within about 0.7 s. */
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line {
+	transform: translateY(-50%);
+	transition-duration: 0.3s, 0.6s, 0.4s, 0.5s, 0.6s;
+}
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line[data-d^="-"] {
+	transform: translateY(calc(-50% - 0.7em));
+	transition-timing-function: ease-out, var(--aur-ease), ease, ease, ease;
+	transition-delay: 0s;
+}
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line.is-active { transition-duration: 0.15s, 0.6s, 0.4s, 0.5s, 0.6s; }
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-wg {
+	animation: aur-cascade-in 0.7s var(--aur-ease) backwards;
+	animation-delay: calc(min(var(--k, 0), 14) * 38ms + 70ms);
+}
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line.is-active :is(.aur-tr, .aur-bgv) { animation: aur-cascade-in 0.7s var(--aur-ease) 0.32s backwards; }
+@keyframes aur-cascade-in { from { opacity: 0; translate: 0 0.42em; } }
+/* A theme that fills a line's text with a gradient (background-clip: text on .aur-main: Synthwave, Black
+   Metal, Karaoke) would lose the words here: a word on a layer of its own drops out of its parent's text
+   clip (and the parent smears the words it can't place at its start). So each word paints the same fill
+   itself and keeps its layer while the line is current, and the line's own fill is moved out of sight. */
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main:has(> .aur-wg) { background-repeat: no-repeat; background-position: -400vw 0; }
+.aur-root[data-anim="cascade"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main > .aur-wg { background: inherit; background-repeat: repeat; background-position: 0 0; will-change: translate; }
 
 /* ---- Depth (list): the lyrics float in 3D space. The active line is in front; the others
    recede into the distance by how far they are from it (--ad) and fade out. The whole scene

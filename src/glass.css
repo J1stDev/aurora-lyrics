@@ -74,8 +74,10 @@
 	width: var(--lw, 0px);
 	height: var(--lh, 0px);
 	font-size: var(--lf, 56px);
-	transform: translate3d(var(--lx, 0px), var(--ly, 0px), 0);
-	transition: transform 0.9s var(--g-ease, ease), width 0.9s var(--g-ease, ease), height 0.9s var(--g-ease, ease);
+	/* placed with the translate property: the quiver below animates scale, which is applied inside
+	   translate, so it squashes the pane about its centre instead of scaling its position too */
+	translate: var(--lx, 0px) var(--ly, 0px);
+	transition: translate 0.9s var(--g-ease, ease), width 0.9s var(--g-ease, ease), height 0.9s var(--g-ease, ease);
 	pointer-events: none;
 }
 .aur-root[data-glass="on"] .aur-lens { display: block; }
@@ -96,15 +98,24 @@
 	box-shadow: var(--g-edge), inset 0 0 30px rgba(255, 255, 255, 0.045), 0 26px 60px -18px var(--g-shadow), 0 0 44px -10px var(--g-glow);
 }
 /* Light passes through the glass on every new line. data-lb flips a/b on the root, which starts the
-   other of two identical animations. */
-.aur-lens-sheen {
-	overflow: hidden;
-	background: linear-gradient(104deg, transparent 34%, rgba(255, 255, 255, 0.2) 47%, rgba(255, 255, 255, 0.05) 55%, transparent 68%) 160% 0 / 240% 100% no-repeat;
+   other of two identical animations. The band is painted once, on a layer 2.4 times the width of the
+   pane, and slides across it (translate), so the sweep never repaints. A theme tints it with
+   --g-sheen / --g-sheen-tail. */
+.aur-lens-sheen { overflow: hidden; }
+.aur-lens-sheen::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	width: 240%;
+	background: linear-gradient(104deg, transparent 34%, var(--g-sheen, rgba(255, 255, 255, 0.2)) 47%, var(--g-sheen-tail, rgba(255, 255, 255, 0.05)) 55%, transparent 68%);
+	translate: -93.33% 0; /* parked off the left edge */
 }
-.aur-root[data-lb="a"] .aur-lens-sheen { animation: aur-lens-sweep-a 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
-.aur-root[data-lb="b"] .aur-lens-sheen { animation: aur-lens-sweep-b 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
-@keyframes aur-lens-sweep-a { from { background-position-x: 160%; } to { background-position-x: -60%; } }
-@keyframes aur-lens-sweep-b { from { background-position-x: 160%; } to { background-position-x: -60%; } }
+.aur-root[data-lb="a"] .aur-lens-sheen::before { animation: aur-lens-sweep-a 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
+.aur-root[data-lb="b"] .aur-lens-sheen::before { animation: aur-lens-sweep-b 1.5s cubic-bezier(0.3, 0.6, 0.3, 1); }
+@keyframes aur-lens-sweep-a { from { translate: -93.33% 0; } to { translate: 35% 0; } }
+@keyframes aur-lens-sweep-b { from { translate: -93.33% 0; } to { translate: 35% 0; } }
 /* the line's progress as a hairline along the bottom edge (a theme that wants it shows .aur-lens-line
    while the lens is on a line, and view.js writes --lp when the theme is in LINE_PROGRESS_LOOKS) */
 .aur-lens-line {
@@ -114,14 +125,13 @@
 	background: linear-gradient(90deg, rgba(255, 255, 255, 0.9) calc(var(--lp, 0) * 100%), rgba(255, 255, 255, 0.14) calc(var(--lp, 0) * 100%));
 	opacity: 0;
 }
-/* and it quivers a little as it settles on the new line, like a drop of water (the scale property is
-   separate from the transform that places the lens, so the two don't fight) */
+/* and it quivers a little as it settles on the new line, like a drop of water */
 .aur-root[data-glass="on"][data-motion="full"][data-lb="a"] .aur-lens { animation: aur-lens-jelly-a 0.95s cubic-bezier(0.3, 0.7, 0.3, 1); }
 .aur-root[data-glass="on"][data-motion="full"][data-lb="b"] .aur-lens { animation: aur-lens-jelly-b 0.95s cubic-bezier(0.3, 0.7, 0.3, 1); }
 @keyframes aur-lens-jelly-a { 0% { scale: 1; } 26% { scale: 1.016 0.958; } 56% { scale: 0.993 1.024; } 100% { scale: 1; } }
 @keyframes aur-lens-jelly-b { 0% { scale: 1; } 26% { scale: 1.016 0.958; } 56% { scale: 0.993 1.024; } 100% { scale: 1; } }
 .aur-root[data-motion="reduced"] .aur-lens { transition: none; }
-.aur-root[data-motion="reduced"] .aur-lens-sheen { animation: none; }
+.aur-root[data-motion="reduced"] .aur-lens-sheen::before { animation: none; }
 
 /* ---------------------------------------------------------------- the control bar: three islands */
 .aur-root[data-glass="on"] .aur-player { column-gap: 18px; padding-bottom: 22px; }

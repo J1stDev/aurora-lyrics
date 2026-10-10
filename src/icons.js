@@ -108,6 +108,15 @@ Object.assign(STYLE_ART, {
 	neon: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="17" y="12" width="26" height="16" rx="8" opacity=".14"/><rect x="4" y="16" width="14" height="8" rx="4" opacity=".75"/><rect x="21" y="16" width="18" height="8" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><rect x="42" y="16" width="14" height="8" rx="4" opacity=".3"/></svg>`,
 	typewriter: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="6" y="16" width="6" height="8" rx="1.5"/><rect x="14" y="16" width="6" height="8" rx="1.5"/><rect x="22" y="16" width="6" height="8" rx="1.5"/><rect x="30" y="14" width="1.6" height="12" rx=".8"/><rect x="34" y="16" width="6" height="8" rx="1.5" opacity=".2"/><rect x="42" y="16" width="6" height="8" rx="1.5" opacity=".2"/></svg>`,
 	shimmer: `<svg viewBox="0 0 60 40" aria-hidden="true"><defs><linearGradient id="sa-sh" x1="0" x2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".75"/><stop offset=".62" stop-color="currentColor"/><stop offset=".72" stop-color="currentColor" stop-opacity=".3"/></linearGradient></defs><rect x="4" y="16" width="52" height="8" rx="4" fill="url(#sa-sh)"/><rect x="33" y="11" width="4" height="18" rx="2" opacity=".25"/></svg>`,
+	// the sung word rising out of its slot, ghosts on either side
+	reveal: `<svg viewBox="0 0 60 40" aria-hidden="true"><defs><clipPath id="sa-rv"><rect x="18" y="6" width="24" height="18.6"/></clipPath></defs><rect x="4" y="16" width="14" height="8" rx="4"/><rect x="21" y="16" width="18" height="8" rx="4" opacity=".22"/><rect x="21" y="19.5" width="18" height="8" rx="4" clip-path="url(#sa-rv)"/><rect x="19" y="25.4" width="22" height="1.1" rx=".55" opacity=".45"/><rect x="42" y="16" width="14" height="8" rx="4" opacity=".22"/></svg>`,
+	// the sung word broken into slipped bands with colour fringes
+	glitch: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="4" y="16" width="13" height="8" rx="4"/><rect x="19" y="15" width="19" height="4.2" rx="1.6"/><rect x="23" y="20.6" width="19" height="4.2" rx="1.6"/><rect x="16.5" y="15" width="2" height="4.2" opacity=".45"/><rect x="42.5" y="20.6" width="2" height="4.2" opacity=".45"/><rect x="46" y="16" width="10" height="8" rx="4" opacity=".3"/></svg>`,
+});
+
+// Line style: Cascade (the words of the line come up one by one; the line before lifts away)
+Object.assign(STYLE_ART, {
+	cascade: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="14" y="5" width="32" height="3" rx="1.5" opacity=".15"/><rect x="4" y="16" width="12" height="7" rx="3.5"/><rect x="18" y="18" width="11" height="7" rx="3.5" opacity=".7"/><rect x="31" y="21" width="13" height="7" rx="3.5" opacity=".4"/><rect x="46" y="24.5" width="10" height="7" rx="3.5" opacity=".15"/></svg>`,
 });
 
 // Layout cards

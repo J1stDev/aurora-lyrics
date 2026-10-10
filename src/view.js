@@ -11,8 +11,9 @@
 //  - "list"  (flow, slide, scale): lines in a column. The list publishes --aur-y (the
 //            scroll offset); every line applies it in its own transform, so each line can
 //            transition with its own delay — that's the staggered "wave" in Flow.
-//  - "stack" (fade, cinematic): lines absolutely stacked at the centre; the active line's
-//            height is published as --aur-ah so neighbours sit above/below it.
+//  - "stack" (fade, cinematic, swipe, zoom, flip, cascade): lines absolutely stacked at the
+//            centre; the active line's height is published as --aur-ah so neighbours sit
+//            above/below it.
 
 import { h, clamp, nextFrame } from "./util.js";
 import { findLineIndex } from "./lrc.js";
@@ -27,6 +28,10 @@ const ENTER_MS = 1600; // how long the entrance animation class stays on
 const LONG_WORD_MS = 900; // words held at least this long get a letter-by-letter sweep + swell
 // Word animations that work on single letters, so every word is split into letters.
 const SPLIT_WORD_ANIMS = new Set(["letters", "typewriter"]);
+// Word animations that draw a copy of the whole word over it (::after from data-t), so a word is never
+// split (split letters lose their kerning and would drift off the copy).
+const WHOLE_WORD_ANIMS = new Set(["reveal"]);
+const splitMode = (anim) => (SPLIT_WORD_ANIMS.has(anim) ? "letters" : WHOLE_WORD_ANIMS.has(anim) ? "whole" : "auto");
 const WORD_LEAD_MS = 40; // highlight words slightly early to cover render latency
 const SOON_MS = 3500; // "a line is coming": the last stretch of a break (karaoke countdown)
 
@@ -57,6 +62,7 @@ export class LyricsView {
 		this.autoScroll = true;
 		this.reduced = false;
 		this.wordAnim = "fill";
+		this.lineAnim = "flow";
 		this.tr = null; // translations: array aligned to lyrics.lines (string|null), or null
 		this.showBg = true;
 		this.frozen = false; // ignore updates while old content fades out
@@ -174,15 +180,18 @@ export class LyricsView {
 		this.stage.scrollTop = 0;
 		this.scrollPos = 0;
 
-		const letters = SPLIT_WORD_ANIMS.has(this.wordAnim);
+		const mode = splitMode(this.wordAnim);
+		const cascade = this.lineAnim === "cascade";
 		/**
 		 * Append word spans for `words` to `container`; returns [{ w, span }].
 		 * Pieces with no whitespace between them (syllables of one word) share one
-		 * no-wrap group so a word can never break across lines or drift apart.
+		 * no-wrap group so a word can never break across lines or drift apart; each group
+		 * knows its place in the line (--k, from `count`) for the Cascade entrance.
 		 * Long-held words (and every word in "letters" mode) are split into letters,
 		 * each knowing its index (--i) and the letter count (--n) for the letter wave.
+		 * data-t holds the word's text, for styles that draw a copy of it.
 		 */
-		const addWords = (container, words) => {
+		const addWords = (container, words, count) => {
 			let group = null;
 			return words.map((w) => {
 				const m = w.text.match(/^(\s*)([\s\S]*?)(\s*)$/);
@@ -192,11 +201,11 @@ export class LyricsView {
 				}
 				const long = w.end - w.time >= LONG_WORD_MS;
 				const chars = Array.from(m[2]);
-				const split = (letters || long) && chars.length > 1 && chars.length <= 16;
+				const split = mode !== "whole" && (mode === "letters" || long) && chars.length > 1 && chars.length <= 16;
 				const content = split ? chars.map((ch, ci) => h("span", { class: "aur-c", style: `--i:${ci};--n:${chars.length}` }, ch)) : m[2];
-				const span = h("span", { class: `aur-w${long ? " is-long" : ""}${split ? " has-chars" : ""}` }, content);
+				const span = h("span", { class: `aur-w${long ? " is-long" : ""}${split ? " has-chars" : ""}`, "data-t": m[2] }, content);
 				if (!group) {
-					group = h("span", { class: "aur-wg" });
+					group = h("span", { class: "aur-wg", style: `--k:${count.k++}` });
 					container.append(group);
 				}
 				group.append(span);
@@ -206,6 +215,13 @@ export class LyricsView {
 				}
 				return { w, span };
 			});
+		};
+		/** Plain text as one no-wrap group per word (Cascade moves the words of every line, timed or not). */
+		const addPlainWords = (container, text, count) => {
+			for (const part of text.split(/(\s+)/)) {
+				if (!part) continue;
+				container.append(/^\s+$/.test(part) ? part : h("span", { class: "aur-wg", style: `--k:${count.k++}` }, part));
+			}
 		};
 
 		const frag = document.createDocumentFragment();
@@ -227,11 +243,14 @@ export class LyricsView {
 				const singer = line.singer ?? (line.opposite ? 1 : null);
 				if (singer) el.dataset.singer = String(singer);
 				let pairs = [];
+				const count = { k: 0 };
 				if (line.words) {
 					el.classList.add("has-words");
-					pairs = addWords(main, line.words);
+					pairs = addWords(main, line.words, count);
 					// Each word's position along the line (0..1), for the album-gradient text colour.
 					pairs.forEach((p, k) => p.span.style.setProperty("--wx", pairs.length > 1 ? (k / (pairs.length - 1)).toFixed(3) : "0.5"));
+				} else if (cascade && lyrics.synced) {
+					addPlainWords(main, line.text, count);
 				} else {
 					main.textContent = line.text;
 				}
@@ -240,7 +259,7 @@ export class LyricsView {
 					const bgEl = h("div", { class: "aur-bgv" });
 					if (line.bg.words) {
 						el.classList.add("has-words");
-						pairs = pairs.concat(addWords(bgEl, line.bg.words));
+						pairs = pairs.concat(addWords(bgEl, line.bg.words, count));
 					} else bgEl.textContent = line.bg.text;
 					el.classList.add("has-bg");
 					el.append(bgEl);
@@ -302,15 +321,19 @@ export class LyricsView {
 		});
 	}
 
-	setOptions({ layout, wordSync, autoScroll, reduced, wordAnim, showBg, lineProgress }) {
+	setOptions({ layout, lineAnim, wordSync, autoScroll, reduced, wordAnim, showBg, lineProgress }) {
 		if (lineProgress != null) this.lineProgress = lineProgress;
 		if (layout && layout !== this.layout) {
 			this.layout = layout;
 			this.stopBrowsing(true);
 		}
 		// These change the DOM structure, so re-render in place (no swap animation).
-		const rebuild = (wordAnim != null && SPLIT_WORD_ANIMS.has(wordAnim) !== SPLIT_WORD_ANIMS.has(this.wordAnim)) || (showBg != null && showBg !== this.showBg);
+		const rebuild =
+			(wordAnim != null && splitMode(wordAnim) !== splitMode(this.wordAnim)) ||
+			(lineAnim != null && (lineAnim === "cascade") !== (this.lineAnim === "cascade")) ||
+			(showBg != null && showBg !== this.showBg);
 		if (wordAnim != null) this.wordAnim = wordAnim;
+		if (lineAnim != null) this.lineAnim = lineAnim;
 		if (showBg != null) this.showBg = showBg;
 		if (rebuild && this.lyrics && !this.frozen) this.render(this.lyrics);
 		if (wordSync != null) this.wordSync = wordSync;

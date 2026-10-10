@@ -65,6 +65,7 @@
 	border-radius: calc(var(--lens-r) - 3px);
 	inset: calc(var(--lens-py) * -1 + 3px) calc(var(--lens-px) * -1 + 3px);
 }
+.aur-root[data-look="gothic"] .aur-lens-sheen::before { display: none; } /* leaded glass: no sweep of light */
 /* the medallion on the lower edge, with a fleuron */
 .aur-root[data-look="gothic"] .aur-lens .aur-lens-line {
 	inset: auto auto calc(var(--lens-py) * -1 - 0.34em) 50% !important;

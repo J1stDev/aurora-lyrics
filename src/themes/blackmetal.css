@@ -60,7 +60,7 @@
 		0 0 60px -14px var(--g-glow);
 }
 .aur-root[data-look="blackmetal"] .aur-lens-rim { padding: 1.5px; }
-.aur-root[data-look="blackmetal"] .aur-lens-sheen { background: linear-gradient(104deg, transparent 34%, rgba(235, 246, 255, 0.24) 47%, rgba(235, 246, 255, 0.05) 55%, transparent 68%) 160% 0 / 240% 100% no-repeat; }
+.aur-root[data-look="blackmetal"] .aur-lens-sheen { --g-sheen: rgba(235, 246, 255, 0.24); --g-sheen-tail: rgba(235, 246, 255, 0.05); }
 /* icicles hanging from its lower edge */
 .aur-root[data-look="blackmetal"] .aur-lens .aur-lens-line {
 	inset: auto calc(var(--lens-px) * -1 + 0.9em) calc(var(--lens-py) * -1 - 0.58em) !important;

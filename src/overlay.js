@@ -30,7 +30,7 @@ const BG_SIZE = 256; // px; background art is drawn small and scaled up (cheap h
 const RELAYOUT_KEYS = new Set(["fontSize", "lineSpacing", "textAlign", "animation", "fontWeight", "font", "showContext", "view", "showBgVocals", "*"]);
 const SOURCE_KEYS = new Set(["providers", "searchUntil"]);
 // Motion styles that stack lines at the centre (one line in focus) instead of a scrolling list.
-const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip"]);
+const STACK_ANIMS = new Set(["fade", "cinematic", "swipe", "zoom", "flip", "cascade"]);
 // Themes that draw the current line's progress (--aur-lp, written every frame, which restyles
 // the whole line, so only when something uses it).
 const LINE_PROGRESS_LOOKS = new Set(["minimal", "retro"]);
@@ -469,7 +469,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			view: all.view,
 			wordanim: all.wordAnim,
 		});
-		view.setOptions({ lineProgress: LINE_PROGRESS_LOOKS.has(all.themeFx), layout, wordSync: all.wordSync, autoScroll: all.unsyncedAutoScroll, reduced, wordAnim: all.wordAnim, showBg: all.showBgVocals });
+		view.setOptions({ lineProgress: LINE_PROGRESS_LOOKS.has(all.themeFx), layout, lineAnim: all.animation, wordSync: all.wordSync, autoScroll: all.unsyncedAutoScroll, reduced, wordAnim: all.wordAnim, showBg: all.showBgVocals });
 		sizeBackground();
 
 		ui.offsetOut.textContent = `${all.offset > 0 ? "+" : ""}${all.offset} ms`;
