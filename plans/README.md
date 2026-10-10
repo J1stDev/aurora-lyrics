@@ -25,7 +25,7 @@ Written by an animation audit (lyric text motion, the glass lens, and the Neon a
 - Line moves of ~1 s (`--aur-move`): this is the lyric choreography, not UI chrome.
 - Reduced motion: handled (`src/styles.css:1791-1807`). The theme ambience pauses with the animated background.
 
-## Also noted (fixed by the Neon and Rain remakes)
+## Also noted (fixed by the Neon and Rain remakes, both done)
 
 - `src/themes/rain.css:454` blurs the whole current line `7px → 0` for 1.5 s on every line (`filter` animation).
 - `src/settings.js:207,220` theme hints still describe the old designs.

@@ -41,9 +41,15 @@ test("Neon is a tunnel of rings, one per beat, that only moves on the compositor
 	assert.doesNotMatch(neon, /data:image\/png/, "no bitmaps");
 });
 
-test("Rain is drawn by its stylesheet, with every layer it relies on", () => {
+test("Rain is a window in focus over a city out of focus, and only moves on the compositor", () => {
 	const rain = css["themes/rain.css"];
-	assert.match(rain, /\.aur-fx-e > i:nth-child\(22\) \{ background-image: url\("data:image\/svg\+xml/, "the cat");
-	for (const v of ["aur-rn-fall-far", "aur-rn-fall-near", "aur-rn-drift", "aur-rn-tail", "aur-rn-steam", "aur-rn-flicker", "aur-rn-bolt"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
+	for (const v of ["aur-rn-drift-a", "aur-rn-drift-b", "aur-rn-drift-c", "aur-rn-glimmer", "aur-rn-fall", "aur-rn-land", "aur-rn-splash", "aur-rn-head-1", "aur-rn-trail-1", "aur-rn-car-r", "aur-rn-car-l"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
+	// eight drops land on the glass, each after its own whole number of beats
+	const beats = [...rain.matchAll(/animation-duration: calc\(var\(--aur-beat, 0\.6s\) \* (\d+)\)/g)].map((m) => Number(m[1]));
+	assert.equal(beats.length, 8);
+	assert.equal(new Set(beats).size, 8, "never all together");
+	for (const m of rain.matchAll(/@keyframes [\w-]+ \{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)) {
+		for (const p of m[1].matchAll(/([a-z-]+)\s*:/g)) assert.ok(["transform", "opacity", "translate", "scale", "rotate"].includes(p[1]), `${p[1]} in ${m[0].slice(0, 40)}`);
+	}
 	assert.doesNotMatch(rain, /data:image\/png/, "all of it is vector art");
 });

@@ -1,218 +1,189 @@
 /* ============================================================== Rain (generated: tools/themes/gen-rain.py fills this template into src/themes/rain.css)
-   A cosy room on a rainy night. A big window fills the screen, a wide pane in the middle for the words and two
-   narrow side panes of small square lights. Outside, a city under a violet sky that glows pink and orange over
-   the rooftops: three depths of towers with lit windows, water tanks, spires with red lights, neon signs in the
-   album's colours, windows that come and go, a hazy moon behind low clouds that drift by, and lightning now and
-   then. Rain falls in two depths; beads of water sit on the glass and drops run down it in fits and starts.
-   Inside, warm light: fairy lights strung along the top of the window that brighten on every beat, and on the
-   sill a mug of tea with steam curling up, a plant that sways a little, a stack of books with a candle on it,
-   and a cat watching the rain, its tail swishing in tempo. All of it is vector art drawn once; only transforms
-   and opacities move. */
+   A close look at a window on a rainy night. The glass is in focus: beads of water like small lenses (each holds the
+   warm light of the streets upside down), drops that run down it in fits and starts, and new drops landing on it in
+   time with the music. Beyond it, out of focus, the city is all light: soft discs of colour in three depths (warm
+   windows and street lamps far off, signs in the album's colours that glimmer and brighten on the beat, a few big
+   blurred lights close by), cars going by, and rain falling between the glass and the city. The three depths drift
+   at their own pace, as if the eye were breathing. Only transforms and opacities move. */
 
 .aur-root[data-look="rain"] {
-	--rn-a: oklch(from var(--aur-accent) 0.78 max(c, 0.17) h);
-	--rn-b: oklch(from var(--aur-accent) 0.8 max(c, 0.16) calc(h + 150));
-	--rn-c: oklch(from var(--aur-accent) 0.76 max(c, 0.18) calc(h - 70));
-	--aur-glow-tint: #a8b8ff;
+	--rn-a: oklch(from var(--aur-accent) 0.8 max(c, 0.16) h);
+	--rn-b: oklch(from var(--aur-accent) 0.82 max(c, 0.14) calc(h + 150));
+	--rn-c: oklch(from var(--aur-accent) 0.78 max(c, 0.16) calc(h - 70));
+	--aur-glow-tint: #b4c0ff;
 	/* the glass kit: cool misted glass */
-	--g-tint: rgba(170, 185, 255, 0.08);
-	--g-tint-top: rgba(225, 232, 255, 0.18);
-	--g-lit: rgba(230, 236, 255, 0.5);
-	--g-hair: rgba(190, 200, 255, 0.16);
-	--g-rim-a: rgba(235, 240, 255, 0.8);
+	--g-tint: rgba(170, 185, 255, 0.09);
+	--g-tint-top: rgba(225, 232, 255, 0.2);
+	--g-lit: rgba(235, 240, 255, 0.55);
+	--g-hair: rgba(190, 200, 255, 0.18);
+	--g-rim-a: rgba(240, 244, 255, 0.85);
 	--g-rim-b: rgba(150, 160, 230, 0.12);
-	--g-shadow: rgba(10, 8, 30, 0.5);
-	--g-glow: rgba(150, 160, 255, 0.24);
-	--g-blur: 16px;
+	--g-shadow: rgba(10, 8, 30, 0.45);
+	--g-glow: rgba(160, 170, 255, 0.22);
+	--g-blur: 18px;
 	--g-sat: 1.35;
 	--g-bright: 1.04;
 	--lens-px: 0.7em;
 	--lens-py: 0.34em;
 	--lens-r: min(0.6em, 40px);
 }
-.aur-root[data-look="rain"][data-color="white"] { --aur-hi: #f2f4ff; }
+.aur-root[data-look="rain"][data-color="white"] { --aur-hi: #f4f5ff; }
 
-/* ---------------------------------------------------------------- the sky, the moon, the city's glow */
+/* ---------------------------------------------------------------- the night beyond the glass */
 .aur-root[data-fx="rain"] .aur-fx {
-	--stw: max(100vw, 177.78vh); /* the city is 16:9 and covers the screen, anchored at the bottom */
-	--sill: 16vh; /* the window sill, along the bottom */
 	background:
-		radial-gradient(70% 34% at 50% 72%, rgba(255, 150, 110, 0.4), transparent 72%),
-		linear-gradient(to bottom, #11154a 0%, #1c1f5e 24%, #362c74 44%, #6c397c 60%, #bb5878 72%, #ee8b6c 82%, #3a2448 100%);
+		radial-gradient(95% 50% at 50% 82%, rgba(255, 146, 116, 0.2), transparent 70%),
+		radial-gradient(55% 48% at 16% 68%, color-mix(in oklab, var(--rn-a) 20%, transparent), transparent 70%),
+		radial-gradient(55% 48% at 84% 62%, color-mix(in oklab, var(--rn-b) 16%, transparent), transparent 70%),
+		linear-gradient(to bottom, #121640 0%, #1c1e54 30%, #2b2764 52%, #3b2a68 70%, #462b62 86%, #24173a 100%);
 }
-.aur-root[data-fx="rain"] .aur-fx::before { /* a hazy moon behind the clouds */
+.aur-root[data-fx="rain"] .aur-bg-grain { opacity: 0.035; }
+/* the city's glow in the album's colour, a little stronger on every bar */
+.aur-root[data-fx="rain"] .aur-fx::before {
 	content: "";
 	position: absolute;
-	left: 62%;
-	top: 7%;
-	width: 34vmin;
-	aspect-ratio: 1;
-	background: radial-gradient(circle, #fff6e2 0 11%, rgba(255, 238, 210, 0.75) 12.5%, rgba(255, 220, 230, 0.3) 22%, rgba(214, 196, 255, 0.16) 38%, transparent 68%);
+	inset: 0;
+	background: radial-gradient(80% 44% at 50% 70%, color-mix(in oklab, var(--rn-c) 16%, transparent), transparent 72%);
+	opacity: 0.7;
 }
-/* the room is darker at the corners */
+.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx::before { animation: aur-rn-bar-a 1.6s ease-out; }
+.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx::before { animation: aur-rn-bar-b 1.6s ease-out; }
+@keyframes aur-rn-bar-a { from { opacity: 1; } }
+@keyframes aur-rn-bar-b { from { opacity: 1; } }
+/* misted at the edges of the glass, never dark */
 .aur-root[data-fx="rain"] .aur-fx::after {
 	content: "";
 	position: absolute;
 	inset: 0;
-	background: radial-gradient(140% 120% at 50% 40%, transparent 55%, rgba(8, 4, 18, 0.55));
+	background: radial-gradient(135% 105% at 50% 46%, transparent 60%, rgba(150, 140, 220, 0.14) 86%, rgba(190, 196, 255, 0.2));
 }
-.aur-root[data-fx="rain"] .aur-bg-grain { opacity: 0.04; }
 
-/* ---------------------------------------------------------------- low clouds drifting by: a tile that wraps, scrolled by exactly one tile */
-.aur-root[data-fx="rain"] :is(.aur-fx-a, .aur-fx-b) { display: block; left: 0; width: calc(100% + 1600px); }
-.aur-root[data-fx="rain"] .aur-fx-a {
-	top: 0;
-	height: 36%;
-	background: {{RN_CLOUDS_FAR}} 0 0 / 1600px 100% repeat-x;
-	animation: aur-rn-drift 280s linear infinite;
+/* ---------------------------------------------------------------- the city out of focus: three depths, each drifting at its own pace */
+.aur-root[data-fx="rain"] :is(.aur-fx-a, .aur-fx-b, .aur-fx-c) { display: block; background-position: 0 0; background-size: 100% 100%; background-repeat: no-repeat; }
+.aur-root[data-fx="rain"] .aur-fx-a { /* far: windows, lamps and streets */
+	inset: -3% -4%;
+	background-image: {{RN_FAR}};
+	animation: aur-rn-drift-a 46s ease-in-out infinite alternate;
 }
-.aur-root[data-fx="rain"] .aur-fx-b {
-	top: 6%;
-	height: 38%;
-	background: {{RN_CLOUDS_NEAR}} 0 0 / 1600px 100% repeat-x;
-	animation: aur-rn-drift 150s linear infinite;
+.aur-root[data-fx="rain"] .aur-fx-b { /* the middle distance */
+	inset: -5% -6%;
+	background-image: {{RN_MID}};
+	animation: aur-rn-drift-b 34s ease-in-out -9s infinite alternate;
 }
-@keyframes aur-rn-drift { to { transform: translateX(-1600px); } }
-
-/* ---------------------------------------------------------------- the city */
-.aur-root[data-fx="rain"] :is(.aur-fx-c, .aur-fx-d) {
-	display: block;
-	left: 50%;
-	bottom: 0;
-	width: var(--stw);
-	height: calc(var(--stw) * 9 / 16);
-	margin-left: calc(var(--stw) / -2);
+.aur-root[data-fx="rain"] .aur-fx-c { /* a few big lights close to the glass */
+	inset: -7% -8%;
+	background-image: {{RN_NEAR}};
+	animation: aur-rn-drift-c 27s ease-in-out -14s infinite alternate;
 }
-.aur-root[data-fx="rain"] .aur-fx-c { background: {{RN_CITY}} 0 0 / 100% 100% no-repeat; }
-/* lightning: the sky flashes twice, a bolt forks down over the rooftops */
-.aur-root[data-fx="rain"] .aur-fx-c::before {
+@keyframes aur-rn-drift-a { from { translate: -1% 0.3%; } to { translate: 1% -0.3%; } }
+@keyframes aur-rn-drift-b { from { translate: 1.6% -0.5%; } to { translate: -1.6% 0.5%; } }
+@keyframes aur-rn-drift-c { from { translate: -2.4% 0.6%; scale: 1.02; } to { translate: 2.4% -0.6%; scale: 1; } }
+/* signs in the album's colours among the far lights: they glimmer, and brighten on every beat */
+.aur-root[data-fx="rain"] .aur-fx-a::before {
 	content: "";
 	position: absolute;
-	inset: 0 0 30% 0;
-	background: radial-gradient(70% 80% at 36% 10%, rgba(226, 222, 255, 0.85), rgba(170, 160, 255, 0.32) 50%, transparent 80%);
-	opacity: 0;
-	animation: aur-rn-flash 23s linear infinite;
-}
-.aur-root[data-fx="rain"] .aur-fx-c::after {
-	content: "";
-	position: absolute;
-	left: 30%;
-	top: 8%;
-	width: 11%;
-	height: 34%;
-	background: {{RN_BOLT}} 50% 0 / contain no-repeat;
-	opacity: 0;
-	animation: aur-rn-bolt 23s linear infinite;
-}
-@keyframes aur-rn-flash {
-	0%, 94% { opacity: 0; }
-	94.4% { opacity: 0.55; }
-	95% { opacity: 0.1; }
-	95.5% { opacity: 0.9; }
-	98% { opacity: 0; }
-}
-@keyframes aur-rn-bolt {
-	0%, 94.3% { opacity: 0; }
-	94.4% { opacity: 1; }
-	95% { opacity: 0; }
-	95.5% { opacity: 1; }
-	96.6% { opacity: 0; }
-}
-.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-c::before,
-.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-c::after { animation-duration: 11.5s; }
-/* windows that come and go, and the neon in the album's colours */
-.aur-root[data-fx="rain"] .aur-fx-d::before,
-.aur-root[data-fx="rain"] .aur-fx-d::after { content: ""; position: absolute; inset: 0; }
-.aur-root[data-fx="rain"] .aur-fx-d::before {
-	background: #ffd38a;
-	-webkit-mask: {{RN_TWINKLE}} 0 0 / 100% 100% no-repeat;
-	mask: {{RN_TWINKLE}} 0 0 / 100% 100% no-repeat;
-	animation: aur-rn-twinkle 9s steps(1) infinite;
-}
-@keyframes aur-rn-twinkle { 0%, 100% { opacity: 0; } 18% { opacity: 1; } 44% { opacity: 0.35; } 61% { opacity: 1; } 83% { opacity: 0; } }
-.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-d::before { animation: aur-rn-twinkle 9s steps(1) infinite, aur-fx-flash-a 0.9s ease-out; }
-.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-d::before { animation: aur-rn-twinkle 9s steps(1) infinite, aur-fx-flash-b 0.9s ease-out; }
-.aur-root[data-fx="rain"] .aur-fx-d::after {
+	inset: 0;
 	background: linear-gradient(90deg, var(--rn-a), var(--rn-b) 50%, var(--rn-c));
-	-webkit-mask: {{RN_SIGNS}} 0 0 / 100% 100% no-repeat;
-	mask: {{RN_SIGNS}} 0 0 / 100% 100% no-repeat;
-	animation: aur-rn-neon 7s linear infinite;
+	-webkit-mask: {{RN_FAR_SIGNS}} 0 0 / 100% 100% no-repeat;
+	mask: {{RN_FAR_SIGNS}} 0 0 / 100% 100% no-repeat;
+	opacity: 0.8;
+	animation: aur-rn-glimmer 5.5s ease-in-out infinite alternate;
 }
-@keyframes aur-rn-neon { 0%, 100% { opacity: 0.95; } 61% { opacity: 0.95; } 61.5% { opacity: 0.4; } 62.2% { opacity: 0.95; } 63% { opacity: 0.5; } 63.6% { opacity: 0.95; } }
-
-/* ---------------------------------------------------------------- the glass, the window and the room */
-.aur-root[data-fx="rain"] .aur-fx-e { display: block; inset: 0; }
-.aur-root[data-fx="rain"] .aur-fx-e > i { position: absolute; display: block; }
-.aur-root[data-fx="rain"] .aur-fx-e::before { /* the room, faintly, in the glass: the candle's light */
+@keyframes aur-rn-glimmer { from { opacity: 0.62; } to { opacity: 0.92; } }
+.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-a::before { animation: aur-rn-glimmer 5.5s ease-in-out infinite alternate, aur-rn-beat-a 0.5s ease-out; }
+.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-a::before { animation: aur-rn-glimmer 5.5s ease-in-out infinite alternate, aur-rn-beat-b 0.5s ease-out; }
+@keyframes aur-rn-beat-a { from { opacity: 1; } }
+@keyframes aur-rn-beat-b { from { opacity: 1; } }
+/* cars going by down in the street: headlights one way, tail lights the other */
+.aur-root[data-fx="rain"] .aur-fx-b::before,
+.aur-root[data-fx="rain"] .aur-fx-b::after {
 	content: "";
 	position: absolute;
-	inset: 0;
-	background: radial-gradient(12vmin 24vmin at 70% 56%, rgba(255, 176, 104, 0.12), transparent 70%), linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.03) 34%, transparent 40%);
-}
-.aur-root[data-fx="rain"] .aur-fx-e::after { /* lightning lights the room too */
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(to bottom, rgba(200, 205, 255, 0.04), rgba(200, 205, 255, 0.22));
+	left: 0;
+	width: 9%;
+	height: 6%;
 	opacity: 0;
-	animation: aur-rn-flash 23s linear infinite;
 }
-.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-e::after { animation-duration: 11.5s; }
+.aur-root[data-fx="rain"] .aur-fx-b::before {
+	top: 79%;
+	background:
+		radial-gradient(closest-side at 30% 50%, rgba(255, 246, 222, 0.75), rgba(255, 236, 196, 0.6) 80%, transparent),
+		radial-gradient(closest-side at 72% 50%, rgba(255, 246, 222, 0.75), rgba(255, 236, 196, 0.6) 80%, transparent);
+	background-size: 46% 100%;
+	background-position: 0 0, 100% 0;
+	background-repeat: no-repeat;
+	animation: aur-rn-car-r 17s linear infinite;
+}
+.aur-root[data-fx="rain"] .aur-fx-b::after {
+	top: 75%;
+	width: 7%;
+	height: 4.6%;
+	background:
+		radial-gradient(closest-side, rgba(255, 70, 80, 0.7), rgba(255, 60, 70, 0.55) 80%, transparent),
+		radial-gradient(closest-side, rgba(255, 70, 80, 0.7), rgba(255, 60, 70, 0.55) 80%, transparent);
+	background-size: 44% 100%;
+	background-position: 0 0, 100% 0;
+	background-repeat: no-repeat;
+	animation: aur-rn-car-l 23s linear -9s infinite;
+}
+@keyframes aur-rn-car-r { 0% { transform: translateX(-120%); opacity: 1; } 46% { transform: translateX(1150%); opacity: 1; } 46.1%, 100% { transform: translateX(1150%); opacity: 0; } }
+@keyframes aur-rn-car-l { 0% { transform: translateX(1450%); opacity: 1; } 52% { transform: translateX(-120%); opacity: 1; } 52.1%, 100% { transform: translateX(-120%); opacity: 0; } }
 
-/* rain outside, far and near: each layer is one tile taller than the screen and moves by exactly one tile */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(1) {
+/* rain falling between the glass and the city: one tile taller than the screen, moved by exactly one tile (heavier in a break) */
+.aur-root[data-fx="rain"] .aur-fx-d {
+	display: block;
 	left: 0;
 	right: 0;
 	top: -600px;
 	height: calc(100% + 600px);
-	background: {{RN_RAIN_FAR}} 0 0 / 600px 600px repeat;
-	opacity: 0.75;
+	background: {{RN_RAIN}} 0 0 / 600px 600px repeat;
+	opacity: 0.5;
 	transition: opacity 2s ease;
-	animation: aur-rn-fall-far 1.15s linear infinite;
+	animation: aur-rn-fall 0.95s linear infinite;
 }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(2) {
-	left: 0;
-	right: 0;
-	top: -900px;
-	height: calc(100% + 900px);
-	background: {{RN_RAIN_NEAR}} 0 0 / 900px 900px repeat;
-	opacity: 0.8;
-	transition: opacity 2s ease;
-	animation: aur-rn-fall-near 0.68s linear infinite;
-}
-.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-e > i:nth-child(-n + 2) { opacity: 1; }
-@keyframes aur-rn-fall-far { to { transform: translateY(600px); } }
-@keyframes aur-rn-fall-near { to { transform: translateY(900px); } }
-/* beads of water on the glass, a little mist low down */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(3) {
+.aur-root[data-fx="rain"][data-gap="on"] .aur-fx-d { opacity: 0.85; }
+@keyframes aur-rn-fall { to { transform: translateY(600px); } }
+
+/* ---------------------------------------------------------------- the glass, in focus */
+.aur-root[data-fx="rain"] .aur-fx-e { display: block; inset: 0; }
+.aur-root[data-fx="rain"] .aur-fx-e > i { position: absolute; display: block; }
+.aur-root[data-fx="rain"] .aur-fx-e::before { /* a breath of mist low on the glass */
+	content: "";
+	position: absolute;
 	inset: 0;
-	background:
-		{{RN_DROPS}} 50% 50% / cover no-repeat,
-		linear-gradient(to top, rgba(205, 215, 255, 0.16), rgba(205, 215, 255, 0.04) 28%, transparent 42%);
+	background: linear-gradient(to top, rgba(210, 218, 255, 0.16), rgba(210, 218, 255, 0.05) 22%, transparent 40%);
 }
+.aur-root[data-fx="rain"] .aur-fx-e::after { /* the faint sheen of the pane */
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(115deg, transparent 26%, rgba(255, 255, 255, 0.035) 33%, transparent 41%, transparent 62%, rgba(255, 255, 255, 0.025) 68%, transparent 74%);
+}
+/* beads of water */
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(1) { inset: 0; background: {{RN_DROPS}} 0 0 / 100% 100% no-repeat; }
 /* running drops: the wet trail is as long as the distance the drop has covered */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 4):nth-child(-n + 11) {
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 2):nth-child(-n + 9) {
 	left: var(--x);
 	top: var(--y);
 	width: 0;
 	height: 0;
 }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 4):nth-child(-n + 11)::before {
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 2):nth-child(-n + 9)::before {
 	content: "";
 	position: absolute;
 	left: 0;
 	top: 0;
-	width: 0.42vmin;
+	width: 0.5vmin;
 	height: var(--dy);
-	margin-left: -0.21vmin;
+	margin-left: -0.25vmin;
 	border-radius: 0.2vmin;
-	background: linear-gradient(to bottom, transparent, rgba(205, 218, 255, 0.12) 25%, rgba(225, 232, 255, 0.4));
+	background: linear-gradient(to bottom, transparent, rgba(215, 222, 255, 0.07) 30%, rgba(235, 238, 255, 0.24));
 	transform-origin: 50% 0;
 	scale: 1 0;
 	opacity: 0;
 	animation: var(--tv) var(--dur) var(--delay) linear infinite;
 }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 4):nth-child(-n + 11)::after {
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 2):nth-child(-n + 9)::after {
 	content: "";
 	position: absolute;
 	left: 0;
@@ -226,116 +197,41 @@
 }
 {{RN_RUNNERS}}
 {{RN_RUNNER_FRAMES}}
-.aur-root[data-bganim="off"] .aur-fx-e > i::before,
-.aur-root[data-bganim="off"] .aur-fx-e > i::after { animation-play-state: paused; }
-
-/* the window frame: painted wood, a wide pane in the middle, small square lights at the sides, lit warm from inside */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(12) {
-	--fw: #1f2c3e; /* the paint */
-	--fd: #121a27; /* in shadow */
-	--fl: rgba(255, 186, 128, 0.55); /* the candle on an edge */
-	inset: 0 0 var(--sill) 0;
-	background:
-		linear-gradient(to bottom, var(--fd), var(--fw) 60%, var(--fl) 94%, var(--fd)) 0 0 / 100% 3.2vmin no-repeat,
-		linear-gradient(to bottom, var(--fl), var(--fw) 18%, var(--fd)) 0 100% / 100% 2.4vmin no-repeat,
-		linear-gradient(to right, var(--fd), var(--fw) 70%, rgba(255, 186, 128, 0.3)) 0 0 / 2.4vmin 100% no-repeat,
-		linear-gradient(to left, var(--fd), var(--fw) 70%, rgba(170, 180, 255, 0.25)) 100% 0 / 2.4vmin 100% no-repeat,
-		linear-gradient(to right, var(--fd), var(--fw) 30%, var(--fl) 50%, var(--fw) 70%, var(--fd)) 15% 0 / 2.2vmin 100% no-repeat,
-		linear-gradient(to right, var(--fd), var(--fw) 30%, var(--fl) 50%, var(--fw) 70%, var(--fd)) 85% 0 / 2.2vmin 100% no-repeat,
-		linear-gradient(to bottom, var(--fd), var(--fw) 40%, var(--fd)) 0 33% / 13.5% 1.1vmin no-repeat,
-		linear-gradient(to bottom, var(--fd), var(--fw) 40%, var(--fd)) 0 64% / 13.5% 1.1vmin no-repeat,
-		linear-gradient(to bottom, var(--fd), var(--fw) 40%, var(--fd)) 100% 33% / 13.5% 1.1vmin no-repeat,
-		linear-gradient(to bottom, var(--fd), var(--fw) 40%, var(--fd)) 100% 64% / 13.5% 1.1vmin no-repeat;
-	box-shadow: inset 0 0 6vmin rgba(4, 4, 16, 0.35);
-}
-/* fairy lights strung along the top of the window; they glow brighter on every beat */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 13):nth-child(-n + 14) {
-	left: 0;
-	right: 0;
-	top: 0;
-	height: max(10vw, 13vmin);
-}
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(13) { background: {{RN_LIGHTS}} 50% 0 / cover no-repeat; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(14) {
-	background: {{RN_GLOWS}} 50% 0 / cover no-repeat;
-	opacity: 0.75;
-	animation: aur-rn-bulbs 5s ease-in-out infinite alternate;
-}
-@keyframes aur-rn-bulbs { from { opacity: 0.55; } to { opacity: 0.85; } }
-.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bt="a"] .aur-fx-e > i:nth-child(14) { animation: aur-rn-bulbs 5s ease-in-out infinite alternate, aur-rn-beat-a 0.5s ease-out; }
-.aur-root[data-fx="rain"][data-bganim="on"] .aur-bg[data-bt="b"] .aur-fx-e > i:nth-child(14) { animation: aur-rn-bulbs 5s ease-in-out infinite alternate, aur-rn-beat-b 0.5s ease-out; }
-@keyframes aur-rn-beat-a { from { opacity: 1; } }
-@keyframes aur-rn-beat-b { from { opacity: 1; } }
-/* the sill: warm wood, lit along its top */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(15) {
-	left: 0;
-	right: 0;
-	bottom: 0;
-	height: var(--sill);
-	background:
-		linear-gradient(to bottom, rgba(255, 214, 170, 0.55), transparent 3px) 0 0 / 100% 30% no-repeat,
-		linear-gradient(to bottom, #a8724e, #8a5a3c 70%, #6f4530) 0 0 / 100% 30% no-repeat,
-		linear-gradient(to bottom, rgba(255, 200, 150, 0.4), transparent 2px) 0 100% / 100% 70% no-repeat,
-		repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 41px) 0 100% / 100% 70% no-repeat,
-		linear-gradient(to bottom, #4c2e20, #2c1a12) 0 100% / 100% 70% no-repeat;
-	box-shadow: 0 -0.6vmin 2vmin rgba(0, 0, 0, 0.35);
-}
-/* the things on the sill: the objects stand on its top, the moving parts share their frames */
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 16):nth-child(-n + 23) { bottom: calc(var(--sill) - 3.4vh); background-position: 50% 100%; background-size: 100% 100%; background-repeat: no-repeat; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 16):nth-child(-n + 17) { left: 63%; width: 21vmin; aspect-ratio: 220 / 260; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(16) { background-image: {{RN_BOOKS}}; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(17) { /* the flame */
-	background-image: {{RN_FLAME}};
-	transform-origin: 50% 24%;
-	animation: aur-rn-flicker 2.3s ease-in-out infinite;
-}
-@keyframes aur-rn-flicker {
-	0%, 100% { transform: scale(1, 1) skewX(0deg); opacity: 1; }
-	18% { transform: scale(0.96, 1.05) skewX(-2deg); }
-	33% { transform: scale(1.03, 0.94) skewX(1.5deg); opacity: 0.9; }
-	52% { transform: scale(0.98, 1.06) skewX(-1deg); }
-	71% { transform: scale(1.02, 0.97) skewX(2deg); opacity: 0.95; }
-	86% { transform: scale(0.97, 1.03) skewX(-1.5deg); }
-}
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 18):nth-child(-n + 20) { left: 5%; width: 14vmin; aspect-ratio: 160 / 220; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(18) { background-image: {{RN_MUG}}; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 19):nth-child(-n + 20) {
-	transform-origin: 46% 55%;
+/* drops landing on the glass, each after its own whole number of beats, with a ring where it hits */
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 10):nth-child(-n + 17) {
+	width: var(--s);
+	height: var(--s);
+	margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+	background: {{RN_BEAD}} center / 100% 100% no-repeat;
 	opacity: 0;
-	animation: aur-rn-steam 5s ease-out infinite;
+	animation-name: aur-rn-land;
+	animation-timing-function: linear;
+	animation-iteration-count: infinite;
 }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(19) { background-image: {{RN_STEAM_A}}; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(20) { background-image: {{RN_STEAM_B}}; animation-delay: -2.5s; }
-@keyframes aur-rn-steam {
-	0% { opacity: 0; transform: translateY(6%) scale(0.85, 0.8); }
-	25% { opacity: 0.85; }
-	100% { opacity: 0; transform: translateY(-12%) scale(1.15, 1.1); }
+.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 10):nth-child(-n + 17)::before {
+	content: "";
+	position: absolute;
+	inset: -45%;
+	border-radius: 50%;
+	border: max(1px, 0.12vmin) solid rgba(236, 240, 255, 0.6);
+	opacity: 0;
+	animation: aur-rn-splash linear infinite;
+	animation-duration: inherit;
+	animation-delay: inherit;
 }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(21) { /* the plant, swaying a little in the warm air */
-	left: 14%;
-	width: 26vmin;
-	aspect-ratio: 260 / 340;
-	background-image: {{RN_PLANT}};
-	transform-origin: 50% 78%;
-	animation: aur-rn-sway 7s ease-in-out infinite alternate;
+{{RN_LANDING}}
+@keyframes aur-rn-land {
+	0% { scale: 0.25; opacity: 0; }
+	2% { scale: 1.14; opacity: 1; }
+	4% { scale: 0.95; }
+	6%, 70% { scale: 1; opacity: 1; }
+	100% { scale: 1; opacity: 0; }
 }
-@keyframes aur-rn-sway { from { transform: skewX(-1.6deg); } to { transform: skewX(1.4deg); } }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(n + 22):nth-child(-n + 23) { left: 78%; width: 27vmin; aspect-ratio: 240 / 300; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(22) { background-image: {{RN_CAT}}; }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(23) { /* the cat's tail swishes in tempo */
-	background-image: {{RN_TAIL}};
-	transform-origin: 71.7% 94%;
-	animation: aur-rn-tail calc(var(--aur-beat, 0.6s) * 4) ease-in-out infinite alternate;
+@keyframes aur-rn-splash {
+	0% { scale: 0.5; opacity: 0; }
+	1% { opacity: 0.85; }
+	8%, 100% { scale: 2; opacity: 0; }
 }
-@keyframes aur-rn-tail { from { transform: rotate(-7deg); } to { transform: rotate(9deg); } }
-.aur-root[data-fx="rain"] .aur-fx-e > i:nth-child(24) { /* the candle's warm light on the sill and the frame */
-	inset: 0;
-	background:
-		radial-gradient(38vmin 24vmin at 71% 84%, rgba(255, 168, 96, 0.34), transparent 70%),
-		radial-gradient(80vmin 46vmin at 70% 100%, rgba(255, 140, 80, 0.14), transparent 70%);
-	animation: aur-rn-candle 3.1s ease-in-out infinite;
-}
-@keyframes aur-rn-candle { 0%, 100% { opacity: 1; } 21% { opacity: 0.86; } 37% { opacity: 0.97; } 58% { opacity: 0.82; } 79% { opacity: 0.94; } }
 
 /* ---------------------------------------------------------------- the lens: a pane of misted glass, with beads along its top edge */
 .aur-root[data-look="rain"] .aur-lens-rim::after {
@@ -362,8 +258,6 @@
 		var(--g-body);
 }
 
-/* ---------------------------------------------------------------- the lyrics: misted-glass white that clears from a blur, as if wiped */
+/* ---------------------------------------------------------------- the lyrics: white on a soft shadow, so they read over the lights */
 .aur-root[data-look="rain"] .aur-stage .aur-line .aur-main { text-shadow: 0 0.04em 0.4em rgba(20, 16, 60, 0.6); }
 .aur-root[data-look="rain"] :is(.aur-side-title, .aur-side-artist, .aur-side-album) { text-shadow: 0 0.06em 0.5em rgba(14, 10, 40, 0.9), 0 0 0.12em rgba(14, 10, 40, 0.6); }
-.aur-root[data-look="rain"][data-motion="full"] .aur-stage[data-mode="synced"] .aur-line.is-active .aur-main { animation: aur-rn-wipe 1.5s var(--aur-ease); }
-@keyframes aur-rn-wipe { from { opacity: 0.3; filter: blur(7px); } }
