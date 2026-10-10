@@ -23,11 +23,25 @@ test("every animation a stylesheet names is defined", () => {
 	for (const name of used) assert.ok(defined.has(name), `@keyframes ${name} is used but not defined`);
 });
 
-test("Neon and Rain are drawn by their stylesheets, with every layer they rely on", () => {
+test("Neon is a tunnel of rings, one per beat, that only moves on the compositor", () => {
 	const neon = css["themes/neon.css"];
-	for (const v of ["aur-nn-chase", "aur-nn-march", "aur-nn-juke", "aur-nn-bubbles", "aur-nn-turn", "aur-nn-strike"]) assert.match(neon, new RegExp(`@keyframes ${v}`));
-	assert.equal((neon.match(/mask-image: url\("data:image\/svg\+xml/g) || []).length, 12, "a lit and a core mask for each of the three colours");
-	assert.doesNotMatch(neon, /data:image\/png/, "all of it is vector art");
+	for (const v of ["aur-nt-ring", "aur-nt-gate-a", "aur-nt-gate-b", "aur-nt-beat-a", "aur-nt-bar-a", "aur-nt-sway", "aur-nt-strike-a"]) assert.match(neon, new RegExp(`@keyframes ${v}`));
+	// nine rings, each a beat behind the last, on a nine-beat trip
+	assert.match(neon, /animation: aur-nt-ring calc\(var\(--aur-beat, 0\.5s\) \* 9\) linear infinite/);
+	for (let k = 2; k <= 9; k++) assert.match(neon, new RegExp(`nth-child\\(${k}\\) \\{ animation-delay: calc\\(var\\(--aur-beat, 0\\.5s\\) \\* -${k - 1}\\); \\}`));
+	// a ring grows as 1 / distance: slowly while far, then in a rush
+	const scales = [...neon.match(/@keyframes aur-nt-ring \{([^}]*\}){22}/)[0].matchAll(/scale\(([\d.]+)\)/g)].map((m) => Number(m[1]));
+	assert.equal(scales.length, 22);
+	for (let i = 1; i < scales.length; i++) assert.ok(scales[i] > scales[i - 1], "keeps growing");
+	assert.ok(scales[0] < 0.2 && scales.at(-1) > 1.2, "from the far end to past the viewer");
+	// every keyframe in the theme animates only transform / opacity / translate / scale / rotate
+	for (const m of neon.matchAll(/@keyframes [\w-]+ \{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)) {
+		for (const p of m[1].matchAll(/([a-z-]+)\s*:/g)) assert.ok(["transform", "opacity", "translate", "scale", "rotate"].includes(p[1]), `${p[1]} in ${m[0].slice(0, 40)}`);
+	}
+	assert.doesNotMatch(neon, /data:image\/png/, "no bitmaps");
+});
+
+test("Rain is drawn by its stylesheet, with every layer it relies on", () => {
 	const rain = css["themes/rain.css"];
 	assert.match(rain, /\.aur-fx-e > i:nth-child\(22\) \{ background-image: url\("data:image\/svg\+xml/, "the cat");
 	for (const v of ["aur-rn-fall-far", "aur-rn-fall-near", "aur-rn-drift", "aur-rn-tail", "aur-rn-steam", "aur-rn-flicker", "aur-rn-bolt"]) assert.match(rain, new RegExp(`@keyframes ${v}`));
