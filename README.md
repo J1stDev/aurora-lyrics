@@ -12,7 +12,7 @@ A [Spicetify](https://spicetify.app) extension for Spotify Desktop.
 
 - 🎤 **Word-by-word lyrics** from Apple Music, Musixmatch, NetEase and more. Each word lights up as it's sung.
 - 🌌 **Looks gorgeous**: the album art drifts behind the lyrics, lines glide in with a soft spring, and the current line glows.
-- 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 12 line motions, 13 word animations, fonts, colours and your own accent colour.
+- 🎨 **Make it yours**: 7 layouts, 12 one-click themes, 12 line motions, 15 word animations, fonts, colours and your own accent colour.
 - 🌍 **Translate** any song into your language with one key.
 - 🪟 **Mini lyrics**: a small floating lyrics bar that stays on screen while you browse Spotify.
 - 📸 **Share** your favourite lines as a ready-to-post image or an animated clip.
@@ -68,7 +68,7 @@ With the mouse:
 
 ### Lyrics that follow the music
 
-- Words light up as they're sung, in 13 styles: **Fill**, **Glow**, **Pop**, **Rise**, **Letters**, **Karaoke**, **Focus** (blur to sharp), **Bounce**, **Neon** (flickers on in colour), **Typewriter**, **Shimmer** (a band of light sweeps through), **Reveal** (each word rises into place out of a mask along its baseline) and **Glitch** (each word lands with a red and cyan jolt, then settles clean).
+- Words light up as they're sung, in 15 styles: **Fill**, **Glow**, **Pop**, **Rise**, **Letters**, **Karaoke**, **Focus** (blur to sharp), **Bounce**, **Neon** (flickers on in colour), **Typewriter**, **Shimmer** (a band of light sweeps through), **Reveal** (each word rises into place out of a mask along its baseline) and **Glitch** (each word lands with a red and cyan jolt, then settles clean), **Wave** (sung words keep riding a slow wave along the line) and **Ink** (each word bleeds in like ink and draws itself sharp).
 - Lines move in 12 styles (*Motion → Style*): **Flow**, **Slide**, **Scale**, **Spring**, **Wheel** (a 3D drum) and **Depth** (lines float in 3D and the scene tilts towards your mouse) scroll the whole song; **Fade**, **Cinematic**, **Swipe**, **Zoom**, **Flip** (split-flap) and **Cascade** (the words of each line rise in one after another, on songs timed only per line too) show one line at a time.
 - Background vocals appear as a smaller line under the main one.
 - In **duets**, each singer gets their own colour and side.

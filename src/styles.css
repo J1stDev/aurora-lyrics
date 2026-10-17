@@ -535,6 +535,39 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	70%, 100% { translate: 0 0; text-shadow: none; clip-path: none; }
 }
 
+/* Wave: once a word is sung it rides a slow wave that runs along the line (each word a little behind the one
+   before it, by its place in the line, --wx), so a finished line keeps breathing. The swell grows in with the
+   word's progress (--e), so nothing jumps when a word starts, and words still to come stay still. */
+.aur-root[data-words="on"][data-wordanim="wave"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 3, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+	transform: translateY(calc(0.03em - var(--lit) * 0.05em));
+}
+.aur-root[data-words="on"][data-wordanim="wave"] .is-active.has-words .aur-w {
+	--wa: var(--aur-wp);
+	animation: aur-wave 2.6s ease-in-out infinite;
+	animation-delay: calc(var(--wx, 0) * -2.2s);
+}
+@keyframes aur-wave {
+	0%, 100% { translate: 0 calc(var(--wa) * 0.07em); }
+	50% { translate: 0 calc(var(--wa) * -0.07em); }
+}
+
+/* Ink: words still to come are a faint ghost; as a word is sung it bleeds in, a soft blot in the accent colour that
+   spreads, darkens into the letters and draws itself sharp, settling from a touch larger. The blur peaks halfway
+   and is gone at both ends, so upcoming words stay readable and sung ones are crisp. */
+.aur-root[data-words="on"][data-wordanim="ink"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 2.2, 1);
+	--ink: calc(1 - (1 - var(--lit)) * (1 - var(--lit)));
+	--bleed: calc(var(--ink) * (1 - var(--ink)) * 4);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--ink) * 100%), color-mix(in srgb, var(--aur-hi) 14%, transparent));
+	transform: translateY(calc(0.03em - var(--ink) * 0.04em)) scale(calc(1.07 - 0.07 * var(--ink)));
+	filter:
+		blur(calc(var(--bleed) * 0.06em))
+		drop-shadow(0 0 calc(0.06em + var(--bleed) * 0.3em) color-mix(in oklab, var(--aur-accent) calc(60% * var(--bleed)), transparent))
+		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--ink) * var(--aur-glow-k)), transparent));
+}
+
 /* ---- translation: a smaller, softer line under each lyric; brightens with the active line */
 .aur-tr {
 	margin-top: 0.22em;

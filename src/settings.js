@@ -137,6 +137,8 @@ export const SCHEMA = [
 			["shimmer", "Shimmer"],
 			["reveal", "Reveal"],
 			["glitch", "Glitch"],
+			["wave", "Wave"],
+			["ink", "Ink"],
 		],
 		hints: {
 			fill: "Soft sweep + lift",
@@ -152,6 +154,8 @@ export const SCHEMA = [
 			shimmer: "Light sweeps through",
 			reveal: "Rises out of a mask",
 			glitch: "Lands with a jolt",
+			wave: "Sung words keep bobbing",
+			ink: "Bleeds in like ink",
 		},
 		default: "fill",
 	},
