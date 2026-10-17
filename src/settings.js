@@ -139,6 +139,8 @@ export const SCHEMA = [
 			["glitch", "Glitch"],
 			["wave", "Wave"],
 			["ink", "Ink"],
+			["stretch", "Stretch"],
+			["echo", "Echo"],
 		],
 		hints: {
 			fill: "Soft sweep + lift",
@@ -156,6 +158,8 @@ export const SCHEMA = [
 			glitch: "Lands with a jolt",
 			wave: "Sung words keep bobbing",
 			ink: "Bleeds in like ink",
+			stretch: "Held notes stretch wide",
+			echo: "A faded copy trails",
 		},
 		default: "fill",
 	},

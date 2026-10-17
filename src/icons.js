@@ -116,6 +116,10 @@ Object.assign(STYLE_ART, {
 	wave: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="3" y="19" width="11" height="7" rx="3.5"/><rect x="16" y="15" width="11" height="7" rx="3.5"/><rect x="29" y="17" width="11" height="7" rx="3.5" opacity=".8"/><rect x="42" y="21" width="14" height="7" rx="3.5" opacity=".3"/><path d="M4 31q6.5-5 13 0t13 0 13 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".4"/></svg>`,
 	// the sung word bleeding in from a soft blot
 	ink: `<svg viewBox="0 0 60 40" aria-hidden="true"><defs><filter id="sa-ink" x="-50%" y="-80%" width="200%" height="260%"><feGaussianBlur stdDeviation="2.2"/></filter></defs><rect x="4" y="16" width="14" height="8" rx="4"/><rect x="20" y="13" width="20" height="14" rx="7" opacity=".45" filter="url(#sa-ink)"/><rect x="22" y="16" width="16" height="8" rx="4" opacity=".75"/><rect x="42" y="16" width="14" height="8" rx="4" opacity=".14"/></svg>`,
+	// a held word, its letters drawn apart
+	stretch: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="3" y="16" width="10" height="8" rx="4"/><rect x="16" y="15" width="5" height="10" rx="2"/><rect x="24" y="15" width="5" height="10" rx="2"/><rect x="32" y="15" width="5" height="10" rx="2"/><rect x="40" y="15" width="5" height="10" rx="2" opacity=".8"/><rect x="48" y="16" width="9" height="8" rx="4" opacity=".3"/><path d="M17 30h27m-3-2.5 3 2.5-3 2.5M20 27.5 17 30l3 2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/></svg>`,
+	// the sung word with a faded copy trailing behind it
+	echo: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect x="4" y="16" width="14" height="8" rx="4"/><rect x="17" y="17.5" width="18" height="8" rx="4" opacity=".14"/><rect x="19.5" y="17" width="18" height="8" rx="4" opacity=".28"/><rect x="22" y="16" width="18" height="8" rx="4"/><rect x="43" y="16" width="13" height="8" rx="4" opacity=".3"/></svg>`,
 });
 
 // Line style: Cascade (the words of the line come up one by one; the line before lifts away)

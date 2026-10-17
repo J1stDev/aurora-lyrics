@@ -383,7 +383,7 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 }
 
 /* Long-held notes (any style except Karaoke): letters rise in a wave and the word swells. */
-.aur-root[data-words="on"]:not([data-wordanim="karaoke"]):not([data-wordanim="letters"]):not([data-wordanim="typewriter"]) .is-active .aur-w.is-long .aur-c {
+.aur-root[data-words="on"]:not([data-wordanim="karaoke"]):not([data-wordanim="letters"]):not([data-wordanim="typewriter"]):not([data-wordanim="stretch"]) .is-active .aur-w.is-long .aur-c {
 	transform: translateY(calc(0.03em - var(--e) * 0.075em - 0.08em * var(--hop))) scale(calc(1 + 0.05 * var(--hop)));
 }
 .aur-root[data-words="on"] .is-active .aur-w.is-long.now .aur-c {
@@ -567,6 +567,45 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 		drop-shadow(0 0 calc(0.06em + var(--bleed) * 0.3em) color-mix(in oklab, var(--aur-accent) calc(60% * var(--bleed)), transparent))
 		drop-shadow(0 0 0.3em color-mix(in oklab, var(--aur-glow-tint) calc(30% * var(--ink) * var(--aur-glow-k)), transparent));
 }
+
+/* Stretch: a word lights as it starts; a held one is drawn out wide while it's held, its letters pulling apart
+   from the middle (the outer ones never more than 0.09em, so the spaces stay) and rising a little, then it lets go as the note ends (the stretch follows --hop, 0 at both
+   ends of the word, so nothing jumps). A short word only swells sideways for a moment. */
+.aur-root[data-words="on"][data-wordanim="stretch"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 4, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+	transform: translateY(calc(0.03em - var(--lit) * 0.05em)) scale(calc(1 + 0.06 * var(--hop)), 1);
+}
+.aur-root[data-words="on"][data-wordanim="stretch"] .is-active.has-words .aur-w.has-chars .aur-c {
+	--wave: 99; /* every letter shares the word's progress */
+	--p: var(--aur-wp);
+	--hw: sin(calc(var(--aur-wp) * 3.14159)); /* 0 → 1 → 0 over the whole held note */
+	transform-origin: 50% 80%;
+	transform: translate(calc((var(--i) / max(1, var(--n) - 1) - 0.5) * 0.18em * var(--hw)), calc(0.03em - var(--lit) * 0.05em - 0.04em * var(--hw))) scale(1, calc(1 + 0.05 * var(--hw)));
+}
+
+/* Echo: as a word is sung a faded copy of it (::after, from data-t) trails just behind it in the accent colour,
+   drifting back and fading as the word ends, like a voice in a hall. Words to come and words sung are clean. */
+.aur-root[data-words="on"][data-wordanim="echo"] .is-active.has-words :is(.aur-w:not(.has-chars), .aur-c) {
+	--lit: clamp(0, var(--e) * 4, 1);
+	color: color-mix(in srgb, var(--aur-hi) calc(var(--lit) * 100%), var(--aur-dim));
+}
+.aur-root[data-words="on"][data-wordanim="echo"] .is-active.has-words .aur-w { position: relative; }
+.aur-root[data-words="on"][data-wordanim="echo"] .is-active.has-words .aur-w::after {
+	--ec: sin(calc(var(--aur-wp) * 3.14159));
+	content: attr(data-t);
+	position: absolute;
+	left: 0;
+	top: 0;
+	z-index: -1;
+	white-space: pre;
+	color: color-mix(in oklab, var(--aur-accent) 55%, #fff);
+	opacity: calc(var(--ec) * 0.55);
+	translate: calc(var(--aur-wp) * -0.16em) calc(var(--aur-wp) * 0.05em);
+	scale: calc(1 + 0.08 * var(--aur-wp));
+	pointer-events: none;
+}
+.aur-root[data-motion="reduced"][data-wordanim="echo"] .aur-w::after { translate: none; scale: none; }
 
 /* ---- translation: a smaller, softer line under each lyric; brightens with the active line */
 .aur-tr {
