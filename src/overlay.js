@@ -718,6 +718,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	async function loadLyrics({ force = false, only = null } = {}) {
 		if (!ui) return;
 		state.abort?.abort();
+		clearTimeout(state.appleRetry);
 		const ctrl = new AbortController();
 		state.abort = ctrl;
 		const token = ++state.loadToken;
@@ -797,6 +798,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			else if (interim && interim !== res.lyrics && lyricsQuality(res.lyrics) === 3) toast(`Upgraded to word sync from ${label}`);
 			else if (force) toast(`Reloaded from ${label}`);
 			maybeShowTip();
+		} else if (only === "paxsenix" && res.report?.paxsenix?.status === "skipped") {
+			toast("Apple Music is busy right now. Trying again in the background…", 2600);
 		} else if (only) {
 			toast(res.error || `${SOURCE_LABELS[only]} has no lyrics for this track`, 2600);
 		} else if (res.instrumental) {
@@ -808,6 +811,42 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		}
 		setSourceBadge();
 		kick();
+		if (res.report?.paxsenix?.status === "skipped" && !(res.lyrics && lyricsQuality(res.lyrics) >= 3) && (!only || only === "paxsenix")) retryApple(track, token);
+	}
+
+	/**
+	 * Apple Music's lyrics service is often too busy to answer at first (it asks for a few seconds' patience). When it was
+	 * passed over as busy and what's showing isn't word-synced, keep asking quietly while the song plays, and switch to
+	 * Apple's lyrics when they come (and remember them for the track).
+	 */
+	function retryApple(track, token) {
+		let tries = 0;
+		const attempt = async () => {
+			if (token !== state.loadToken || state.track?.uri !== track.uri) return;
+			if (state.lyrics && lyricsQuality(state.lyrics) >= 3 && state.source !== "paxsenix") return; // word sync came from elsewhere
+			tries++;
+			let r = null;
+			try {
+				r = await resolveLyrics(track, settings.all(), { only: "paxsenix", probe: true });
+			} catch {
+				/* network hiccup: try again below */
+			}
+			if (token !== state.loadToken || state.track?.uri !== track.uri) return;
+			if (r?.report?.paxsenix) state.report = { ...state.report, paxsenix: r.report.paxsenix };
+			if (r?.lyrics && (!state.lyrics || lyricsQuality(r.lyrics) > lyricsQuality(state.lyrics))) {
+				lyricsCache.set(track.uri, "paxsenix", r.lyrics, { tried: ["paxsenix"] });
+				state.lyrics = r.lyrics;
+				state.source = "paxsenix";
+				state.cached = false;
+				displayLyrics();
+				toast(lyricsQuality(r.lyrics) === 3 ? "Upgraded to word sync from Apple Music" : "Lyrics from Apple Music");
+				kick();
+				return;
+			}
+			const busy = !r || r.report?.paxsenix?.status === "skipped" || r.report?.paxsenix?.status === "error";
+			if (busy && tries < 12) state.appleRetry = setTimeout(attempt, 10000 + tries * 2000);
+		};
+		state.appleRetry = setTimeout(attempt, 6000);
 	}
 
 	/**

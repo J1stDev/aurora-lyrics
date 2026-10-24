@@ -41,6 +41,18 @@ export async function getJSON(url, { signal, headers, proxy = false, timeout = 9
 	return { status: res.status, ok: res.ok, json, headers: res.headers };
 }
 
+/** GET a URL as text (for XML / TTML). Same contract as getJSON: HTTP errors don't throw, network failures do. */
+export async function getText(url, { signal, headers, timeout = 9000 } = {}) {
+	const res = await fetchWithTimeout(url, { signal, headers }, timeout);
+	let text = "";
+	try {
+		text = await res.text();
+	} catch {
+		/* body unreadable */
+	}
+	return { status: res.status, ok: res.ok, text, headers: res.headers };
+}
+
 /** Headers for Spotify's own APIs, or null if no access token is available. */
 export function spotifyAuthHeaders() {
 	const S = globalThis.Spicetify;

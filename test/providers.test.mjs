@@ -30,7 +30,7 @@ function installSpicetify(routes = {}) {
 }
 
 function jsonResponse(status, body) {
-	return { status, ok: status >= 200 && status < 300, headers: new Map([["retry-after", "30"]]), json: async () => body };
+	return { status, ok: status >= 200 && status < 300, headers: new Map([["retry-after", "30"]]), json: async () => body, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) };
 }
 
 /** An LRCLIB record for the test track (real responses always include these fields). */
@@ -379,6 +379,37 @@ test("paxsenix: iTunes lookup (validated) → Apple Music syllable lyrics", asyn
 	assert.equal(r.source, "paxsenix");
 	assert.equal(lyricsQuality(r.lyrics), 3);
 	assert.ok(urls.every((u) => !u.includes("cors-proxy")), "no proxy needed");
+});
+
+test("paxsenix: busy (503) → Apple's TTML from the server's store, and the iTunes id is remembered", async () => {
+	const ttml = `<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1.000" end="2.000"><span begin="1.000" end="1.400">Hi</span> <span begin="1.400" end="2.000">there</span></p></div></body></tt>`;
+	const urls = routeFetch({
+		"itunes.apple.com/search": { results: [{ kind: "song", trackId: 42, trackName: "My Song", artistName: "Main Artist", trackTimeMillis: 200500 }] },
+		"apple-music/lyrics?id=42": [503, { message: "Lyrics service currently busy handling 500 requests at the same time! please retry later", error: true }],
+		"apple-music/cache/42": ttml,
+	});
+	const r = await resolveLyrics(track, using(["paxsenix"]), { force: true });
+	assert.equal(r.source, "paxsenix");
+	assert.equal(lyricsQuality(r.lyrics), 3);
+	await resolveLyrics(track, using(["paxsenix"]), { force: true });
+	assert.equal(urls.filter((u) => u.includes("itunes.apple.com")).length, 1, "searched once");
+});
+
+test("paxsenix: busy with nothing stored → skipped, paused only as long as the server asks", async () => {
+	const urls = routeFetch({
+		"itunes.apple.com/search": { results: [{ kind: "song", trackId: 42, trackName: "My Song", artistName: "Main Artist", trackTimeMillis: 200500 }] },
+		"apple-music/lyrics?id=42": [503, { message: "busy", error: true }],
+		"apple-music/cache/42": [404, { detail: "not in cache" }],
+	});
+	const r = await resolveLyrics(track, using(["paxsenix"]), { force: true });
+	assert.equal(r.lyrics, null);
+	assert.equal(r.report.paxsenix.status, "skipped");
+	assert.match(r.report.paxsenix.message, /busy/i);
+	const before = urls.length;
+	const r2 = await resolveLyrics(track, using(["paxsenix"]), { force: true });
+	assert.equal(r2.report.paxsenix.status, "skipped");
+	assert.equal(urls.length, before, "paused: no new requests");
+	assert.match(r2.report.paxsenix.message, /paused for (2\d|30)s/, "for the Retry-After (30 s here), not minutes");
 });
 
 test("paxsenix: no validated iTunes match → not found (lyrics endpoint not called)", async () => {

@@ -7,8 +7,8 @@
 
 import { EXT_ID, normalizeTitle, titleMatches, artistMatches, sameSong } from "./util.js";
 import { store } from "./storage.js";
-import { getJSON } from "./net.js";
-import { fromMusixmatch, parseYrc, parseNeteaseLrc, isNeteaseInstrumental, fromUnison, fromPaxsenixApple } from "./formats.js";
+import { getJSON, getText } from "./net.js";
+import { fromMusixmatch, parseYrc, parseNeteaseLrc, isNeteaseInstrumental, fromUnison, fromPaxsenixApple, parseTTML } from "./formats.js";
 import { hasContent } from "./lrc.js";
 
 const qs = (o) =>
@@ -25,9 +25,10 @@ const pause = (key, ms) => (pausedUntil[key] = Date.now() + ms);
 const isPaused = (key) => (pausedUntil[key] || 0) > Date.now();
 const skipped = (key) => ({ status: "skipped", message: `${key} paused for ${Math.ceil((pausedUntil[key] - Date.now()) / 1000)}s` });
 
-/** Test hook: clear all backoffs. */
+/** Test hook: clear all backoffs and remembered lookups. */
 export function resetSourceBackoff() {
 	for (const k of Object.keys(pausedUntil)) delete pausedUntil[k];
+	appleIds.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -241,11 +242,16 @@ export const unisonProvider = {
 };
 
 // ---------------------------------------------------------------------------
-// Apple Music lyrics via Paxsenix (community API, no key). Syllable-level timing,
+// Apple Music lyrics via Paxsenix's Lyrically API (community, no key). Syllable-level timing,
 // background vocals and duet sides. Both hosts send CORS headers → plain fetch().
 //   1) iTunes Search finds the Apple Music track id (checked with sameSong, so remixes /
-//      covers / other versions are skipped).
+//      covers / other versions are skipped). Remembered per track, so a retry skips it.
 //   2) lyrics.paxsenix.org/apple-music/lyrics?id=… returns Apple's lyrics as JSON.
+//   3) That endpoint is often overloaded: for every song Cloudflare hasn't cached it answers 503
+//      "busy handling 500 requests at the same time" with Retry-After: 3, or just hangs. Its store of Apple's TTML
+//      files (/apple-music/cache/{id}) is served apart from that queue, so it's asked next. If
+//      that has nothing either, the source pauses only as long as the server asks (3–30 s), and
+//      the overlay keeps retrying in the background while the song plays.
 // ---------------------------------------------------------------------------
 
 /** Pick the iTunes search result for the track. Exported for tests. */
@@ -268,26 +274,47 @@ export function pickItunesSong(results, track) {
 	return best;
 }
 
+const appleIds = new Map(); // track → Apple Music track id (null: iTunes has no match), so a retry skips the search
+/** How long the server asked us to wait (Retry-After, in seconds), kept between 3 s and 30 s. */
+const retryAfterMs = (res) => Math.min(30, Math.max(3, Number(res.headers?.get?.("retry-after")) || 5)) * 1000;
+
 export const paxsenixProvider = {
 	id: "paxsenix",
 	isAvailable: (track) => !!track.title && !!track.artist,
 	async fetch(track, signal) {
 		if (isPaused("paxsenix")) return skipped("paxsenix");
 		try {
-			const search = await getJSON(`https://itunes.apple.com/search?${qs({ term: `${track.title} ${primaryArtist(track.artist)}`, entity: "song", limit: 15 })}`, { signal });
-			if (search.status === 403 || search.status === 429) {
-				pause("paxsenix", 2 * 60 * 1000);
-				return skipped("paxsenix");
+			const key = track.uri || `${track.title}|${track.artist}`;
+			let id = appleIds.get(key);
+			if (id === undefined) {
+				const search = await getJSON(`https://itunes.apple.com/search?${qs({ term: `${track.title} ${primaryArtist(track.artist)}`, entity: "song", limit: 15 })}`, { signal });
+				if (search.status === 403 || search.status === 429) {
+					pause("paxsenix", 60 * 1000); // iTunes allows about 20 searches a minute
+					return skipped("paxsenix");
+				}
+				if (!search.ok) return { status: "error", message: `Apple Music search: HTTP ${search.status}` };
+				id = pickItunesSong(search.json?.results, track)?.trackId ?? null;
+				appleIds.set(key, id);
 			}
-			if (!search.ok) return { status: "error", message: `Apple Music search: HTTP ${search.status}` };
-			const song = pickItunesSong(search.json?.results, track);
-			if (!song) return { status: "notfound" };
+			if (!id) return { status: "notfound" };
 
-			const r = await getJSON(`https://lyrics.paxsenix.org/apple-music/lyrics?${qs({ id: song.trackId })}`, { signal, timeout: 15000 });
+			// When it's overloaded it either says so (503) or just hangs: a timeout counts as busy too.
+			const r = await getJSON(`https://lyrics.paxsenix.org/apple-music/lyrics?${qs({ id })}`, { signal, timeout: 7000 }).catch((e) => {
+				if (signal?.aborted) throw e;
+				return { status: 503, ok: false, json: null, headers: null };
+			});
 			if (r.status === 404 || r.status === 400) return { status: "notfound" };
-			if (r.status === 429 || r.status === 503) {
-				pause("paxsenix", 3 * 60 * 1000);
-				return skipped("paxsenix");
+			if (r.status === 429 || r.status === 503 || r.status === 502 || r.status === 504) {
+				const stored = await getText(`https://lyrics.paxsenix.org/apple-music/cache/${encodeURIComponent(id)}`, { signal, timeout: 6000 }).catch((e) => {
+					if (signal?.aborted) throw e;
+					return null;
+				});
+				if (stored?.ok) {
+					const lyrics = parseTTML(stored.text, track.duration);
+					if (hasContent(lyrics)) return { status: "found", lyrics };
+				}
+				pause("paxsenix", retryAfterMs(r));
+				return { status: "skipped", message: "Apple Music's lyrics service is busy" };
 			}
 			if (!r.ok) return { status: "error", message: `Paxsenix: HTTP ${r.status}` };
 			const lyrics = fromPaxsenixApple(r.json, track.duration);
