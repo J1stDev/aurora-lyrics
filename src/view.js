@@ -129,6 +129,7 @@ export class LyricsView {
 		this.soon = null;
 		this.list.replaceChildren();
 		this.lineEls = [];
+		this.wheelMeasured = false;
 		this.wordEls = [];
 		this.active = -2;
 		this.wordIdx = -1;
@@ -446,10 +447,21 @@ export class LyricsView {
 		if (this.layout === "stack") {
 			this.stage.style.setProperty("--aur-ah", `${focus.offsetHeight}px`);
 		} else {
-			this.y = Math.round(this.stage.clientHeight * ANCHOR - (focus.offsetTop + focus.offsetHeight / 2));
-			if (!this.browsing) this.list.style.setProperty("--aur-y", `${this.y}px`);
+			const anchor = Math.round(this.stage.clientHeight * ANCHOR);
+			this.y = Math.round(anchor - (focus.offsetTop + focus.offsetHeight / 2));
+			if (!this.browsing) this.setY(this.y);
 			// Where the active line sits inside the list box: the Wheel's shared vanishing point.
 			this.list.style.setProperty("--aur-anchor-y", `${Math.round(this.stage.clientHeight * ANCHOR - this.list.offsetTop)}px`);
+			if (this.lineAnim === "wheel") {
+				// The Wheel wraps the list round a drum (styles.css): it needs every line's resting centre, the anchor and the
+				// drum's radius, as plain numbers of px (CSS can't divide a length by a length to get the angle).
+				if (instant || !this.wheelMeasured) {
+					for (const el of this.lineEls) el.style.setProperty("--wc", String(Math.round(el.offsetTop + el.offsetHeight / 2)));
+					this.wheelMeasured = true;
+				}
+				this.list.style.setProperty("--aur-wa", String(anchor));
+				this.list.style.setProperty("--aur-wr", String(Math.round(this.stage.clientHeight * 0.55)));
+			}
 		}
 
 		this.placeLens(instant);
@@ -571,7 +583,7 @@ export class LyricsView {
 			this.stage.classList.add("is-browsing");
 			if (this.lens) this.lens.dataset.browse = "on";
 		}
-		this.list.style.setProperty("--aur-y", `${Math.round(this.browseY)}px`);
+		this.setY(Math.round(this.browseY));
 		clearTimeout(this.browseTimer);
 		this.browseTimer = setTimeout(() => this.stopBrowsing(), BROWSE_RESUME);
 	}
@@ -585,7 +597,13 @@ export class LyricsView {
 		if (this.lens) delete this.lens.dataset.browse;
 		if (instant) return;
 		this.list.dataset.dir = this.browseY > this.y ? "up" : "down";
-		this.list.style.setProperty("--aur-y", `${this.y}px`);
+		this.setY(this.y);
+	}
+
+	/** The list's scroll offset: as a length for every line's transform, and as a plain number for the Wheel's angles. */
+	setY(y) {
+		this.list.style.setProperty("--aur-y", `${y}px`);
+		this.list.style.setProperty("--aur-yn", String(y));
 	}
 
 	// -------------------------------------------------------------------------

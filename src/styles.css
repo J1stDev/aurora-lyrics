@@ -844,20 +844,23 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 }
 @keyframes aur-spring-settle { from { transform: translateY(0.08em) scale(0.97); } }
 
-/* ---- Wheel (list): lines sit on a turning drum. All lines share one vanishing point at the
-   active line (--aur-anchor-y, set by view.js), so the rows curve away above and below like a
-   real cylinder: each line tilts by its distance from the active one (--dd signed, --ad
-   absolute), sinks back in depth, is pulled towards the centre and fades out. */
-.aur-root[data-anim="wheel"] { --aur-stagger: 0ms; --aur-move: 1s; --aur-move-ease: cubic-bezier(0.22, 1.08, 0.36, 1); }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-lines { perspective: 1100px; perspective-origin: 50% var(--aur-anchor-y, 40%); }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line {
-	transform: translate3d(0, calc(var(--aur-y, 0px) - var(--dd, 0) * var(--ad, 0) * 0.09em), calc(var(--ad, 0) * -0.35em)) rotateX(calc(var(--dd, 0) * -19deg));
+/* ---- Wheel (list): the lyrics wrapped round a turning drum, like the cylinder of a picker. Each line sits at an
+   angle round the drum set by how far it is from the line being sung along the list (--wd), over the drum's radius:
+   it rises or sinks as the sine of that angle and falls back as its cosine, turning to face the drum's axis, so rows
+   crowd together towards the rim and fade over it. view.js gives the numbers as plain px: --wc, each line's resting
+   centre; --aur-yn, the scroll; --aur-wa, the anchor; --aur-wr, the radius. Moving the scroll turns the whole drum. */
+.aur-root[data-anim="wheel"] { --aur-stagger: 0ms; --aur-move: 0.9s; --aur-move-ease: cubic-bezier(0.22, 1, 0.36, 1); }
+.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-lines { perspective: 900px; perspective-origin: 50% var(--aur-anchor-y, 40%); }
+/* ([data-layout] so this outranks the list's own transform for the lines near the active one) */
+.aur-root[data-anim="wheel"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line {
+	--wd: calc(var(--wc, 0) + var(--aur-yn, 0) - var(--aur-wa, 0));
+	--wt: clamp(-1.5, var(--wd) / var(--aur-wr, 380), 1.5); /* radians; past the rim the rows stop and fade out */
+	transform: translate3d(0, calc((var(--aur-wa, 0) - var(--wc, 0) + sin(var(--wt)) * var(--aur-wr, 380)) * 1px), calc((cos(var(--wt)) - 1) * var(--aur-wr, 380) * 1px)) rotateX(calc(var(--wt) * -1rad));
 	transform-origin: 50% 50%;
 	backface-visibility: hidden;
+	opacity: clamp(0, cos(var(--wt)) * 0.95 - 0.25, 0.55);
 }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.6 - var(--ad, 0) * 0.11); }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
-.aur-root[data-anim="wheel"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; }
+.aur-root[data-anim="wheel"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; }
 .aur-line[data-d="-6"] { --dd: -6; --ad: 6; }
 .aur-line[data-d="-5"] { --dd: -5; --ad: 5; }
 .aur-line[data-d="-4"] { --dd: -4; --ad: 4; }
@@ -990,12 +993,12 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	from { translate: -1.2% 0.6% 0; rotate: y -1.5deg; }
 	to { translate: 1.2% -0.6% 0; rotate: y 1.5deg; }
 }
-.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line {
+.aur-root[data-anim="depth"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line {
 	transform: translate3d(0, var(--aur-y, 0px), calc(var(--ad, 0) * -140px));
 }
-.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.62 - var(--ad, 0) * 0.1); }
-.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
-.aur-root[data-anim="depth"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; transform: translate3d(0, var(--aur-y, 0px), 40px); }
+.aur-root[data-anim="depth"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line[data-d] { opacity: calc(0.62 - var(--ad, 0) * 0.1); }
+.aur-root[data-anim="depth"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line:not([data-d]) { opacity: 0; }
+.aur-root[data-anim="depth"][data-layout="list"] .aur-stage[data-mode="synced"] .aur-line.is-active { opacity: 1; transform: translate3d(0, var(--aur-y, 0px), 40px); }
 
 /* ============================================================== context off */
 
