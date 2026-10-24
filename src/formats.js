@@ -319,6 +319,55 @@ export function fromPaxsenixApple(json, duration) {
 	return finalizeSynced(lines.sort(byTime), {}, duration);
 }
 
+// ---------------------------------------------------------------------------
+// LyricsPlus (Apple Music lyrics as KPoe JSON)
+// ---------------------------------------------------------------------------
+
+/**
+ * /v2/lyrics/get response: { type: "Word"|"Line"|"None", metadata: { agents }, lyrics: [{ time, duration, text,
+ * syllabus: [{ time, duration, text, isBackground }], element: { singer } }] } (ms). Syllables carry their own spacing
+ * ("I ", "e", "nough"); background vocals are syllables flagged isBackground, in parentheses.
+ */
+export function fromLyricsPlus(json, duration) {
+	const rows = json?.lyrics;
+	if (!Array.isArray(rows) || !rows.length) return null;
+	const type = String(json.type || "").toLowerCase();
+	if (type === "none" || !rows.some((l) => Number.isFinite(Number(l?.time)))) return parsePlain(rows.map((l) => String(l?.text ?? "")).join("\n"));
+	const wordSynced = type === "word" || type === "syllable";
+	// Duets: voices in order of appearance, like the TTML agents (a group = everyone together).
+	const agents = json.metadata?.agents || {};
+	const order = [];
+	for (const l of rows) if (l?.element?.singer && !order.includes(l.element.singer)) order.push(l.element.singer);
+	const singerOf = new Map();
+	let people = 0;
+	if (order.length > 1) for (const id of order) singerOf.set(id, agents[id]?.type === "group" ? 2 : people++ % 2);
+	const toWords = (parts) =>
+		parts
+			.filter((s) => s && String(s.text ?? "").length && Number.isFinite(Number(s.time)))
+			.map((s) => ({ time: Number(s.time), end: Number(s.time) + (Number(s.duration) || 0) || null, text: String(s.text) }));
+	const joinText = (words) => words.map((w) => w.text).join("").replace(/\s+/g, " ").trim();
+	const lines = rows.map((l) => {
+		const syl = Array.isArray(l.syllabus) ? l.syllabus : [];
+		const main = toWords(syl.filter((s) => !s.isBackground));
+		const bg = toWords(syl.filter((s) => s.isBackground));
+		const bgText = stripParens(joinText(bg));
+		if (bg.length) {
+			bg[0].text = bg[0].text.replace(/^\s*\(/, "");
+			bg[bg.length - 1].text = bg[bg.length - 1].text.replace(/\)\s*$/, "");
+		}
+		const singer = singerOf.get(l.element?.singer) ?? null;
+		return {
+			time: Number(l.time) || main[0]?.time || 0,
+			text: main.length ? joinText(main) : String(l.text ?? "").trim(),
+			words: wordSynced && main.length ? main : null,
+			bg: bgText ? { text: bgText, words: wordSynced && bg.length ? bg : null } : null,
+			opposite: singer === 1,
+			singer,
+		};
+	});
+	return finalizeSynced(lines.sort(byTime), {}, duration);
+}
+
 /** Unison /lyrics response → Lyrics */
 export function fromUnison(data, duration) {
 	const format = String(data?.format || "").toLowerCase();

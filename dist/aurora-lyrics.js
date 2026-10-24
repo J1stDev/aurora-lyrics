@@ -449,6 +449,7 @@ const FONTS = {
  */
 const PROVIDER_INFO = [
 	{ id: "paxsenix", label: "Apple Music", words: true, on: true, desc: "Apple Music's syllable-synced lyrics with background vocals and duets, via the community Paxsenix API." },
+	{ id: "lyricsplus", label: "Apple Music (LyricsPlus)", words: true, on: true, desc: "Apple Music's word-synced lyrics again, through LyricsPlus (the YouLy+ backend), for when Paxsenix is busy. A song it hasn't seen yet can take a few seconds." },
 	{ id: "musixmatch", label: "Musixmatch", words: true, on: true, desc: "Line-synced and plain lyrics for most songs; word-by-word (richsync) when Musixmatch allows it." },
 	{ id: "spotify", label: "Spotify", words: false, on: true, desc: "Spotify's own lyrics. Mostly line-synced." },
 	{ id: "netease", label: "NetEase", words: true, on: true, desc: "NetEase Cloud Music. Word-by-word (YRC) and line lyrics; great for Asian music." },
@@ -1504,6 +1505,55 @@ function fromPaxsenixApple(json, duration) {
 			bg: bgText ? { text: bgText, words: wordSynced && bg.length ? bg : null } : null,
 			opposite: !!l.oppositeTurn,
 			singer: l.oppositeTurn ? 1 : 0, // the only duet info this API gives
+		};
+	});
+	return finalizeSynced(lines.sort(byTime), {}, duration);
+}
+
+// ---------------------------------------------------------------------------
+// LyricsPlus (Apple Music lyrics as KPoe JSON)
+// ---------------------------------------------------------------------------
+
+/**
+ * /v2/lyrics/get response: { type: "Word"|"Line"|"None", metadata: { agents }, lyrics: [{ time, duration, text,
+ * syllabus: [{ time, duration, text, isBackground }], element: { singer } }] } (ms). Syllables carry their own spacing
+ * ("I ", "e", "nough"); background vocals are syllables flagged isBackground, in parentheses.
+ */
+function fromLyricsPlus(json, duration) {
+	const rows = json?.lyrics;
+	if (!Array.isArray(rows) || !rows.length) return null;
+	const type = String(json.type || "").toLowerCase();
+	if (type === "none" || !rows.some((l) => Number.isFinite(Number(l?.time)))) return parsePlain(rows.map((l) => String(l?.text ?? "")).join("\n"));
+	const wordSynced = type === "word" || type === "syllable";
+	// Duets: voices in order of appearance, like the TTML agents (a group = everyone together).
+	const agents = json.metadata?.agents || {};
+	const order = [];
+	for (const l of rows) if (l?.element?.singer && !order.includes(l.element.singer)) order.push(l.element.singer);
+	const singerOf = new Map();
+	let people = 0;
+	if (order.length > 1) for (const id of order) singerOf.set(id, agents[id]?.type === "group" ? 2 : people++ % 2);
+	const toWords = (parts) =>
+		parts
+			.filter((s) => s && String(s.text ?? "").length && Number.isFinite(Number(s.time)))
+			.map((s) => ({ time: Number(s.time), end: Number(s.time) + (Number(s.duration) || 0) || null, text: String(s.text) }));
+	const joinText = (words) => words.map((w) => w.text).join("").replace(/\s+/g, " ").trim();
+	const lines = rows.map((l) => {
+		const syl = Array.isArray(l.syllabus) ? l.syllabus : [];
+		const main = toWords(syl.filter((s) => !s.isBackground));
+		const bg = toWords(syl.filter((s) => s.isBackground));
+		const bgText = stripParens(joinText(bg));
+		if (bg.length) {
+			bg[0].text = bg[0].text.replace(/^\s*\(/, "");
+			bg[bg.length - 1].text = bg[bg.length - 1].text.replace(/\)\s*$/, "");
+		}
+		const singer = singerOf.get(l.element?.singer) ?? null;
+		return {
+			time: Number(l.time) || main[0]?.time || 0,
+			text: main.length ? joinText(main) : String(l.text ?? "").trim(),
+			words: wordSynced && main.length ? main : null,
+			bg: bgText ? { text: bgText, words: wordSynced && bg.length ? bg : null } : null,
+			opposite: singer === 1,
+			singer,
 		};
 	});
 	return finalizeSynced(lines.sort(byTime), {}, duration);
@@ -4006,6 +4056,44 @@ const paxsenixProvider = {
 	},
 };
 
+// ---------------------------------------------------------------------------
+// Apple Music lyrics via LyricsPlus (lyricsplus.binimum.org, the community backend of the YouLy+
+// extension; no key, CORS open): a second way to Apple's word-synced lyrics, for when Paxsenix is
+// busy. It searches by title / artist / album / duration and names the song it found, which is
+// checked with sameSong. A song nobody has asked for yet takes it several seconds (then it's cached).
+// ---------------------------------------------------------------------------
+
+/** "3:21.570" → ms (LyricsPlus's metadata.totalDuration). */
+const clockMs = (v) => {
+	const m = /^(?:(\d+):)?(\d+(?:\.\d+)?)$/.exec(String(v || "").trim());
+	return m ? Math.round(((Number(m[1]) || 0) * 60 + Number(m[2])) * 1000) : null;
+};
+
+const lyricsplusProvider = {
+	id: "lyricsplus",
+	isAvailable: (track) => !!track.title && !!track.artist,
+	async fetch(track, signal) {
+		if (isPaused("lyricsplus")) return skipped("lyricsplus");
+		try {
+			const q = { title: track.title, artist: primaryArtist(track.artist), album: track.album || null, duration: track.duration ? Math.round(track.duration / 1000) : null, source: "apple" };
+			const r = await getJSON(`https://lyricsplus.binimum.org/v2/lyrics/get?${qs(q)}`, { signal, timeout: 12000 });
+			if (r.status === 404) return { status: "notfound" };
+			if (r.status === 429 || r.status === 503 || r.status === 502 || r.status === 504) {
+				pause("lyricsplus", retryAfterMs(r));
+				return { status: "skipped", message: "LyricsPlus is busy" };
+			}
+			if (!r.ok) return { status: "error", message: `LyricsPlus: HTTP ${r.status}` };
+			const m = r.json?.metadata;
+			if (m?.title && !sameSong(track, { title: m.title, artists: [m.artist || ""], durationMs: clockMs(m.totalDuration) }, 5000)) return { status: "notfound" };
+			const lyrics = fromLyricsPlus(r.json, track.duration);
+			return hasContent(lyrics) ? { status: "found", lyrics } : { status: "notfound" };
+		} catch (e) {
+			if (signal?.aborted) throw e;
+			return { status: "error", message: `LyricsPlus: ${e?.message || e}` };
+		}
+	},
+};
+
 // ---- providers.js ----------------------------------------------------------
 // Lyrics providers + resolver.
 //
@@ -4202,6 +4290,7 @@ const lrclibProvider = {
 
 const PROVIDERS = {
 	paxsenix: paxsenixProvider,
+	lyricsplus: lyricsplusProvider,
 	musixmatch: musixmatchProvider,
 	spotify: spotifyProvider,
 	netease: neteaseProvider,

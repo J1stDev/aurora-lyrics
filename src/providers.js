@@ -13,7 +13,7 @@ import { EXT_ID, fetchWithTimeout, withTimeout, normalizeTitle, sameSong } from 
 import { parseLRC, parsePlain, parseLyricsText, finalizeSynced, hasContent } from "./lrc.js";
 import { lyricsCache, localLyrics } from "./cache.js";
 import { PROVIDER_INFO } from "./settings.js";
-import { musixmatchProvider, neteaseProvider, unisonProvider, paxsenixProvider } from "./sources.js";
+import { musixmatchProvider, neteaseProvider, unisonProvider, paxsenixProvider, lyricsplusProvider } from "./sources.js";
 import { getJSON, spotifyAuthHeaders } from "./net.js";
 
 const TIMEOUT = 8000;
@@ -199,6 +199,7 @@ const lrclibProvider = {
 
 export const PROVIDERS = {
 	paxsenix: paxsenixProvider,
+	lyricsplus: lyricsplusProvider,
 	musixmatch: musixmatchProvider,
 	spotify: spotifyProvider,
 	netease: neteaseProvider,

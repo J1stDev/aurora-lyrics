@@ -208,8 +208,8 @@ src/
   translate.js   line-by-line translation (batched, aligned, cached)
   providers.js   Spotify + LRCLIB providers, registry, and the resolver (quality tiers, upgrades, pinning)
   net.js         fetch / CORS-proxy / Spotify-auth helpers (no CosmosAsync for third-party hosts)
-  sources.js     Musixmatch, NetEase, Unison and Apple Music (Paxsenix) network code
-  formats.js     pure converters: Musixmatch richsync, NetEase YRC, TTML, Paxsenix JSON
+  sources.js     Musixmatch, NetEase, Unison and Apple Music (Paxsenix, LyricsPlus) network code
+  formats.js     pure converters: Musixmatch richsync, NetEase YRC, TTML, Paxsenix JSON, LyricsPlus JSON
   lrc.js         lyrics model, LRC / enhanced LRC / plain parsers, word-timing estimator, LRC serializer
   cache.js       LRU lyrics cache (TTL + negative cache) and imported-lyrics store
   settings.js    settings schema, themes, defaults, validation, persistence
@@ -234,7 +234,8 @@ The sources are ES modules so the tests can import them directly. The build stri
 
 | Source | Timing | How it's reached |
 | --- | --- | --- |
-| Apple Music (Paxsenix) | word/syllable, background vocals, duets | iTunes Search finds the Apple track (validated), then the community Paxsenix API returns Apple's lyrics; both called directly |
+| Apple Music (Paxsenix) | word/syllable, background vocals, duets | iTunes Search finds the Apple track (validated), then the community Paxsenix (Lyrically) API returns Apple's lyrics; both called directly. When it's busy, its store of Apple's TTML files is tried, and the overlay retries in the background while the song plays |
+| Apple Music (LyricsPlus) | word, background vocals, duets | The community LyricsPlus API (YouLy+'s backend) searches by title, artist, album and duration and returns Apple's lyrics; the song it names is checked against the one playing |
 | Musixmatch | word (richsync), line, plain | mobile API through the CORS proxy with a free token (the tokenless desktop API returns a decoy song, so it is never used) |
 | Spotify | line (rarely syllable) | Spotify's lyrics endpoint, called directly with your session token |
 | NetEase | word (YRC), line | NetEase Cloud Music's API, through the CORS proxy |
@@ -245,7 +246,7 @@ The sources are ES modules so the tests can import them directly. The build stri
 
 - **Spotify's lyrics endpoint is internal.** `spclient…/color-lyrics/v2` is undocumented and can change or be region/account-restricted.
 - **Why not CosmosAsync.** On Spotify 1.3.x, Spicetify 2.45.1 sends every `CosmosAsync` request to Spotify's native resolver, which throws "Resolver not found" for non-Spotify hosts and drops custom headers. The extension uses `fetch()` directly where CORS allows it, and Spicetify's CORS proxy (`cors-proxy.spicetify.app`, or your `spicetify:corsProxyTemplate`) for NetEase and the Musixmatch mobile API.
-- **Unofficial APIs.** Musixmatch, NetEase, Paxsenix and Unison are used the way community lyrics apps use them. Any of them can change, rate-limit, or disappear. Rate-limited sources are skipped for a few minutes.
+- **Unofficial APIs.** Musixmatch, NetEase, Paxsenix, LyricsPlus and Unison are used the way community lyrics apps use them. Any of them can change, rate-limit, or disappear. Rate-limited sources are skipped for a while (a busy Apple Music source only for the few seconds it asks).
 - **Musixmatch needs a token**, and Musixmatch captcha-limits token requests per IP. The CORS proxy is shared by all Spicetify users, so tokens sometimes can't be obtained; Musixmatch is then skipped for 15 minutes. If you use lyrics-plus, its saved token is reused.
 - **The offset is global, not per track.** For a single track, import lyrics with an `[offset:]` tag.
 - **Unsynced auto-scroll is an estimate** based on track progress.

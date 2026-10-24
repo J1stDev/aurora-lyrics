@@ -412,6 +412,31 @@ test("paxsenix: busy with nothing stored → skipped, paused only as long as the
 	assert.match(r2.report.paxsenix.message, /paused for (2\d|30)s/, "for the Retry-After (30 s here), not minutes");
 });
 
+test("lyricsplus: Apple Music word sync, checked against the song it says it found", async () => {
+	const body = (title) => ({ type: "Word", metadata: { title, artist: "Main Artist", totalDuration: "3:20.400", agents: { v1: { type: "person" } } }, lyrics: [{ time: 1000, duration: 1000, text: "Hi there", syllabus: [{ time: 1000, duration: 400, text: "Hi " }, { time: 1400, duration: 600, text: "there" }], element: { singer: "v1" } }] });
+	let answer = body("My Song");
+	const urls = routeFetch({ "lyricsplus.binimum.org/v2/lyrics/get": () => answer });
+	const r = await resolveLyrics(track, using(["lyricsplus"]), { force: true });
+	assert.equal(r.source, "lyricsplus");
+	assert.equal(lyricsQuality(r.lyrics), 3);
+	assert.match(urls[0], /source=apple/);
+	answer = body("Another Song Entirely");
+	const r2 = await resolveLyrics(track, using(["lyricsplus"]), { force: true });
+	assert.equal(r2.lyrics, null, "a different song is not used");
+});
+
+test("resolver: Apple Music busy → LyricsPlus right after it", async () => {
+	routeFetch({
+		"itunes.apple.com/search": { results: [{ kind: "song", trackId: 42, trackName: "My Song", artistName: "Main Artist", trackTimeMillis: 200500 }] },
+		"apple-music/lyrics?id=42": [503, { message: "busy", error: true }],
+		"apple-music/cache/42": [404, { detail: "not in cache" }],
+		"lyricsplus.binimum.org": { type: "Word", metadata: { title: "My Song", artist: "Main Artist" }, lyrics: [{ time: 1000, duration: 1000, text: "Hi", syllabus: [{ time: 1000, duration: 1000, text: "Hi" }] }] },
+	});
+	const r = await resolveLyrics(track, using(["paxsenix", "lyricsplus", "lrclib"]), { force: true });
+	assert.equal(r.source, "lyricsplus");
+	assert.equal(r.report.paxsenix.status, "skipped");
+});
+
 test("paxsenix: no validated iTunes match → not found (lyrics endpoint not called)", async () => {
 	const urls = routeFetch({ "itunes.apple.com/search": { results: [{ kind: "song", trackId: 7, trackName: "My Song", artistName: "Somebody Else", trackTimeMillis: 200000 }] } });
 	const r = await resolveLyrics(track, using(["paxsenix"]));

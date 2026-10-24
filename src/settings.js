@@ -33,6 +33,7 @@ export const FONTS = {
  */
 export const PROVIDER_INFO = [
 	{ id: "paxsenix", label: "Apple Music", words: true, on: true, desc: "Apple Music's syllable-synced lyrics with background vocals and duets, via the community Paxsenix API." },
+	{ id: "lyricsplus", label: "Apple Music (LyricsPlus)", words: true, on: true, desc: "Apple Music's word-synced lyrics again, through LyricsPlus (the YouLy+ backend), for when Paxsenix is busy. A song it hasn't seen yet can take a few seconds." },
 	{ id: "musixmatch", label: "Musixmatch", words: true, on: true, desc: "Line-synced and plain lyrics for most songs; word-by-word (richsync) when Musixmatch allows it." },
 	{ id: "spotify", label: "Spotify", words: false, on: true, desc: "Spotify's own lyrics. Mostly line-synced." },
 	{ id: "netease", label: "NetEase", words: true, on: true, desc: "NetEase Cloud Music. Word-by-word (YRC) and line lyrics; great for Asian music." },

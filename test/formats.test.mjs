@@ -262,3 +262,30 @@ test("estimateWords keeps a one-word line whole", () => {
 	assert.equal(syllables("places"), 2);
 	assert.equal(syllables("times"), 1);
 });
+
+test("LyricsPlus Apple Music JSON: syllables with their own spacing, background vocals, duet voices", async () => {
+	const { fromLyricsPlus } = await import("../src/formats.js");
+	const l = fromLyricsPlus(
+		{
+			type: "Word",
+			metadata: { agents: { v1: { type: "person" }, v2: { type: "person" }, v1000: { type: "group" } } },
+			lyrics: [
+				{ time: 1000, duration: 1500, text: "I been tryna", syllabus: [{ time: 1000, duration: 200, text: "I " }, { time: 1200, duration: 300, text: "been " }, { time: 1500, duration: 200, text: "tryn" }, { time: 1700, duration: 300, text: "a" }], element: { singer: "v1" } },
+				{ time: 3000, duration: 2000, text: "Call back (back)", syllabus: [{ time: 3000, duration: 400, text: "Call " }, { time: 3400, duration: 400, text: "back " }, { time: 3900, duration: 500, text: "(back)", isBackground: true }], element: { singer: "v2" } },
+				{ time: 6000, duration: 1000, text: "All", syllabus: [{ time: 6000, duration: 1000, text: "All" }], element: { singer: "v1000" } },
+			],
+		},
+		10000,
+	);
+	assert.equal(l.synced, true);
+	assert.equal(l.lines[0].text, "I been tryna");
+	assert.deepEqual(l.lines[0].words.map((w) => w.text), ["I ", "been ", "tryn", "a"]);
+	assert.equal(l.lines[0].words[1].end, 1500);
+	assert.equal(l.lines[1].text, "Call back");
+	assert.equal(l.lines[1].bg.text, "back");
+	assert.equal(l.lines[1].bg.words[0].text, "back");
+	assert.equal(l.lines[1].opposite, true);
+	assert.equal(l.lines[2].singer, 2, "a group sings together");
+	const plain = fromLyricsPlus({ type: "None", lyrics: [{ text: "one" }, { text: "two" }] });
+	assert.equal(plain.synced, false);
+});

@@ -8,7 +8,7 @@
 import { EXT_ID, normalizeTitle, titleMatches, artistMatches, sameSong } from "./util.js";
 import { store } from "./storage.js";
 import { getJSON, getText } from "./net.js";
-import { fromMusixmatch, parseYrc, parseNeteaseLrc, isNeteaseInstrumental, fromUnison, fromPaxsenixApple, parseTTML } from "./formats.js";
+import { fromMusixmatch, parseYrc, parseNeteaseLrc, isNeteaseInstrumental, fromUnison, fromPaxsenixApple, parseTTML, fromLyricsPlus } from "./formats.js";
 import { hasContent } from "./lrc.js";
 
 const qs = (o) =>
@@ -322,6 +322,44 @@ export const paxsenixProvider = {
 		} catch (e) {
 			if (signal?.aborted) throw e;
 			return { status: "error", message: `Paxsenix: ${e?.message || e}` };
+		}
+	},
+};
+
+// ---------------------------------------------------------------------------
+// Apple Music lyrics via LyricsPlus (lyricsplus.binimum.org, the community backend of the YouLy+
+// extension; no key, CORS open): a second way to Apple's word-synced lyrics, for when Paxsenix is
+// busy. It searches by title / artist / album / duration and names the song it found, which is
+// checked with sameSong. A song nobody has asked for yet takes it several seconds (then it's cached).
+// ---------------------------------------------------------------------------
+
+/** "3:21.570" → ms (LyricsPlus's metadata.totalDuration). */
+const clockMs = (v) => {
+	const m = /^(?:(\d+):)?(\d+(?:\.\d+)?)$/.exec(String(v || "").trim());
+	return m ? Math.round(((Number(m[1]) || 0) * 60 + Number(m[2])) * 1000) : null;
+};
+
+export const lyricsplusProvider = {
+	id: "lyricsplus",
+	isAvailable: (track) => !!track.title && !!track.artist,
+	async fetch(track, signal) {
+		if (isPaused("lyricsplus")) return skipped("lyricsplus");
+		try {
+			const q = { title: track.title, artist: primaryArtist(track.artist), album: track.album || null, duration: track.duration ? Math.round(track.duration / 1000) : null, source: "apple" };
+			const r = await getJSON(`https://lyricsplus.binimum.org/v2/lyrics/get?${qs(q)}`, { signal, timeout: 12000 });
+			if (r.status === 404) return { status: "notfound" };
+			if (r.status === 429 || r.status === 503 || r.status === 502 || r.status === 504) {
+				pause("lyricsplus", retryAfterMs(r));
+				return { status: "skipped", message: "LyricsPlus is busy" };
+			}
+			if (!r.ok) return { status: "error", message: `LyricsPlus: HTTP ${r.status}` };
+			const m = r.json?.metadata;
+			if (m?.title && !sameSong(track, { title: m.title, artists: [m.artist || ""], durationMs: clockMs(m.totalDuration) }, 5000)) return { status: "notfound" };
+			const lyrics = fromLyricsPlus(r.json, track.duration);
+			return hasContent(lyrics) ? { status: "found", lyrics } : { status: "notfound" };
+		} catch (e) {
+			if (signal?.aborted) throw e;
+			return { status: "error", message: `LyricsPlus: ${e?.message || e}` };
 		}
 	},
 };
