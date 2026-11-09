@@ -1,7 +1,7 @@
 // The overlay controller: builds the full-screen UI once (lazily), owns the playback loop,
 // loads lyrics on track changes, and applies settings live.
 
-import { h, clamp, nextFrame, setText, EXT_ID } from "./util.js";
+import { h, clamp, nextFrame, setText, EXT_ID, albumColors } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO, THEMES } from "./settings.js";
 import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
@@ -13,6 +13,7 @@ import { createPanel, ensureFont } from "./panel.js";
 import { createShareSheet } from "./share.js";
 import { findTabs, songsterrSearchUrl } from "./tabs.js";
 import { ICONS } from "./icons.js";
+import { THEME_CSS } from "./styles.js";
 import { loadBackground } from "./media.js";
 import { loadBeats, beatIndexAt } from "./beats.js";
 import { createScenes, hasScene } from "./scenes.js";
@@ -420,6 +421,24 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 	// ---------------------------------------------------------------------------
 	// Settings → CSS variables / data attributes
 	// ---------------------------------------------------------------------------
+	/**
+	 * Only the theme in use has its rules in the page: each theme's CSS (its art is most of the stylesheet) sits in
+	 * one style element after the base one, swapped when the theme changes.
+	 */
+	function useThemeCss(id) {
+		let el = document.getElementById(`${EXT_ID}-theme`);
+		if (!el) {
+			el = document.createElement("style");
+			el.id = `${EXT_ID}-theme`;
+			const base = document.getElementById(`${EXT_ID}-style`);
+			base ? base.after(el) : document.head.append(el);
+		}
+		const key = id || "";
+		if (el.dataset.theme === key) return;
+		el.dataset.theme = key;
+		el.textContent = THEME_CSS[key] || "";
+	}
+
 	function reducedMotion(all) {
 		if (all.reducedMotion === "on") return true;
 		if (all.reducedMotion === "off") return false;
@@ -443,6 +462,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		const layout = STACK_ANIMS.has(all.animation) ? "stack" : "list";
 		const reduced = reducedMotion(all);
+		useThemeCss(all.themeFx);
 		Object.assign(root.dataset, {
 			anim: all.animation,
 			layout,
@@ -605,9 +625,8 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		blobs[0].decode ? blobs[0].decode().then(reveal, reveal) : (blobs[0].onload = reveal);
 
 		// Accent colours for the gradient background / tinted text (best effort).
-		const extract = globalThis.Spicetify?.colorExtractor;
-		if (typeof extract === "function" && track.uri) {
-			Promise.resolve(extract(track.uri))
+		if (track.uri) {
+			albumColors(track.uri)
 				.then((c) => {
 					if (!c || state.track?.uri !== track.uri) return;
 					const st = ui.root.style;

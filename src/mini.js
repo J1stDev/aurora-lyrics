@@ -6,7 +6,7 @@
 // Lyrics come from the Now Playing card's lookup (see npv.js → main.js), so there is no
 // second search for the same song.
 
-import { h, clamp, setText } from "./util.js";
+import { h, clamp, setText, albumColors } from "./util.js";
 import { settings } from "./settings.js";
 import { getCurrentTrack, getNextTrack, getPosition, getDuration, isPlaying } from "./player.js";
 import { findLineIndex } from "./lrc.js";
@@ -156,11 +156,8 @@ export function createMiniLyrics({ openOverlay, isOverlayOpen }) {
 	}
 
 	function tint(track) {
-		const extract = globalThis.Spicetify?.colorExtractor;
-		if (!track?.uri || typeof extract !== "function") return;
-		Promise.resolve(extract(track.uri))
-			.then((c) => c && state.uri === track.uri && el.style.setProperty("--float-c", c.DARK_VIBRANT || c.VIBRANT || c.PROMINENT || "#2a2a33"))
-			.catch(() => {});
+		if (!track?.uri) return;
+		albumColors(track.uri).then((c) => c && state.uri === track.uri && el.style.setProperty("--float-c", c.DARK_VIBRANT || c.VIBRANT || c.PROMINENT || "#2a2a33"));
 	}
 
 	/** Swap the two lines with a short enter animation. `a` is a line ({ gap } or one with text / words) or plain text. */

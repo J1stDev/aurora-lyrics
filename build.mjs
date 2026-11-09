@@ -75,6 +75,92 @@ function stylesheets() {
 	return ["styles.css", "glass.css", ...extra].filter((f) => existsSync(join(SRC, f)));
 }
 
+// Themes whose rules are split off the base stylesheet and only injected while that theme is in use.
+const THEME_IDS = ["aurora", "neon", "minimal", "karaoke", "gothic", "blackmetal", "lounge", "retro", "synthwave", "zen", "sunset", "midnight", "vaporwave", "ocean", "rain"];
+
+/** Top-level statements of a (comment-free) stylesheet: { prelude, text }. */
+function statements(css) {
+	const out = [];
+	let depth = 0;
+	let start = 0;
+	let quote = "";
+	for (let i = 0; i < css.length; i++) {
+		const c = css[i];
+		if (quote) {
+			if (c === "\\") i++;
+			else if (c === quote) quote = "";
+			continue;
+		}
+		if (c === '"' || c === "'") quote = c;
+		else if (c === "{") depth++;
+		else if (c === "}" && --depth === 0) {
+			const text = css.slice(start, i + 1).trim();
+			out.push({ prelude: text.slice(0, text.indexOf("{")).trim(), text });
+			start = i + 1;
+		} else if (c === ";" && depth === 0) {
+			const text = css.slice(start, i + 1).trim(); // e.g. @import / @charset
+			if (text) out.push({ prelude: text, text });
+			start = i + 1;
+		}
+	}
+	return out;
+}
+
+/** Selectors of a rule, split on top-level commas (not the ones inside :is() / :not()). */
+function selectorList(prelude) {
+	const parts = [];
+	let depth = 0;
+	let cur = "";
+	for (const c of prelude) {
+		if (c === "(") depth++;
+		else if (c === ")") depth--;
+		if (c === "," && depth === 0) (parts.push(cur), (cur = ""));
+		else cur += c;
+	}
+	return parts.concat(cur).map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Split the stylesheet into the base (always injected) and one chunk per theme. A rule goes to a theme when every
+ * one of its selectors names that theme (data-fx / data-look), a @keyframes when only that theme's rules use it.
+ * Order is kept within each part; a theme's chunk is injected after the base, as the theme files already were.
+ */
+function splitThemes(css) {
+	const all = statements(css);
+	const themeOf = (st) => {
+		if (st.prelude.startsWith("@")) return null;
+		let theme = null;
+		for (const sel of selectorList(st.prelude)) {
+			const ids = new Set([...sel.matchAll(/data-(?:fx|look)="(\w+)"/g)].map((m) => m[1]));
+			if (ids.size !== 1) return null;
+			const [id] = ids;
+			if (!THEME_IDS.includes(id) || (theme && theme !== id)) return null;
+			theme = id;
+		}
+		return theme;
+	};
+	const owner = all.map(themeOf);
+	// keyframes: who uses each name
+	const users = new Map();
+	all.forEach((st, i) => {
+		if (st.prelude.startsWith("@keyframes")) return;
+		for (const m of st.text.matchAll(/\baur-[\w-]+/g)) {
+			if (!users.has(m[0])) users.set(m[0], new Set());
+			users.get(m[0]).add(owner[i] || "_base");
+		}
+	});
+	all.forEach((st, i) => {
+		const kf = /^@keyframes\s+([\w-]+)/.exec(st.prelude);
+		if (!kf) return;
+		const u = users.get(kf[1]);
+		if (u && u.size === 1 && !u.has("_base")) owner[i] = [...u][0];
+	});
+	const base = [];
+	const themes = {};
+	all.forEach((st, i) => (owner[i] ? (themes[owner[i]] ||= []).push(st.text) : base.push(st.text)));
+	return { base: base.join("\n"), themes: Object.fromEntries(Object.entries(themes).map(([k, v]) => [k, v.join("\n")])) };
+}
+
 function transform(file, code) {
 	const stripped = code
 		.replace(/^import\s[^;]*?from\s+["'][^"']+["'];?[ \t]*\r?\n/gm, "")
@@ -100,7 +186,10 @@ function build() {
 				.replace(/\s*\n\s*/g, "\n")
 				.replace(/\n+/g, "\n")
 				.trim();
-			code = `const CSS = ${JSON.stringify(css)};\n`;
+			const { base, themes } = splitThemes(css);
+			code = `const CSS = ${JSON.stringify(base)};\n// Each theme's own rules, injected only while that theme is in use (overlay.js).\nconst THEME_CSS = ${JSON.stringify(themes)};\n`;
+			const kb = (s) => (s.length / 1024).toFixed(0);
+			console.log(`[build] css: base ${kb(base)} KB, themes ${Object.entries(themes).map(([k, v]) => `${k} ${kb(v)}`).join(", ")} KB`);
 		} else {
 			code = transform(file, readFileSync(join(SRC, file), "utf8"));
 		}

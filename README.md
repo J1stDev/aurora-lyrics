@@ -122,7 +122,9 @@ In the last 20 seconds of a song, a small card shows what's playing next. Click 
 
 ### Now Playing panel
 
-Spotify's lyrics card in the right-hand panel is replaced by a live one: synced, with words filling in and click-to-jump on every line. You can turn it off in *General → Interface*.
+Spotify's lyrics card in the right-hand panel is replaced by a live one: a pane of glass lit by the album's colours, with the line being sung in a small glass lens that glides from line to line. It's synced, with words filling in and click-to-jump on every line, and it stays light on Spotify: it only works frame by frame while a word is being sung, and sleeps while paused or hidden. You can turn it off in *General → Interface*.
+
+The buttons that open the lyrics, in the top bar and the player bar, are small glass tiles that fill with the album's colour while the lyrics are open.
 
 ## Where the lyrics come from
 

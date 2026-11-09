@@ -1965,93 +1965,190 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 
 
 /* ============================================================== Now Playing panel card
-   Lives inside Spotify's own UI (outside .aur-root), so every rule is prefixed .aur-npv. */
+   Lives inside Spotify's own UI (outside .aur-root), so every rule is prefixed .aur-npv. A pane of glass lit from
+   inside by the album's colours (--npv-c the bright one, --npv-c2 the deep one, from npv.js): two soft glows under a
+   frosted sheen, a hairline rim that catches light at the top. The line being sung sits in a small glass lens that
+   glides with it (moved in step with the lines, on the same curve). Only transform / opacity / colour move. */
 
 [data-testid="lyrics-npv-section"][data-aur-hidden] { display: none !important; }
 
 .aur-npv {
-	--npv-c: #3a3a46;
+	--npv-c: #8a7bd8;
+	--npv-c2: #2c2440;
+	--npv-ease: cubic-bezier(0.22, 1, 0.36, 1);
+	--npv-glide: 0.75s;
 	position: relative;
+	isolation: isolate;
 	overflow: hidden;
-	padding: 16px 16px 10px;
-	border-radius: 8px;
+	padding: 14px 14px 8px;
+	border-radius: 14px;
 	color: #fff;
 	font-family: var(--encore-body-font-stack, "SpotifyMixUI", "CircularSp", system-ui, sans-serif);
 	background:
-		radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--npv-c) 80%, #fff 6%) 0%, transparent 70%),
-		linear-gradient(165deg, color-mix(in oklab, var(--npv-c) 72%, #000) 0%, color-mix(in oklab, var(--npv-c) 38%, #0d0d10) 100%);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-	transition: background 0.8s ease;
+		radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--npv-c) 42%, transparent) 0%, transparent 62%),
+		radial-gradient(110% 90% at 100% 100%, color-mix(in oklab, var(--npv-c2) 75%, transparent) 0%, transparent 70%),
+		linear-gradient(160deg, color-mix(in oklab, var(--npv-c2) 55%, #121218) 0%, color-mix(in oklab, var(--npv-c2) 30%, #0c0c11) 100%);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.16),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.07),
+		0 14px 32px -16px rgba(0, 0, 0, 0.7),
+		0 10px 40px -22px color-mix(in oklab, var(--npv-c) 60%, transparent);
 }
-.aur-npv-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
-.aur-npv-title { margin: 0; font-size: 16px; font-weight: 700; }
-.aur-npv-src { min-width: 0; overflow: hidden; padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); font-size: 11px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; color: rgba(255, 255, 255, 0.72); }
+/* the frosted sheen over the glows: brighter at the top, like the fullscreen glass */
+.aur-npv::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.02) 38%, transparent 60%);
+	pointer-events: none;
+}
+.aur-npv.no-anim :is(.aur-npv-lines, .aur-npv-lens) { transition: none !important; }
+
+/* head: a light that's lit while the song plays, the title, where the lyrics came from, two glass buttons */
+.aur-npv-head { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 6px; }
+.aur-npv-live {
+	flex: none;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: color-mix(in oklab, var(--npv-c) 70%, #fff);
+	box-shadow: 0 0 0 3px color-mix(in oklab, var(--npv-c) 22%, transparent), 0 0 10px color-mix(in oklab, var(--npv-c) 80%, transparent);
+	opacity: 0.35;
+	transition: opacity 0.4s ease;
+}
+.aur-npv.is-playing .aur-npv-live { opacity: 1; }
+.aur-npv-title { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.aur-npv-src {
+	min-width: 0;
+	overflow: hidden;
+	padding: 3px 9px;
+	border-radius: 99px;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: rgba(255, 255, 255, 0.74);
+}
 .aur-npv-src:empty { display: none; }
-.aur-npv-open {
+.aur-npv-gap { flex: 1; }
+.aur-npv-btn {
 	display: grid;
 	flex: none;
 	place-items: center;
-	width: 32px;
-	height: 32px;
-	margin-left: auto;
+	width: 30px;
+	height: 30px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.1);
-	color: rgba(255, 255, 255, 0.8);
+	color: rgba(255, 255, 255, 0.78);
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 	cursor: pointer;
-	transition: background 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+	transition: color 0.16s ease, background 0.16s ease, transform 0.16s var(--npv-ease);
 }
-.aur-npv-open:hover { background: rgba(255, 255, 255, 0.2); color: #fff; transform: scale(1.08); }
-.aur-npv-open svg { width: 16px; height: 16px; }
+.aur-npv-btn svg { width: 15px; height: 15px; }
+@media (hover: hover) {
+	.aur-npv-btn:hover { color: #fff; background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.09)); }
+}
+.aur-npv-btn:active { transform: scale(0.94); }
+.aur-npv-btn:focus-visible { outline: 2px solid color-mix(in oklab, var(--npv-c) 70%, #fff); outline-offset: 2px; }
+
+/* body: the lines scroll under a soft fade at both edges */
 .aur-npv-body {
 	position: relative;
-	height: 204px;
+	height: 214px;
 	overflow: hidden;
 	cursor: pointer;
-	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);
-	mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 78%, transparent 100%);
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 13%, #000 80%, transparent 100%);
 }
-.aur-npv-lines { padding-top: 6px; will-change: transform; transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1); }
-.aur-npv-lines.no-anim { transition: none; }
+.aur-npv-lines { position: relative; padding-top: 8px; will-change: transform; transition: transform var(--npv-glide) var(--npv-ease); }
+/* the lens: a little pane of glass behind the line being sung, moving with it */
+.aur-npv-lens {
+	position: absolute;
+	top: 0;
+	left: -2px;
+	right: -2px;
+	height: 0;
+	border-radius: 11px;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.055) 55%, rgba(255, 255, 255, 0.035));
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.3),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+		0 8px 22px -10px rgba(0, 0, 0, 0.55),
+		0 6px 26px -10px color-mix(in oklab, var(--npv-c) 55%, transparent);
+	opacity: 0;
+	transition: transform var(--npv-glide) var(--npv-ease), height var(--npv-glide) var(--npv-ease), opacity 0.35s ease;
+	pointer-events: none;
+}
+.aur-npv.has-lens .aur-npv-lens { opacity: 1; }
 .aur-npv-line {
-	margin: 0 -8px;
-	padding: 5px 8px;
-	border-radius: 8px;
-	font-size: 19px;
+	position: relative;
+	padding: 6px 10px;
+	border-radius: 10px;
+	font-size: 18px;
 	font-weight: 700;
-	line-height: 1.32;
-	letter-spacing: -0.01em;
+	line-height: 1.3;
+	letter-spacing: -0.012em;
 	color: rgba(255, 255, 255, 0.42);
-	transition: color 0.45s ease, background 0.2s ease, text-shadow 0.6s ease;
+	transition: color 0.45s ease, background 0.16s ease;
 }
-.aur-npv-line.is-past { color: rgba(255, 255, 255, 0.7); }
-.aur-npv-line.is-active { color: #fff; text-shadow: 0 0 18px rgba(255, 255, 255, 0.25); }
-.aur-npv-line.is-gap { letter-spacing: 0.15em; }
-.aur-npv-line[title]:hover { background: rgba(255, 255, 255, 0.09); color: rgba(255, 255, 255, 0.92); }
-/* word fill on the active line (same --aur-wp idea as the fullscreen view) */
-.aur-npv-line.is-active:has(.aur-npv-w) { text-shadow: none; }
-.aur-npv-line.is-active .aur-npv-w { color: rgba(255, 255, 255, 0.42); }
+.aur-npv-line.is-past { color: rgba(255, 255, 255, 0.62); }
+.aur-npv-line.is-active { color: #fff; }
+@media (hover: hover) {
+	.aur-npv-line[title]:not(.is-active):hover { background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.9); }
+}
+/* an instrumental break: three dots */
+.aur-npv-line.is-gap { display: flex; gap: 6px; padding-block: 12px; }
+.aur-npv-line.is-gap i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* word fill on the active line (the same --aur-wp idea as the fullscreen view) */
+.aur-npv-line.is-active .aur-npv-w { color: rgba(255, 255, 255, 0.45); }
 .aur-npv-line.is-active .aur-npv-w.sung { color: #fff; }
 .aur-npv-line.is-active .aur-npv-w.now {
 	color: transparent;
-	background: linear-gradient(90deg, #fff calc(var(--aur-wp, 0) * (100% + 0.6em) - 0.6em), rgba(255, 255, 255, 0.42) calc(var(--aur-wp, 0) * (100% + 0.6em)));
+	background: linear-gradient(90deg, #fff calc(var(--aur-wp, 0) * (100% + 0.6em) - 0.6em), rgba(255, 255, 255, 0.45) calc(var(--aur-wp, 0) * (100% + 0.6em)));
 	-webkit-background-clip: text;
 	background-clip: text;
 }
-.aur-npv.is-unsynced .aur-npv-line { color: rgba(255, 255, 255, 0.85); font-size: 16px; }
+.aur-npv.is-unsynced .aur-npv-line { color: rgba(255, 255, 255, 0.86); font-size: 15px; font-weight: 600; }
 /* duets: second singer on the right, group lines centred, each with a soft tint when active */
 .aur-npv[data-duet="on"] .aur-npv-line[data-singer="1"] { text-align: right; }
 .aur-npv[data-duet="on"] .aur-npv-line[data-singer="2"] { text-align: center; }
 .aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="1"],
-.aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="1"] .aur-npv-w.sung { color: #ffd3e6; }
+.aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="1"] .aur-npv-w.sung { color: color-mix(in oklab, var(--npv-c) 30%, #fff); }
 .aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="2"],
-.aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="2"] .aur-npv-w.sung { color: #ffe9f2; }
-.aur-npv-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 16px; font-size: 13px; text-align: center; color: rgba(255, 255, 255, 0.62); }
-.aur-npv-msg:empty { display: none; }
-
+.aur-npv[data-duet="on"] .aur-npv-line.is-active[data-singer="2"] .aur-npv-w.sung { color: color-mix(in oklab, var(--npv-c) 15%, #fff); }
 .aur-npv-tr { margin-top: 2px; font-size: 13px; font-weight: 600; line-height: 1.3; color: rgba(255, 255, 255, 0.55); }
 .aur-npv-line.is-active .aur-npv-tr { color: rgba(255, 255, 255, 0.85); }
+
+/* messages; while loading, three placeholder lines breathe in their place */
+.aur-npv-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 0 18px; font-size: 13px; font-weight: 600; text-align: center; color: rgba(255, 255, 255, 0.62); }
+.aur-npv-msg:empty { display: none; }
+.aur-npv-msg[data-kind="loading"] { place-items: start stretch; align-content: start; gap: 14px; padding: 34px 10px 0; font-size: 0; color: transparent; }
+.aur-npv-msg[data-kind="loading"]::before,
+.aur-npv-msg[data-kind="loading"]::after,
+.aur-npv[data-state="loading"] .aur-npv-body::after {
+	content: "";
+	display: block;
+	height: 15px;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.11);
+	animation: aur-npv-wait 1.3s ease-in-out infinite alternate;
+}
+.aur-npv-msg[data-kind="loading"]::before { width: 78%; }
+.aur-npv-msg[data-kind="loading"]::after { width: 92%; animation-delay: -0.4s; }
+.aur-npv[data-state="loading"] .aur-npv-body::after { position: absolute; top: 92px; left: 10px; width: 60%; animation-delay: -0.8s; }
+@keyframes aur-npv-wait { from { opacity: 0.45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+	.aur-npv :is(.aur-npv-lines, .aur-npv-lens) { transition: opacity 0.2s ease; }
+	.aur-npv-msg[data-kind="loading"]::before,
+	.aur-npv-msg[data-kind="loading"]::after,
+	.aur-npv[data-state="loading"] .aur-npv-body::after { animation: none; }
+}
 
 /* ============================================================== share sheet
    A centred dialog over the overlay: preview on the left, options on the right. */
@@ -2298,26 +2395,6 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 /* artist / album names that open their Spotify page */
 .aur-link { display: inline; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-decoration: underline transparent 1px; text-underline-offset: 3px; transition: color 0.2s ease, text-decoration-color 0.2s ease; }
 .aur-link:hover, .aur-link:focus-visible { color: #fff; text-decoration-color: currentColor; outline: none; }
-
-/* ============================================================== top-bar button
-   The same liquid-glass tile as the player-bar button (see the end of this file), sized to
-   sit with Spotify's 48px global-nav buttons. */
-.aur-topbar-btn {
-	--aur-pb-c: #b98cff;
-	position: relative;
-	display: inline-grid !important;
-	place-items: center;
-	width: 44px !important;
-	height: 44px !important;
-	min-width: 44px;
-	margin-inline: 8px;
-	padding: 0 !important;
-	border: 0;
-	border-radius: 14px !important;
-	overflow: hidden;
-	cursor: pointer;
-}
-.aur-topbar-btn svg { position: relative; width: 20px; height: 20px; }
 
 /* ============================================================== Songsterr tabs card */
 .aur-root[data-tabs="off"] .aur-tabs-btn { display: none; }
@@ -3324,82 +3401,68 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-root[data-fx="midnight"][data-bganim="on"] .aur-bg[data-bar="a"] .aur-fx-a { animation: aur-fx-twinkle 5s ease-in-out infinite alternate, aur-fx-flash-a 1s ease-out; }
 .aur-root[data-fx="midnight"][data-bganim="on"] .aur-bg[data-bar="b"] .aur-fx-a { animation: aur-fx-twinkle 5s ease-in-out infinite alternate, aur-fx-flash-b 1s ease-out; }
 
-/* ============================================================== player-bar button
-   A small liquid-glass tile like the logo: frosted, with a bright top edge. While the lyrics
-   are open it fills with the album's colour and glows. Lives in Spotify's own UI, so every
-   rule is scoped to .aur-pb-btn and overrides Spotify's button styles where needed. */
-.aur-pb-btn {
+/* ============================================================== the buttons that open the lyrics
+   A small tile of glass (the top bar's, the player bar's, our own fallback ones): a faint frosted body that's brighter
+   at the top, a hairline rim, a lit top edge. While the lyrics are open it fills with the album's colour and glows.
+   They live in Spotify's own bars, so every rule is scoped to our classes and overrides Spotify's button styles where
+   needed. No backdrop blur: the bars behind are solid, and a blur would be redrawn with every frame Spotify paints. */
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch) {
 	--aur-pb-c: #b98cff;
+	--aur-pb-ease: cubic-bezier(0.23, 1, 0.32, 1);
 	position: relative;
 	display: inline-grid !important;
 	place-items: center;
-	width: 32px !important;
-	height: 32px !important;
-	min-width: 32px;
-	margin-inline: 4px;
+	flex: none;
 	padding: 0 !important;
 	border: 0;
-	border-radius: 10px !important;
-	overflow: hidden;
-	cursor: pointer;
-}
-/* glass surface, shared by both buttons */
-:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch) {
-	color: rgba(255, 255, 255, 0.82) !important;
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04)) !important;
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.28),
-		inset 0 0 0 1px rgba(255, 255, 255, 0.08),
-		0 2px 8px rgba(0, 0, 0, 0.35);
-	backdrop-filter: blur(10px) saturate(1.4);
-	transition: background 0.3s ease, box-shadow 0.3s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-/* the glassy sheen across the top half */
-:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch)::before {
-	content: "";
-	position: absolute;
-	inset: 0 0 50%;
-	border-radius: inherit;
-	border-bottom-left-radius: 40% 8px;
-	border-bottom-right-radius: 40% 8px;
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
-	pointer-events: none;
-}
-:is(.aur-pb-btn, .aur-topbar-btn)::after { display: none !important; } /* Spotify's own "active" dot; the glow replaces it */
-.aur-pb-btn svg { position: relative; width: 16px; height: 16px; }
-:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):hover { color: #fff !important; transform: translateY(-1px); background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
-:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):active { transform: scale(0.94); }
-:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch).is-on {
-	color: #fff !important;
-	background:
-		linear-gradient(180deg, color-mix(in oklab, var(--aur-pb-c) 55%, rgba(255, 255, 255, 0.25)), color-mix(in oklab, var(--aur-pb-c) 28%, transparent)) !important;
-	box-shadow:
-		inset 0 1px 0 rgba(255, 255, 255, 0.4),
-		inset 0 0 0 1px color-mix(in oklab, var(--aur-pb-c) 50%, transparent),
-		0 0 14px color-mix(in oklab, var(--aur-pb-c) 55%, transparent),
-		0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-/* Our own buttons: one placed in the player bar when Spicetify's isn't on screen, and a floating one
-   in the corner when no button is (src/launcher.js). They look like the others. */
-.aur-launch {
-	--aur-pb-c: #b98cff;
-	position: relative;
-	display: inline-grid;
-	place-items: center;
-	flex: none;
-	width: 32px;
-	height: 32px;
-	margin-inline: 4px;
-	padding: 0;
-	border: 0;
-	border-radius: 10px;
 	overflow: hidden;
 	cursor: pointer;
 	font: inherit;
+	color: rgba(255, 255, 255, 0.8) !important;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.035)) !important;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.26),
+		inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+		0 1px 3px rgba(0, 0, 0, 0.4);
+	transition:
+		color 0.16s ease,
+		background 0.2s ease,
+		box-shadow 0.3s ease,
+		transform 0.16s var(--aur-pb-ease);
 }
+.aur-pb-btn { width: 32px !important; height: 32px !important; min-width: 32px; margin-inline: 4px; border-radius: 10px !important; }
+.aur-topbar-btn { width: 40px !important; height: 40px !important; min-width: 40px; margin-inline: 8px; border-radius: 13px !important; }
+.aur-launch { width: 32px; height: 32px; margin-inline: 4px; border-radius: 10px; }
 .aur-launch[hidden] { display: none !important; }
-.aur-launch svg { position: relative; width: 16px; height: 16px; }
+:is(.aur-pb-btn, .aur-launch) svg { position: relative; width: 16px; height: 16px; }
+.aur-topbar-btn svg { position: relative; width: 19px; height: 19px; }
+/* the frosted sheen across the top half */
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch)::before {
+	content: "";
+	position: absolute;
+	inset: 0 0 52%;
+	border-radius: inherit;
+	border-bottom-left-radius: 40% 6px;
+	border-bottom-right-radius: 40% 6px;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
+	pointer-events: none;
+}
+:is(.aur-pb-btn, .aur-topbar-btn)::after { display: none !important; } /* Spotify's own "active" dot; the glow replaces it */
+@media (hover: hover) {
+	:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):hover { color: #fff !important; background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.07)) !important; }
+}
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):active { transform: scale(0.95); }
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):focus-visible { outline: 2px solid color-mix(in oklab, var(--aur-pb-c) 70%, #fff) !important; outline-offset: 2px; }
+:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch).is-on {
+	color: #fff !important;
+	background: linear-gradient(180deg, color-mix(in oklab, var(--aur-pb-c) 62%, rgba(255, 255, 255, 0.3)), color-mix(in oklab, var(--aur-pb-c) 32%, rgba(0, 0, 0, 0.1))) !important;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.42),
+		inset 0 0 0 1px color-mix(in oklab, var(--aur-pb-c) 55%, transparent),
+		0 0 0 1px color-mix(in oklab, var(--aur-pb-c) 25%, transparent),
+		0 2px 14px color-mix(in oklab, var(--aur-pb-c) 50%, transparent);
+}
+/* the floating one, in the corner when no other button is on screen */
 .aur-launch-float {
 	position: fixed;
 	right: 22px;
@@ -3409,7 +3472,7 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	height: 46px;
 	margin: 0;
 	border-radius: 15px;
-	animation: aur-launch-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+	animation: aur-launch-in 0.45s var(--aur-pb-ease) both;
 }
 .aur-launch-float svg { width: 20px; height: 20px; }
 .aur-launch-float::after { /* a ring that pulses twice, so it gets noticed */
@@ -3421,9 +3484,14 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 	opacity: 0;
 	animation: aur-launch-ping 1.6s ease-out 0.7s 2;
 }
-@keyframes aur-launch-in { from { opacity: 0; transform: translateY(10px) scale(0.8); } }
+@keyframes aur-launch-in { from { opacity: 0; transform: translateY(8px) scale(0.92); } }
 @keyframes aur-launch-ping { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.5); } }
 html.aur-covered .aur-launch-float { display: none; }
+@media (prefers-reduced-motion: reduce) {
+	:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch) { transition: color 0.16s ease, background 0.2s ease, box-shadow 0.3s ease; }
+	:is(.aur-pb-btn, .aur-topbar-btn, .aur-launch):active { transform: none; }
+	.aur-launch-float, .aur-launch-float::after { animation: none; }
+}
 
 /* ============================================================== custom background
    The user's own image or video (Look → Background → Custom), cover-fitted, optionally

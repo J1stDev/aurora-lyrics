@@ -156,3 +156,19 @@ export function withTimeout(promise, ms, label = "request") {
 		}),
 	]).finally(() => clearTimeout(t));
 }
+
+/**
+ * Spotify's colour palette for a track (colorExtractor), fetched once per track and shared: the buttons, the Now
+ * Playing card, mini lyrics and the overlay all tint themselves from it on every song change.
+ * @returns {Promise<object|null>}
+ */
+const albumColorCache = new Map();
+export function albumColors(uri) {
+	const extract = globalThis.Spicetify?.colorExtractor;
+	if (!uri || typeof extract !== "function") return Promise.resolve(null);
+	if (!albumColorCache.has(uri)) {
+		if (albumColorCache.size >= 24) albumColorCache.delete(albumColorCache.keys().next().value);
+		albumColorCache.set(uri, Promise.resolve().then(() => extract(uri)).catch(() => null));
+	}
+	return albumColorCache.get(uri);
+}

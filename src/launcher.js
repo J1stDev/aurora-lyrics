@@ -7,7 +7,7 @@
 // no button on screen at all, a small floating one appears in the corner, so the lyrics can always
 // be opened (Alt+L works too).
 
-import { h } from "./util.js";
+import { h, albumColors } from "./util.js";
 import { ICONS } from "./icons.js";
 
 // Where the player bar's right-hand group of buttons lives, by class and by test id (the test ids
@@ -134,7 +134,7 @@ export function createLauncher({ label, onToggle, getUri }) {
 				state.ticks++;
 				schedule();
 			},
-			delays[state.ticks] ?? 2500,
+			delays[state.ticks] ?? 4000,
 		);
 	}
 	schedule();
@@ -150,14 +150,12 @@ export function createLauncher({ label, onToggle, getUri }) {
 		/** They glow in the album's colour. */
 		retint() {
 			const uri = getUri?.();
-			if (!uri || typeof S?.colorExtractor !== "function") return;
-			Promise.resolve(S.colorExtractor(uri))
-				.then((c) => {
-					if (!c) return;
-					state.color = c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#b98cff";
-					for (const b of every()) b?.style.setProperty("--aur-pb-c", state.color);
-				})
-				.catch(() => {});
+			if (!uri) return;
+			albumColors(uri).then((c) => {
+				if (!c || getUri?.() !== uri) return;
+				state.color = c.LIGHT_VIBRANT || c.VIBRANT || c.PROMINENT || "#b98cff";
+				for (const b of every()) b?.style.setProperty("--aur-pb-c", state.color);
+			});
 		},
 	};
 }
