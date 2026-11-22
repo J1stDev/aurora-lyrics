@@ -1,4 +1,4 @@
-// Aurora Lyrics v2.5.0 — full-screen animated lyrics for Spicetify
+// Aurora Lyrics v2.6.0 — full-screen animated lyrics for Spicetify
 // Built from src/ by build.mjs — edit the sources, not this file.
 // NAME: Aurora Lyrics
 // AUTHOR: yamac
