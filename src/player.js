@@ -5,7 +5,8 @@
 function imageUrl(src) {
 	if (!src) return null;
 	if (src.startsWith("spotify:image:")) return `https://i.scdn.co/image/${src.slice("spotify:image:".length)}`;
-	if (/^(https?:\/\/|data:image\/)/.test(src)) return src;
+	// Local files carry "spotify:localfileimage:…", which the desktop client serves to <img> directly.
+	if (/^(https?:\/\/|data:image\/|spotify:localfileimage:)/.test(src)) return src;
 	return null;
 }
 

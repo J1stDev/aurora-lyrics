@@ -3,7 +3,7 @@
 
 import { h, clamp, nextFrame, setText, EXT_ID, albumColors } from "./util.js";
 import { settings, FONTS, PROVIDER_INFO, THEMES } from "./settings.js";
-import { getCurrentTrack, getNextTrack, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
+import { getCurrentTrack, getNextTrack, describeQueueItem, openUri, getPosition, getDuration, isPlaying, seek, playerCommand, playerState, setVolume } from "./player.js";
 import { resolveLyrics, lyricsQuality, SOURCE_LABELS } from "./providers.js";
 import { lyricsCache, localLyrics } from "./cache.js";
 import { toLRC, estimateWords } from "./lrc.js";
@@ -194,6 +194,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		// Actions: like, volume, settings, fullscreen, close.
 		const tabsBtn = iconBtn("Guitar tabs on Songsterr (G)", ICONS.pick(), () => toggleTabs(), "aur-icon-btn aur-toggle aur-tabs-btn");
+		const queueBtn = iconBtn("Queue (Q)", ICONS.queue(), () => toggleQueue(), "aur-icon-btn aur-toggle");
 		const heartBtn = iconBtn("Save to Liked Songs", ICONS.heart(), act(() => playerCommand("toggleHeart")), "aur-icon-btn aur-heart");
 		const muteBtn = iconBtn("Mute", ICONS.volHigh(), act(() => playerCommand("toggleMute")));
 		const vol = h("input", { type: "range", class: "aur-vol", min: "0", max: "1", step: "0.01", "aria-label": "Volume" });
@@ -216,6 +217,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				heartBtn,
 				h("div", { class: "aur-volume" }, muteBtn, vol),
 				h("span", { class: "aur-sep", "aria-hidden": "true" }),
+				queueBtn,
 				tabsBtn,
 				iconBtn("Share lyrics as an image (S)", ICONS.share(), () => openShare()),
 				iconBtn("Mini lyrics (Alt+M)", ICONS.mini(), () => (settings.set("miniLyrics", true), close())),
@@ -275,6 +277,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		// Songsterr tabs: a small card above the control bar with what's available.
 		const tabsPop = h("div", { class: "aur-tabs-pop", role: "dialog", "aria-label": "Guitar tabs", hidden: true });
+		const queuePop = h("div", { class: "aur-tabs-pop aur-queue-pop", role: "dialog", "aria-label": "Queue", hidden: true });
 
 		// Queue peek: the next track, shown near the end of the current one. Click to skip to it.
 		const upArt = h("img", { class: "aur-upnext-art", alt: "", decoding: "async" });
@@ -353,6 +356,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			panel.el,
 			share.el,
 			tabsPop,
+			queuePop,
 			upNext,
 			toastEl,
 			createGlassDefs(),
@@ -372,6 +376,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		// Clicking anywhere else closes the tabs card.
 		root.addEventListener("pointerdown", (e) => {
 			if (!tabsPop.hidden && !tabsPop.contains(e.target) && !tabsBtn.contains(e.target)) closeTabs();
+			if (!queuePop.hidden && !queuePop.contains(e.target) && !queueBtn.contains(e.target)) closeQueue();
 		});
 
 		// Depth motion: the lyric scene tilts gently towards the pointer (at most one update a frame).
@@ -414,7 +419,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 
 		document.body.append(root);
 		if (globalThis.AURORA_LYRICS_DEBUG) globalThis.__aurSettings = settings; // the preview page sets this, to switch themes from the console
-		ui = { lens, trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), sc: bg.querySelector(".aur-fx-sc"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
+		ui = { lens, trBtn, root, bgStack, cover, title, artist, artA, artB, artHint, sideTitle, sideArtist, sideAlbum, activeArt: artA, stage, dock, bar, miniProgress, elapsed, remaining, playBtn, shuffleBtn, repeatBtn, heartBtn, muteBtn, vol, source, offsetOut, fsBtn, toastEl, tabsPop, tabsBtn, queuePop, queueBtn, bgCustom: bg.querySelector(".aur-bg-custom"), fx: bg.querySelector(".aur-fx"), sc: bg.querySelector(".aur-fx-sc"), bg, panel, share, view, upNext, upArt, upTitle, upArtist, upWhen };
 		applySettings("*", null, settings.all());
 	}
 
@@ -755,6 +760,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		}
 		updateTrackChrome(track);
 		closeTabs();
+		if (!ui.queuePop.hidden) renderQueue();
 		ui.panel.onTrackChange();
 		setSourceBadge();
 
@@ -1213,6 +1219,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		ui.panel.close();
 		ui.share.close();
 		closeTabs();
+		closeQueue();
 		ui.view.stopBrowsing(true);
 		clearTimeout(state.coverTimer);
 		document.documentElement.classList.remove("aur-covered");
@@ -1287,6 +1294,57 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 		);
 	}
 
+	// ---------------------------------------------------------------------------
+	// Queue popover: what plays next; tracks you queued can be removed.
+	// ---------------------------------------------------------------------------
+	function closeQueue() {
+		if (!ui || ui.queuePop.hidden) return;
+		ui.queuePop.classList.remove("is-open");
+		ui.queueBtn.classList.remove("is-on");
+		setTimeout(() => !ui.queuePop.classList.contains("is-open") && (ui.queuePop.hidden = true), 220);
+	}
+
+	function toggleQueue() {
+		if (!ui) return;
+		if (!ui.queuePop.hidden && ui.queuePop.classList.contains("is-open")) return closeQueue();
+		renderQueue();
+		ui.queuePop.hidden = false;
+		void ui.queuePop.offsetWidth;
+		ui.queuePop.classList.add("is-open");
+		ui.queueBtn.classList.add("is-on");
+	}
+
+	function renderQueue() {
+		const S = globalThis.Spicetify;
+		const rows = [];
+		for (const raw of S?.Queue?.nextTracks || []) {
+			const t = describeQueueItem(raw);
+			if (!t) continue;
+			// Only tracks you queued can be removed; the rest come from the playlist / album.
+			const remove =
+				raw.provider === "queue" && typeof S.removeFromQueue === "function"
+					? h("button", {
+							class: "aur-mini-btn",
+							title: "Remove from queue",
+							"aria-label": `Remove ${t.title} from queue`,
+							html: ICONS.close(),
+							onclick: async () => {
+								try {
+									await S.removeFromQueue([raw.contextTrack]);
+								} catch (e) {
+									console.warn("[aurora-lyrics] removeFromQueue failed", e);
+								}
+								setTimeout(renderQueue, 250); // Spicetify.Queue updates a moment later
+							},
+						})
+					: null;
+			rows.push(h("div", { class: "aur-queue-row" }, h("img", { class: "aur-queue-art", alt: "", decoding: "async", src: t.image }), h("div", { class: "aur-queue-text" }, h("div", { class: "aur-tabs-song" }, t.title), h("div", { class: "aur-queue-artist" }, t.artist)), remove));
+			if (rows.length >= 30) break;
+		}
+		const head = h("div", { class: "aur-tabs-head" }, h("span", { class: "aur-tabs-logo", html: ICONS.queue() }), h("div", null, h("div", { class: "aur-tabs-kicker" }, "Queue"), h("div", { class: "aur-tabs-song" }, "Up next")));
+		ui.queuePop.replaceChildren(head, rows.length ? h("div", { class: "aur-queue-list" }, rows) : h("div", { class: "aur-tabs-status" }, "Nothing up next."));
+	}
+
 	/** Share sheet; `lineIdx` preselects that line (right-click on a line). */
 	function openShare(lineIdx) {
 		if (!ui) return;
@@ -1324,6 +1382,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 				e.preventDefault();
 				e.stopPropagation();
 				if (!ui.tabsPop.hidden) closeTabs();
+				else if (!ui.queuePop.hidden) closeQueue();
 				else if (ui.share.isOpen()) ui.share.close();
 				else if (ui.panel.isOpen()) ui.panel.close();
 				else if (ui.view.browsing) ui.view.stopBrowsing();
@@ -1337,6 +1396,7 @@ export function createOverlay({ onOpenChange, onLyrics } = {}) {
 			else if (e.key === "t" || e.key === "T") settings.set("translate", !settings.get("translate"));
 			else if (e.key === "s" || e.key === "S") openShare();
 			else if ((e.key === "g" || e.key === "G") && settings.get("tabsButton")) toggleTabs();
+			else if (e.key === "q" || e.key === "Q") toggleQueue();
 			else return;
 			e.preventDefault();
 			e.stopPropagation();

@@ -2436,6 +2436,13 @@ html.aur-covered body > :not(.aur-root, .aur-float) *::after { animation-play-st
 .aur-tabs-dots[style*="--d:5"] i:nth-child(-n + 5) { background: var(--aur-green); }
 .aur-tabs-actions { display: flex; gap: 8px; margin-top: 14px; }
 .aur-tabs-actions .aur-btn { flex: 1; justify-content: center; }
+.aur-queue-pop { width: min(340px, calc(100vw - 32px)); }
+.aur-queue-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; max-height: min(52vh, 420px); overflow-y: auto; }
+.aur-queue-row { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 4px; border-radius: 10px; }
+.aur-queue-row:hover { background: rgba(255, 255, 255, 0.06); }
+.aur-queue-art { flex: none; width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: rgba(255, 255, 255, 0.08); }
+.aur-queue-text { flex: 1; min-width: 0; }
+.aur-queue-artist { font-size: 12px; color: rgba(255, 255, 255, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ============================================================== theme ambience
    Each theme gets its own atmosphere, drawn in spare layers (.aur-fx-a to -e, and the pseudo-elements of .aur-fx) between the
